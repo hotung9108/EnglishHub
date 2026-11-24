@@ -1,12 +1,15 @@
 package com.english_hub.core.modules.student_evaluation.infrastructure.adapter;
 
 import com.english_hub.core.common.ApiException;
+import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassEntity;
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluation;
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluationFilter;
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluationPage;
 import com.english_hub.core.modules.student_evaluation.domain.repository.StudentEvaluationRepository;
 import com.english_hub.core.modules.student_evaluation.infrastructure.mapper.StudentEvaluationPersistenceMapper;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +83,15 @@ public class StudentEvaluationJpaAdapter implements StudentEvaluationRepository 
 			predicates.add(criteriaBuilder.equal(root.get("studentId"), filter.studentId()));
 			if (filter.classId() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("classId"), filter.classId()));
+			}
+			if (filter.teacherId() != null) {
+				Subquery<Long> ownedClassIds = query.subquery(Long.class);
+				Root<ClassEntity> classEntity = ownedClassIds.from(ClassEntity.class);
+				ownedClassIds.select(classEntity.get("id"));
+				ownedClassIds.where(
+						criteriaBuilder.equal(classEntity.get("id"), root.get("classId")),
+						criteriaBuilder.equal(classEntity.get("teacherId"), filter.teacherId()));
+				predicates.add(root.get("classId").in(ownedClassIds));
 			}
 			if (filter.createdAtFromInclusive() != null) {
 				predicates.add(criteriaBuilder.greaterThanOrEqualTo(

@@ -7,6 +7,7 @@ import java.util.List;
 
 public record SubmissionListItemResponse(
 		Long id,
+		Long assignmentId,
 		Long studentId,
 		int attemptNumber,
 		String status,
@@ -16,6 +17,7 @@ public record SubmissionListItemResponse(
 	public static SubmissionListItemResponse from(SubmissionListItemResult result) {
 		return new SubmissionListItemResponse(
 				result.id(),
+				result.assignmentId(),
 				result.studentId(),
 				result.attemptNumber(),
 				result.status().name(),

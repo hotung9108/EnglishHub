@@ -50,6 +50,10 @@ public class AuthUserJpaEntity {
 	@Column(nullable = false, columnDefinition = "user_status")
 	private UserStatus status;
 
+	@Column(name = "is_deleted", nullable = false, insertable = false, updatable = false)
+	@Setter(AccessLevel.NONE)
+	private boolean deleted;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private OffsetDateTime createdAt;
 

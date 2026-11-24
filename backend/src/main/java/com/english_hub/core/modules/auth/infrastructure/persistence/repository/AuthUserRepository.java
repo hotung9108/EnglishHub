@@ -8,5 +8,9 @@ public interface AuthUserRepository extends JpaRepository<AuthUserJpaEntity, Lon
 
 	Optional<AuthUserJpaEntity> findByEmail(String email);
 
+	Optional<AuthUserJpaEntity> findByEmailAndDeletedFalse(String email);
+
+	Optional<AuthUserJpaEntity> findByIdAndDeletedFalse(Long id);
+
 	Optional<AuthUserJpaEntity> findByEmailIgnoreCase(String email);
 }

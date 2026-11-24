@@ -1,976 +1,1122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
 import { 
-  GraduationCap, Sparkles, Users, 
-  Download, Calendar, CheckCircle2, 
-  AlertTriangle, FileSpreadsheet, Layers,
-  TrendingUp, Award, Clock, ArrowUpRight,
-  BookOpen, HelpCircle, ArrowRight
+  BookOpen, Loader2, Calendar,
+  Filter, RotateCcw, AlertCircle, X,
+  TrendingDown, User, ChevronDown, Clock, Download, Award,
+  School, BarChart3, Users, FileText
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ThemeContext } from '../contexts/ThemeContext';
+import { reportService } from '../api/services/report.service';
+import { userService } from '../api/services/user.service';
+import { classService } from '../api/services/class.service';
+import { submissionService } from '../api/services/submission.service';
+import type { 
+  ReportOverviewResponse, 
+  ReportClassSummary, 
+  ReportClassProgressResponse 
+} from '../types/report.types';
+import type { UserListItem } from '../api/services/user.service';
+import type { ClassSummary } from '../api/services/class.service';
+import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
+import {
+  filterReportClasses,
+  filterAvailableClasses,
+  reconcileSelectedClass,
+  computeReportPagination,
+} from '../utils/reportFilters.utils';
 
-interface CalibrationItem {
-  skill: string;
-  totalGraded: number;
-  avgAiScore: number;
-  avgTeacherScore: number;
-  mae: number;
-  overrideRate: number;
-  status: 'good' | 'warning' | 'excellent';
-}
+type TotalState = 'loading' | 'error' | number;
 
-interface OutlierItem {
-  id: string;
-  assignmentTitle: string;
-  studentName: string;
-  skill: string;
-  aiScore: number;
-  teacherScore: number;
-  delta: number;
-  reason: string;
-}
+const totalRequests = {
+  users: (signal: AbortSignal) => userService.listUsers({ page: 1, limit: 1 }, { signal }),
+  submitted: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'SUBMITTED' }, { signal }),
+  graded: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'GRADED' }, { signal }),
+};
+type TotalSource = keyof typeof totalRequests;
 
-interface ClassPerformanceItem {
-  code: string;
-  name: string;
-  teacher: string;
-  students: number;
-  listening: number;
-  reading: number;
-  writing: number;
-  speaking: number;
-  overall: number;
-  targetAttainment: number;
-  submissionRate: number;
+function getSubmissionTotal(submitted: TotalState, graded: TotalState): TotalState {
+  if (submitted === 'error' || graded === 'error') return 'error';
+  if (submitted === 'loading' || graded === 'loading') return 'loading';
+  return submitted + graded;
 }
 
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
+  const themeContext = useContext(ThemeContext);
+  const toast = useToast();
   const isVi = language === 'vi';
+  const isDark = themeContext ? themeContext.theme === 'dark' : false;
 
-  const [activeTab, setActiveTab] = useState<'studentResults' | 'calibration' | 'teachers'>('studentResults');
-  const [selectedPeriod, setSelectedPeriod] = useState('quarter');
-  const [selectedClass, setSelectedClass] = useState('all');
-
-  // Student Class Performance Data
-  const classPerformances: ClassPerformanceItem[] = [
-    {
-      code: 'ENG-IELTS-6.5A',
-      name: 'IELTS Intensive 6.5+ (Khóa A)',
-      teacher: 'Cô Trần Thị Mai Lan',
-      students: 24,
-      listening: 7.2,
-      reading: 7.0,
-      writing: 6.6,
-      speaking: 6.5,
-      overall: 6.85,
-      targetAttainment: 91.6,
-      submissionRate: 96.0,
-    },
-    {
-      code: 'ENG-IELTS-7.0B',
-      name: 'IELTS Master 7.5+ Target',
-      teacher: 'Thầy David Miller',
-      students: 20,
-      listening: 7.5,
-      reading: 7.4,
-      writing: 6.8,
-      speaking: 6.8,
-      overall: 7.15,
-      targetAttainment: 90.0,
-      submissionRate: 95.0,
-    },
-    {
-      code: 'ENG-TOEIC-750',
-      name: 'TOEIC 4 Kỹ Năng Cấp Tốc',
-      teacher: 'Thầy Nguyễn Văn Nam',
-      students: 28,
-      listening: 7.0,
-      reading: 6.8,
-      writing: 6.4,
-      speaking: 6.2,
-      overall: 6.60,
-      targetAttainment: 85.7,
-      submissionRate: 92.5,
-    },
-    {
-      code: 'ENG-GRAM-PREP',
-      name: 'Tiếng Anh Nền Tảng & Viết Câu',
-      teacher: 'Cô Lê Hoàng Oanh',
-      students: 22,
-      listening: 6.5,
-      reading: 6.6,
-      writing: 6.0,
-      speaking: 5.9,
-      overall: 6.25,
-      targetAttainment: 81.8,
-      submissionRate: 91.0,
-    },
-    {
-      code: 'ENG-IELTS-FAST',
-      name: 'Luyện Đề IELTS Chuyên Sâu',
-      teacher: 'Cô Trần Thị Mai Lan',
-      students: 18,
-      listening: 7.4,
-      reading: 7.3,
-      writing: 6.7,
-      speaking: 6.6,
-      overall: 7.00,
-      targetAttainment: 94.4,
-      submissionRate: 98.0,
-    }
-  ];
-
-  // Top Performers & Students Needing Support
-  const topStudents = [
-    { name: 'Nguyễn Hoàng Long', classCode: 'ENG-IELTS-7.0B', overall: 8.5, growth: '+2.0 band', status: isVi ? 'Vượt chuẩn đầu ra' : 'Exceeded Target' },
-    { name: 'Lê Bảo Trâm', classCode: 'ENG-IELTS-6.5A', overall: 8.0, growth: '+1.5 band', status: isVi ? 'Xuất sắc cả 4 kỹ năng' : 'Top 4-Skill Mastery' },
-    { name: 'Alice Johnson', classCode: 'ENG-IELTS-7.0B', overall: 8.0, growth: '+1.5 band', status: isVi ? 'Writing Task 2: 8.5' : 'Writing Mastery' },
-  ];
-
-  const atRiskStudents = [
-    { name: 'Đặng Minh Khôi', classCode: 'ENG-TOEIC-750', overall: 5.0, issue: isVi ? 'Thiếu 4 bài tập nộp' : 'Missing 4 assignments', action: isVi ? 'Cần nhắc nhở nộp bù' : 'Follow-up needed' },
-    { name: 'Trần Văn Quân', classCode: 'ENG-GRAM-PREP', overall: 5.2, issue: isVi ? 'Điểm Viết 4.5 cần phụ đạo' : 'Writing 4.5 below target', action: isVi ? 'Gợi ý lớp trợ giảng' : 'Tutor session suggested' },
-    { name: 'David Pham', classCode: 'ENG-IELTS-6.5A', overall: 5.5, issue: isVi ? 'Kỹ năng Nói 5.0 bị chậm' : 'Speaking 5.0 lagged', action: isVi ? 'Tăng cường luyện 1-1' : '1-on-1 drill needed' },
-  ];
-
-  // AI Calibration Data (Secondary)
-  const calibrationData: CalibrationItem[] = [
-    {
-      skill: 'Writing Task 2 (Essay)',
-      totalGraded: 520,
-      avgAiScore: 6.6,
-      avgTeacherScore: 6.8,
-      mae: 0.35,
-      overrideRate: 18.5,
-      status: 'good'
-    },
-    {
-      skill: 'Writing Task 1 (Report/Chart)',
-      totalGraded: 480,
-      avgAiScore: 6.4,
-      avgTeacherScore: 6.5,
-      mae: 0.28,
-      overrideRate: 12.0,
-      status: 'excellent'
-    },
-    {
-      skill: 'Speaking Part 2 & 3 (Audio)',
-      totalGraded: 390,
-      avgAiScore: 6.2,
-      avgTeacherScore: 6.6,
-      mae: 0.45,
-      overrideRate: 24.2,
-      status: 'warning'
-    },
-    {
-      skill: 'Reading Comprehension (Quiz)',
-      totalGraded: 640,
-      avgAiScore: 7.2,
-      avgTeacherScore: 7.2,
-      mae: 0.02,
-      overrideRate: 1.5,
-      status: 'excellent'
-    },
-    {
-      skill: 'Listening Audio Test (Quiz)',
-      totalGraded: 610,
-      avgAiScore: 7.0,
-      avgTeacherScore: 7.0,
-      mae: 0.04,
-      overrideRate: 1.8,
-      status: 'excellent'
-    }
-  ];
-
-  const outlierCases: OutlierItem[] = [
-    {
-      id: 'OUT-101',
-      assignmentTitle: 'Writing Task 2: Artificial Intelligence & Workforce',
-      studentName: 'Alice Johnson',
-      skill: 'Writing',
-      aiScore: 6.0,
-      teacherScore: 7.5,
-      delta: 1.5,
-      reason: isVi ? 'AI đánh giá thấp phần Cohesion do cấu trúc Inversion hiếm gặp, GV nâng lại theo đúng band descriptor.' : 'AI penalized rare inverted syntax, teacher validated high-band lexical resource.'
-    },
-    {
-      id: 'OUT-102',
-      assignmentTitle: 'Speaking Part 2: Environmental Megacities',
-      studentName: 'David Pham',
-      skill: 'Speaking',
-      aiScore: 7.0,
-      teacherScore: 5.5,
-      delta: -1.5,
-      reason: isVi ? 'AI không nhận diện được tạp âm và hiện tượng đọc sẵn script; GV hạ điểm do vi phạm quy chế.' : 'AI missed background script reading; teacher flagged pre-prepared recitation.'
-    },
-    {
-      id: 'OUT-103',
-      assignmentTitle: 'Writing Task 1: Comparative Carbon Emissions',
-      studentName: 'Lê Bảo Trâm',
-      skill: 'Writing',
-      aiScore: 6.5,
-      teacherScore: 7.5,
-      delta: 1.0,
-      reason: isVi ? 'Dữ liệu số liệu phân tích chính xác, GV bổ sung điểm Task Achievement.' : 'Accurate complex data grouping acknowledged by teacher.'
-    }
-  ];
-
-  // Teacher Stats
-  const teacherStats = [
-    { name: 'Cô Trần Thị Mai Lan', classes: 4, graded: 342, avgHours: 14.5, aiAcceptRate: 91 },
-    { name: 'Thầy Nguyễn Văn Nam', classes: 3, graded: 218, avgHours: 19.2, aiAcceptRate: 86 },
-    { name: 'Cô Lê Hoàng Oanh', classes: 3, graded: 195, avgHours: 16.8, aiAcceptRate: 89 },
-    { name: 'Thầy David Miller', classes: 2, graded: 140, avgHours: 12.0, aiAcceptRate: 94 },
-  ];
-
-  const handleExport = (type: 'excel' | 'pdf') => {
-    alert(isVi ? `Đang kết xuất báo cáo ${type.toUpperCase()}... File sẽ được tải xuống tự động.` : `Exporting ${type.toUpperCase()} report... Download will begin shortly.`);
+  const palette = {
+    emerald: isDark ? '#34d399' : '#059669',
+    gold: isDark ? '#fbbf24' : '#d97706',
+    sky: isDark ? '#38bdf8' : '#0284c7',
+    rose: isDark ? '#fb7185' : '#e11d48',
   };
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
+  const [totals, setTotals] = useState<Record<TotalSource, TotalState>>({
+    users: 'loading', submitted: 'loading', graded: 'loading',
+  });
+  const totalsRequest = useRef<AbortController | null>(null);
+
+  const loadTotal = useCallback(async (source: TotalSource, signal: AbortSignal) => {
+    let result: TotalState;
+    try {
+      const response = await totalRequests[source](signal);
+      const total = response.pagination?.total;
+      result = typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : 'error';
+    } catch {
+      result = 'error';
+    }
+    if (!signal.aborted) setTotals(previous => ({ ...previous, [source]: result }));
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    totalsRequest.current = controller;
+    // StrictMode can clean up the first effect before starting its replacement.
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      void loadTotal('users', controller.signal);
+      void loadTotal('submitted', controller.signal);
+      void loadTotal('graded', controller.signal);
+    });
+    return () => controller.abort();
+  }, [loadTotal]);
+
+  const retryTotal = (...sources: TotalSource[]) => {
+    const controller = totalsRequest.current;
+    if (!controller) return;
+    for (const source of sources) {
+      if (totals[source] !== 'error') continue;
+      setTotals(previous => ({ ...previous, [source]: 'loading' }));
+      void loadTotal(source, controller.signal);
+    }
+  };
+
+  // Filters
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | undefined>(undefined);
+  const [selectedClassId, setSelectedClassId] = useState<number | undefined>(undefined);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const handleFromDateChange = (val: string) => {
+    setFromDate(val);
+    setCurrentPage(1);
+  };
+
+  const handleToDateChange = (val: string) => {
+    setToDate(val);
+    setCurrentPage(1);
+  };
+
+  const handleTeacherChange = (id: number | undefined) => {
+    setSelectedTeacherId(id);
+    setSelectedClassId(reconcileSelectedClass(selectedClassId, id, allClasses));
+    setInspectingClass(null);
+    setClassProgress(null);
+    setCurrentPage(1);
+  };
+
+  const handleClassChange = (id: number | undefined) => {
+    setSelectedClassId(id);
+    setInspectingClass(null);
+    setClassProgress(null);
+    setCurrentPage(1);
+  };
+
+  // Quick date presets helper
+  const getPresetDates = (preset: 'today' | '7days' | '30days' | 'thisMonth') => {
+    const today = new Date();
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const toStr = formatDate(today);
+    let fromStr = '';
+
+    if (preset === 'today') {
+      fromStr = toStr;
+    } else if (preset === '7days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      fromStr = formatDate(d);
+    } else if (preset === '30days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      fromStr = formatDate(d);
+    } else if (preset === 'thisMonth') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromStr = formatDate(d);
+    }
+    return { from: fromStr, to: toStr };
+  };
+
+  const handleApplyPreset = (preset: 'today' | '7days' | '30days' | 'thisMonth' | 'all') => {
+    if (preset === 'all') {
+      setFromDate('');
+      setToDate('');
+    } else {
+      const { from, to } = getPresetDates(preset);
+      setFromDate(from);
+      setToDate(to);
+    }
+    setCurrentPage(1);
+  };
+
+  const activeFilterCount = 
+    (fromDate ? 1 : 0) + 
+    (toDate ? 1 : 0) + 
+    (selectedTeacherId !== undefined ? 1 : 0) + 
+    (selectedClassId !== undefined ? 1 : 0);
+
+  // Report Data
+  const [overview, setOverview] = useState<ReportOverviewResponse | null>(null);
+  const [reportClasses, setReportClasses] = useState<ReportClassSummary[]>([]);
+  const [teachers, setTeachers] = useState<UserListItem[]>([]);
+  const [allClasses, setAllClasses] = useState<ClassSummary[]>([]);
+  const showOverview = !loading && !error && overview;
+  const noMatchingClasses = showOverview && overview.classCount === 0;
+  const noAssignedWork = showOverview
+    && overview.classCount > 0
+    && overview.assignedAssignmentCount === 0
+    && overview.pendingGradingCount === 0
+    && (overview.averageScorePercent ?? 0) === 0;
+
+  // Available classes for dropdown based on selected teacher
+  const availableClasses = filterAvailableClasses(allClasses, selectedTeacherId);
+
+  // Filtered report classes based on selected class cohort
+  const filteredClasses = filterReportClasses(reportClasses, selectedClassId);
+
+  // Score distribution calculation across filtered classes (Issue #374)
+  const scoreDistribution = useMemo(() => {
+    let excellent = 0; // >= 85%
+    let good = 0;      // 70 - 84%
+    let average = 0;   // 50 - 69%
+    let poor = 0;      // < 50%
+
+    filteredClasses.forEach((cls) => {
+      const score = cls.averageScorePercent;
+      if (score >= 85) excellent++;
+      else if (score >= 70) good++;
+      else if (score >= 50) average++;
+      else poor++;
+    });
+
+    const total = filteredClasses.length;
+    return {
+      excellent,
+      good,
+      average,
+      poor,
+      total,
+      pctExcellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
+      pctGood: total > 0 ? Math.round((good / total) * 100) : 0,
+      pctAverage: total > 0 ? Math.round((average / total) * 100) : 0,
+      pctPoor: total > 0 ? Math.round((poor / total) * 100) : 0,
+    };
+  }, [filteredClasses]);
+
+  // Class Progress Modal
+  const [inspectingClass, setInspectingClass] = useState<ReportClassSummary | null>(null);
+  const [classProgress, setClassProgress] = useState<ReportClassProgressResponse | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(false);
+  const [progressError, setProgressError] = useState<string | null>(null);
+
+  // Initial load of teacher and class options
+  useEffect(() => {
+    let isMounted = true;
+    const loadFilterOptions = async () => {
+      try {
+        const [tcRes, clRes] = await Promise.allSettled([
+          userService.listUsers({ role: 'TEACHER', limit: 100 }),
+          classService.list({ page: 1, limit: 100 })
+        ]);
+
+        if (!isMounted) return;
+
+        if (tcRes.status === 'fulfilled') {
+          setTeachers(tcRes.value.data || []);
+        }
+        if (clRes.status === 'fulfilled') {
+          setAllClasses(clRes.value.data || []);
+        }
+      } catch {
+        // filter options fallback
+      }
+    };
+
+    loadFilterOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fetch report metrics
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setTableError(null);
+
+        const [ovRes, clRes] = await Promise.allSettled([
+          reportService.getOverview({
+            from: fromDate || undefined,
+            to: toDate || undefined,
+            teacherId: selectedTeacherId,
+            classId: selectedClassId,
+          }),
+          reportService.listClasses({
+            from: fromDate || undefined,
+            to: toDate || undefined,
+            teacherId: selectedTeacherId,
+            page: 1,
+            limit: 100,
+          })
+        ]);
+
+        if (!isMounted) return;
+
+        if (ovRes.status === 'fulfilled') {
+          setOverview(ovRes.value);
+        } else {
+          setOverview(null);
+          setError(ovRes.reason instanceof Error && ovRes.reason.message ? ovRes.reason.message : isVi ? 'Không thể tổng hợp báo cáo thời gian thực.' : 'Failed to aggregate telemetry reports.');
+        }
+
+        if (clRes.status === 'fulfilled') {
+          setReportClasses(clRes.value.data || []);
+        } else {
+          setReportClasses([]);
+          setTableError(clRes.reason instanceof Error && clRes.reason.message ? clRes.reason.message : isVi ? 'Không thể tải bảng báo cáo lớp học.' : 'Failed to load class reports.');
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setOverview(null);
+          setReportClasses([]);
+          setError(err instanceof Error && err.message ? err.message : isVi ? 'Không thể tổng hợp báo cáo thời gian thực.' : 'Failed to aggregate telemetry reports.');
+          setTableError(err instanceof Error && err.message ? err.message : isVi ? 'Không thể tải bảng báo cáo lớp học.' : 'Failed to load class reports.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadReports();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fromDate, toDate, selectedTeacherId, selectedClassId, refreshKey, isVi]);
+
+  // Inspect class details
+  const handleOpenClassProgress = async (cls: ReportClassSummary) => {
+    setInspectingClass(cls);
+    setClassProgress(null);
+    setProgressError(null);
+    setLoadingProgress(true);
+
+    try {
+      const res = await reportService.getClassProgress(cls.classId, {
+        from: fromDate || undefined,
+        to: toDate || undefined,
+      });
+      setClassProgress(res);
+    } catch (err: unknown) {
+      setProgressError(err instanceof Error ? err.message : isVi ? 'Không thể tải chi tiết tiến độ lớp.' : 'Failed to load cohort progress.');
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setFromDate('');
+    setToDate('');
+    setSelectedTeacherId(undefined);
+    setSelectedClassId(undefined);
+    setCurrentPage(1);
+    setInspectingClass(null);
+    setClassProgress(null);
+  };
+
+  const handleExportCSV = () => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `bao_cao_thong_ke_${timestamp}.csv`;
+
+    const headers = [
+      isVi ? 'Mã lớp' : 'Class ID',
+      isVi ? 'Tên lớp học' : 'Class Name',
+      isVi ? 'Trạng thái' : 'Status',
+      isVi ? 'Bài tập đã giao' : 'Assignments Assigned',
+      isVi ? 'Tỷ lệ hoàn thành (%)' : 'Completion Rate (%)',
+      isVi ? 'Điểm trung bình (%)' : 'Average Score (%)',
+    ];
+
+    const escapeCsv = (str: string | number) => {
+      const s = String(str);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const rows: string[][] = [
+      [isVi ? 'BÁO CÁO THỐNG KÊ HỆ THỐNG ENGLIS开放' : 'SYSTEM REPORTS EXPORT'],
+      [isVi ? 'Thời gian xuất' : 'Exported At', new Date().toLocaleString()],
+      [isVi ? 'Khoảng thời gian' : 'Time Interval', `${fromDate || (isVi ? 'Tất cả' : 'All')} - ${toDate || (isVi ? 'Hiện tại' : 'Now')}`],
+      [],
+      [isVi ? 'TỔNG QUAN HỆ THỐNG' : 'SYSTEM OVERVIEW'],
+      [isVi ? 'Tổng số lớp' : 'Total Classes', String(overview?.classCount ?? 0)],
+      [isVi ? 'Tổng bài tập đã giao' : 'Total Assignments Assigned', String(overview?.assignedAssignmentCount ?? 0)],
+      [isVi ? 'Tỷ lệ hoàn thành trung bình' : 'Avg Completion Rate', `${overview?.completionRatePercent ?? 0}%`],
+      [isVi ? 'Điểm trung bình toàn hệ thống' : 'Avg System Score', `${overview?.averageScorePercent ?? 0}%`],
+      [isVi ? 'Bài tập chờ chấm' : 'Pending Grading', String(overview?.pendingGradingCount ?? 0)],
+      [],
+      [isVi ? 'CHI TIẾT CÁC LỚP HỌC' : 'CLASS COHORTS BREAKDOWN'],
+      headers,
+    ];
+
+    for (const cls of filteredClasses) {
+      const statusLabel = cls.status === 'ACTIVE'
+        ? (isVi ? 'Đang hoạt động' : 'Active')
+        : (isVi ? 'Đã hoàn thành' : 'Completed');
+
+      rows.push([
+        String(cls.classId),
+        cls.className,
+        statusLabel,
+        String(cls.assignedAssignmentCount),
+        `${cls.completionRatePercent}%`,
+        `${cls.averageScorePercent}%`,
+      ]);
+    }
+
+    const csvContent = '\uFEFF' + rows.map((r) => r.map(escapeCsv).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(isVi ? 'Đã xuất báo cáo CSV thành công!' : 'CSV report exported successfully!');
+  };
+
+  const totalCard = (
+    title: string, 
+    value: TotalState, 
+    retryLabel: string, 
+    options: { icon?: React.ReactNode; iconBgColor?: string; iconColor?: string; sources: TotalSource[] }
+  ) => (
+    <MetricCard
+      title={title}
+      value={typeof value === 'number' ? value : t(`adminReports.total.${value}`)}
+      icon={options.icon}
+      iconBgColor={options.iconBgColor}
+      iconColor={options.iconColor}
+      footerText={value === 'error' && (
+        <Button variant="secondary" size="sm" aria-label={retryLabel} onClick={() => retryTotal(...options.sources)}>
+          {t('adminReports.totalRetry')}
+        </Button>
+      )}
+    />
+  );
 
   return (
     <div className="adm-container">
       {/* Header */}
-      <div className="adm-header">
+      <div className="adm-header mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="adm-title-group">
-          <div className="adm-rep-header-title-wrap">
-            <h1 className="adm-title">
-              <GraduationCap size={28} color="var(--primary)" />
-              <span>{t('adminReports.title')}</span>
-            </h1>
-            <span className="adm-rep-header-badge">
-              <Award size={13} />
-              {isVi ? 'Khảo Thí & Chuẩn Đầu Ra' : 'Academic Attainment & Progress'}
-            </span>
-          </div>
-          <p className="adm-subtitle">
-            {t('adminReports.subtitle')}
-          </p>
+          <h1 className="adm-title font-serif tracking-tight">
+            <span>{t('adminReports.title')}</span>
+          </h1>
         </div>
-
-        {/* Export Buttons */}
-        <div className="adm-actions">
-          <button 
-            type="button"
-            className="btn btn-secondary adm-rep-header-btn" 
-            onClick={() => handleExport('excel')}
+        <div>
+          <Button
+            variant="secondary"
+            icon={Download}
+            onClick={handleExportCSV}
+            disabled={loading || filteredClasses.length === 0}
+            title={isVi ? 'Xuất toàn bộ dữ liệu báo cáo ra định dạng CSV (Excel)' : 'Export analytics data to CSV'}
           >
-            <FileSpreadsheet size={16} className="adm-rep-excel-icon" />
-            <span>{t('adminReports.exportExcel')}</span>
-          </button>
-          <button 
-            type="button"
-            className="btn btn-primary adm-rep-header-btn" 
-            onClick={() => handleExport('pdf')}
-          >
-            <Download size={16} />
-            <span>{t('adminReports.exportPdf')}</span>
-          </button>
+            {isVi ? 'Xuất báo cáo (CSV)' : 'Export CSV Report'}
+          </Button>
         </div>
       </div>
 
-      {/* Hero Banner: Centered on Student Outcomes */}
-      <div className="adm-hero">
-        <div className="adm-hero-content">
-          <div>
-            <div className="adm-rep-hero-meta">
-              <span className="adm-rep-hero-tag">
-                <Award size={13} />
-                {isVi ? 'Tổng Quan Đào Tạo & Kết Quả Học Viên' : 'Center Academic Attainment'}
-              </span>
-              <span className="adm-rep-hero-subtitle">
-                {isVi ? 'Đồng bộ kết quả từ hệ thống khảo thí & sổ điểm trung tâm' : 'Live synced from academic grading & exam records'}
+      {error && (
+        <div className="adm-alert-error justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+          <Button 
+            variant="secondary"
+            size="sm"
+            onClick={() => setRefreshKey(prev => prev + 1)}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
+        </div>
+      )}
+
+      {/* Tier 1 Primary KPI Strip - 4 Operational Core Cards */}
+      <div className="adm-reports-kpi-tier1">
+        <MetricCard
+          title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
+          value={loading ? '...' : error ? '—' : (overview?.classCount ?? filteredClasses.length)}
+          icon={<School size={18} />}
+          iconBgColor={isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(5, 150, 105, 0.1)'}
+          iconColor={palette.emerald}
+        />
+
+        <MetricCard
+          title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
+          value={loading ? '...' : error ? '—' : `${overview?.completionRatePercent ?? 0}%`}
+          icon={<Award size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 191, 36, 0.12)' : 'rgba(217, 119, 6, 0.1)'}
+          iconColor={palette.gold}
+        />
+
+        <MetricCard
+          title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
+          value={loading ? '...' : error ? '—' : `${overview?.averageScorePercent ?? 0}%`}
+          icon={<BarChart3 size={18} />}
+          iconBgColor={isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.1)'}
+          iconColor={palette.sky}
+        />
+
+        <MetricCard
+          title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
+          value={loading ? '...' : error ? '—' : (overview?.pendingGradingCount ?? 0)}
+          icon={<Clock size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 113, 133, 0.12)' : 'rgba(225, 29, 72, 0.1)'}
+          iconColor={palette.rose}
+        />
+      </div>
+
+      {/* Tier 2 Secondary KPI Strip - 3 Volume & Telemetry Cards */}
+      <div className="adm-reports-kpi-tier2">
+        {totalCard(
+          t('adminReports.totalUsers'), 
+          totals.users, 
+          t('adminReports.retryTotalUsers'), 
+          {
+            icon: <Users size={18} />, 
+            iconBgColor: isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(79, 70, 229, 0.1)', 
+            iconColor: '#6366f1', 
+            sources: ['users']
+          }
+        )}
+        {totalCard(
+          t('adminReports.totalSubmissions'),
+          getSubmissionTotal(totals.submitted, totals.graded),
+          t('adminReports.retryTotalSubmissions'),
+          {
+            icon: <FileText size={18} />,
+            iconBgColor: isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(5, 150, 105, 0.1)',
+            iconColor: palette.emerald,
+            sources: ['submitted', 'graded']
+          }
+        )}
+        <MetricCard
+          title={isVi ? 'TỔNG BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}
+          value={loading ? '...' : error ? '—' : (overview?.assignedAssignmentCount ?? 0)}
+          icon={<BookOpen size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 191, 36, 0.12)' : 'rgba(217, 119, 6, 0.1)'}
+          iconColor={palette.gold}
+        />
+      </div>
+
+      {/* Phổ Điểm Hệ Thống Theo Lớp Học (Score Distribution - Issue #374) */}
+      {!loading && !error && filteredClasses.length > 0 && (
+        <div className="adm-reports-distribution-card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-outline-variant/30">
+            <div className="font-bold text-sm text-on-surface flex items-center gap-2">
+              <Award size={18} style={{ color: palette.gold }} />
+              <span>{isVi ? 'Phổ điểm thống kê theo lớp học' : 'Cohort Score Distribution'}</span>
+            </div>
+            <div className="text-xs font-mono text-on-surface-variant">
+              {isVi ? `Dựa trên ${scoreDistribution.total} lớp học trong phạm vi lọc` : `Based on ${scoreDistribution.total} filtered cohorts`}
+            </div>
+          </div>
+
+          {/* Biểu đồ Cột đứng Phân bổ Năng lực */}
+          <div className="adm-dash-histogram mb-4">
+            {/* Xuất sắc */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctExcellent}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctExcellent > 0 ? `${Math.max(8, scoreDistribution.pctExcellent)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.emerald} 0%, rgba(16, 185, 129, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctExcellent > 0 ? `0 0 10px ${palette.emerald}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.excellent} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.emerald }} />
+                {isVi ? 'Xuất sắc (≥ 85%)' : 'Exc. (≥ 85%)'}
               </span>
             </div>
-            <h2 className="adm-rep-hero-title">
-              {isVi ? 'Báo Cáo Kết Quả Học Tập & Tiến Độ Học Viên' : 'Student Learning Outcomes & Progress Report'}
+
+            {/* Khá - Giỏi */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctGood}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctGood > 0 ? `${Math.max(8, scoreDistribution.pctGood)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.sky} 0%, rgba(56, 189, 248, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctGood > 0 ? `0 0 10px ${palette.sky}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.good} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.sky }} />
+                {isVi ? 'Khá - Giỏi (70-84%)' : 'Good (70-84%)'}
+              </span>
+            </div>
+
+            {/* Trung bình */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctAverage}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctAverage > 0 ? `${Math.max(8, scoreDistribution.pctAverage)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.gold} 0%, rgba(245, 158, 11, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctAverage > 0 ? `0 0 10px ${palette.gold}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.average} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.gold }} />
+                {isVi ? 'Trung bình (50-69%)' : 'Avg. (50-69%)'}
+              </span>
+            </div>
+
+            {/* Cần cải thiện */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctPoor}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctPoor > 0 ? `${Math.max(8, scoreDistribution.pctPoor)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.rose} 0%, rgba(244, 63, 94, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctPoor > 0 ? `0 0 10px ${palette.rose}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.poor} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.rose }} />
+                {isVi ? 'Cần cải thiện (< 50%)' : 'Needs Focus'}
+              </span>
+            </div>
+          </div>
+
+          {/* Horizon Multi-Segment Glowing Progress Track */}
+          <div className="adm-dash-track" style={{ height: '7px' }}>
+            <div className="w-full h-full flex">
+              {scoreDistribution.pctExcellent > 0 && (
+                <div style={{ width: `${scoreDistribution.pctExcellent}%`, backgroundColor: palette.emerald }} title={`Xuất sắc: ${scoreDistribution.pctExcellent}%`} />
+              )}
+              {scoreDistribution.pctGood > 0 && (
+                <div style={{ width: `${scoreDistribution.pctGood}%`, backgroundColor: palette.sky }} title={`Khá: ${scoreDistribution.pctGood}%`} />
+              )}
+              {scoreDistribution.pctAverage > 0 && (
+                <div style={{ width: `${scoreDistribution.pctAverage}%`, backgroundColor: palette.gold }} title={`Trung bình: ${scoreDistribution.pctAverage}%`} />
+              )}
+              {scoreDistribution.pctPoor > 0 && (
+                <div style={{ width: `${scoreDistribution.pctPoor}%`, backgroundColor: palette.rose }} title={`Cần cải thiện: ${scoreDistribution.pctPoor}%`} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Filter Toolbar - Directly Above Table */}
+      <div className="adm-reports-filter-box">
+        {/* Top Header Row: Clean Title on Left, Quick Presets & Reset on Right */}
+        <div className="adm-reports-filter-header">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+              <Filter size={16} />
+            </div>
+            <h2 className="text-sm font-bold text-on-surface">
+              {isVi ? 'Bộ lọc dữ liệu báo cáo' : 'Report Analytics Filters'}
             </h2>
-            <p className="adm-rep-hero-desc">
-              {isVi 
-                ? 'Thống kê toàn diện về điểm số 4 kỹ năng (Nghe, Nói, Đọc, Viết), tỷ lệ đạt chuẩn cam kết đầu ra, tiến độ nộp bài và đánh giá mức độ tiến bộ của học viên toàn trung tâm.'
-                : 'Comprehensive intelligence tracking 4-skill band progression (Listening, Reading, Writing, Speaking), target attainment rates, assignment completion, and student growth.'}
-            </p>
-          </div>
-          <div className="adm-rep-hero-stats">
-            <div className="adm-rep-hero-stat-card">
-              <div className="adm-rep-hero-stat-label">{isVi ? 'Tổng học viên' : 'Tracked Students'}</div>
-              <div className="adm-rep-hero-stat-val">318</div>
-            </div>
-            <div className="adm-rep-hero-stat-card">
-              <div className="adm-rep-hero-stat-label">{isVi ? 'Đạt chuẩn đầu ra' : 'Target Attainment'}</div>
-              <div className="adm-rep-hero-stat-val accent">88.4%</div>
-            </div>
-            <div className="adm-rep-hero-stat-card">
-              <div className="adm-rep-hero-stat-label">{isVi ? 'Điểm TB toàn khóa' : 'Center Average'}</div>
-              <div className="adm-rep-hero-stat-val primary">6.85</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="adm-filter-bar">
-        <div className="adm-rep-filter-row">
-          <div className="adm-rep-filter-item">
-            <Calendar size={16} className="text-on-surface-variant" />
-            <span className="adm-rep-filter-label">{t('adminReports.filterPeriod')}</span>
-            <select 
-              className="adm-rep-select" 
-              value={selectedPeriod} 
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-            >
-              <option value="month">{isVi ? '30 ngày qua' : 'Last 30 days'}</option>
-              <option value="quarter">{isVi ? 'Học kỳ Q1-2026' : 'Q1-2026 Term'}</option>
-              <option value="year">{isVi ? 'Toàn bộ năm học' : 'Full Academic Year'}</option>
-            </select>
           </div>
 
-          <div className="adm-rep-filter-item">
-            <Layers size={16} className="text-on-surface-variant" />
-            <span className="adm-rep-filter-label">{t('adminReports.filterClass')}</span>
-            <select 
-              className="adm-rep-select" 
-              value={selectedClass} 
-              onChange={(e) => setSelectedClass(e.target.value)}
-            >
-              <option value="all">{isVi ? 'Tất cả các lớp' : 'All Classes'}</option>
-              <option value="ENG-IELTS-6.5A">ENG-IELTS-6.5A</option>
-              <option value="ENG-IELTS-7.0B">ENG-IELTS-7.0B</option>
-              <option value="ENG-TOEIC-750">ENG-TOEIC-750</option>
-              <option value="ENG-GRAM-PREP">ENG-GRAM-PREP</option>
-              <option value="ENG-IELTS-FAST">ENG-IELTS-FAST</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="adm-pills adm-rep-pills-wrap">
-          {(
-            [
-              { key: 'studentResults', label: t('adminReports.tabStudentResults'), icon: GraduationCap },
-              { key: 'calibration', label: t('adminReports.tabCalibration'), icon: Sparkles },
-              { key: 'teachers', label: t('adminReports.tabTeacher'), icon: Users },
-            ] as const
-          ).map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
+          {/* Quick Date Presets & Reset Button */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="adm-reports-presets-container">
+              <div 
+                className="adm-reports-presets-lead"
+                title={isVi ? 'Mốc thời gian nhanh' : 'Quick time presets'}
+                aria-hidden="true"
+              >
+                <Clock size={13} />
+              </div>
               <button
-                key={tab.key}
                 type="button"
-                className={`adm-pill ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
+                className={`adm-reports-preset-btn ${!fromDate && !toDate ? 'active' : ''}`}
+                onClick={() => handleApplyPreset('all')}
               >
-                <Icon size={15} />
-                <span>{tab.label}</span>
+                {isVi ? 'Tất cả' : 'All'}
               </button>
-            );
-          })}
+              <button
+                type="button"
+                className={`adm-reports-preset-btn ${
+                  fromDate === getPresetDates('today').from && toDate === getPresetDates('today').to
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => handleApplyPreset('today')}
+              >
+                {isVi ? 'Hôm nay' : 'Today'}
+              </button>
+              <button
+                type="button"
+                className={`adm-reports-preset-btn ${
+                  fromDate === getPresetDates('7days').from && toDate === getPresetDates('7days').to
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => handleApplyPreset('7days')}
+              >
+                {isVi ? '7 ngày qua' : '7 Days'}
+              </button>
+              <button
+                type="button"
+                className={`adm-reports-preset-btn ${
+                  fromDate === getPresetDates('30days').from && toDate === getPresetDates('30days').to
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => handleApplyPreset('30days')}
+              >
+                {isVi ? '30 ngày qua' : '30 Days'}
+              </button>
+              <button
+                type="button"
+                className={`adm-reports-preset-btn ${
+                  fromDate === getPresetDates('thisMonth').from && toDate === getPresetDates('thisMonth').to
+                    ? 'active'
+                    : ''
+                }`}
+                onClick={() => handleApplyPreset('thisMonth')}
+              >
+                {isVi ? 'Tháng này' : 'This Month'}
+              </button>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                className="adm-reports-reset-btn"
+                onClick={handleResetFilters}
+                aria-label={isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                title={isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+              >
+                <RotateCcw size={13} />
+                <span>{isVi ? 'Xóa bộ lọc' : 'Reset Filters'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Input Grid - 4 Columns Across Desktop */}
+        <div className="adm-reports-filter-grid">
+          {/* From Date */}
+          <div className="adm-filter-group">
+            <label className="adm-filter-label">
+              <span>{isVi ? 'Từ ngày' : 'From Date'}</span>
+            </label>
+            <div className="adm-filter-control-wrap">
+              <span className="adm-filter-control-icon">
+                <Calendar size={16} />
+              </span>
+              <input 
+                type="date" 
+                className={`adm-filter-input ${fromDate ? 'has-value' : ''}`}
+                value={fromDate}
+                onChange={(e) => handleFromDateChange(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* To Date */}
+          <div className="adm-filter-group">
+            <label className="adm-filter-label">
+              <span>{isVi ? 'Đến ngày' : 'To Date'}</span>
+            </label>
+            <div className="adm-filter-control-wrap">
+              <span className="adm-filter-control-icon">
+                <Calendar size={16} />
+              </span>
+              <input 
+                type="date" 
+                className={`adm-filter-input ${toDate ? 'has-value' : ''}`}
+                value={toDate}
+                onChange={(e) => handleToDateChange(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Teacher Filter */}
+          <div className="adm-filter-group">
+            <label className="adm-filter-label">
+              <span>{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</span>
+            </label>
+            <div className="adm-filter-control-wrap">
+              <span className="adm-filter-control-icon">
+                <User size={16} />
+              </span>
+              <select
+                className={`adm-filter-select ${selectedTeacherId !== undefined ? 'has-value' : ''}`}
+                value={selectedTeacherId ?? ''}
+                onChange={(e) => handleTeacherChange(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">{isVi ? 'Tất cả giảng viên' : 'All Instructors'}</option>
+                {teachers.map(tc => (
+                  <option key={tc.id} value={tc.id}>
+                    {tc.fullName} (GV-{String(tc.id).padStart(3, '0')})
+                  </option>
+                ))}
+              </select>
+              <span className="adm-filter-control-arrow">
+                <ChevronDown size={15} />
+              </span>
+            </div>
+          </div>
+
+          {/* Class Filter */}
+          <div className="adm-filter-group">
+            <label className="adm-filter-label">
+              <span>{isVi ? 'Lớp học' : 'Class Cohort'}</span>
+            </label>
+            <div className="adm-filter-control-wrap">
+              <span className="adm-filter-control-icon">
+                <BookOpen size={16} />
+              </span>
+              <select
+                className={`adm-filter-select ${selectedClassId !== undefined ? 'has-value' : ''}`}
+                value={selectedClassId ?? ''}
+                onChange={(e) => handleClassChange(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">{isVi ? 'Tất cả lớp học' : 'All Classes'}</option>
+                {availableClasses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <span className="adm-filter-control-arrow">
+                <ChevronDown size={15} />
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* TAB 1: KẾT QUẢ HỌC VIÊN & LỚP HỌC (PRIMARY FOCUS) */}
-      {activeTab === 'studentResults' && (
-        <div className="adm-rep-content-stack">
-          {/* Top Bento KPI Grid */}
-          <div className="adm-kpi-grid">
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'TỶ LỆ ĐẠT CHUẨN ĐẦU RA' : 'TARGET BAND ATTAINMENT'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-green">
-                  <Award size={18} />
-                </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">88.4%</span>
-                <span className="adm-kpi-badge positive">
-                  <ArrowUpRight size={12} />
-                  +5.2%
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? '281/318 học viên đạt hoặc vượt target ban đầu' : '281/318 students achieved or exceeded entrance goal'}</span>
-              </div>
-            </div>
+      {noMatchingClasses && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noMatchingClasses')}
+          description={t('adminReports.noMatchingClassesDescription')}
+        />
+      )}
+      {noAssignedWork && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noAssignedWork')}
+          description={t('adminReports.noAssignedWorkDescription')}
+        />
+      )}
 
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'OVERALL CENTER BAND'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-blue">
-                  <TrendingUp size={18} />
-                </div>
+      {loading ? (
+        <div className="p-8 text-center text-muted">
+          <Loader2 size={32} className="animate-spin mx-auto mb-3" />
+          <div>{isVi ? 'Đang tổng hợp báo cáo...' : 'Aggregating reports...'}</div>
+        </div>
+      ) : (
+        <div className="adm-table-card">
+          {tableError ? (
+            <div className="adm-alert-error justify-between" role="alert">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} />
+                <span>{tableError}</span>
               </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">6.85</span>
-                <span className="adm-kpi-badge positive">
-                  <ArrowUpRight size={12} />
-                  +1.15 band
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? 'Tăng trưởng trung bình sau 12 tuần học' : 'Average band progression after 12-week syllabus'}</span>
-              </div>
-            </div>
-
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'TỶ LỆ NỘP BÀI ĐÚNG HẠN' : 'ON-TIME SUBMISSION RATE'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-purple">
-                  <Clock size={18} />
-                </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">94.2%</span>
-                <span className="adm-kpi-badge positive">
-                  SLA High
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? 'Trung bình hoàn thành 14.1/15 bài tập được giao' : 'Average completed 14.1/15 assigned coursework'}</span>
-              </div>
-            </div>
-
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'HỌC VIÊN CẦN HỖ TRỢ' : 'STUDENTS NEEDING SUPPORT'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-amber">
-                  <HelpCircle size={18} />
-                </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">18</span>
-                <span className="adm-kpi-badge neutral">
-                  5.8%
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? 'Điểm thi thử hoặc tiến độ nộp bài dưới 70%' : 'Exam simulation score or homework pace under 70%'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 2-Column: Score Distribution & 4-Skill Band Performance */}
-          <div className="adm-rep-grid-2col">
-            {/* Phổ Điểm & Phân Bố Trình Độ */}
-            <div className="adm-rep-card">
-              <div className="adm-rep-card-header">
-                <h3 className="adm-rep-card-title">
-                  <BookOpen size={18} color="var(--primary)" />
-                  <span>{isVi ? 'Phổ Điểm Toàn Khóa & Phân Bố Học Viên' : 'Center-wide Band Distribution'}</span>
-                </h3>
-                <p className="adm-rep-card-desc">
-                  {isVi ? 'Tỷ lệ học viên đạt các mốc band điểm kiểm tra định kỳ gần nhất' : 'Breakdown of enrolled students across proficiency bands'}
-                </p>
-              </div>
-
-              <div className="adm-rep-dist-list">
-                <div className="adm-rep-dist-item">
-                  <div className="adm-rep-dist-info">
-                    <span className="adm-rep-dist-band-name">
-                      <span className="adm-rep-dist-dot adm-rep-dot-expert"></span>
-                      Band 8.0 - 9.0 (Xuất sắc / Vượt chuẩn)
-                    </span>
-                    <span className="adm-rep-dist-count"><strong>48</strong> {isVi ? 'học viên' : 'students'} (15%)</span>
-                  </div>
-                  <div className="adm-rep-dist-bar-track">
-                    <div className="adm-rep-dist-bar-fill adm-rep-bar-expert"></div>
-                  </div>
-                </div>
-
-                <div className="adm-rep-dist-item">
-                  <div className="adm-rep-dist-info">
-                    <span className="adm-rep-dist-band-name">
-                      <span className="adm-rep-dist-dot adm-rep-dot-good"></span>
-                      Band 7.0 - 7.5 (Giỏi / Đạt Target cao)
-                    </span>
-                    <span className="adm-rep-dist-count"><strong>142</strong> {isVi ? 'học viên' : 'students'} (45%)</span>
-                  </div>
-                  <div className="adm-rep-dist-bar-track">
-                    <div className="adm-rep-dist-bar-fill adm-rep-bar-good"></div>
-                  </div>
-                </div>
-
-                <div className="adm-rep-dist-item">
-                  <div className="adm-rep-dist-info">
-                    <span className="adm-rep-dist-band-name">
-                      <span className="adm-rep-dist-dot adm-rep-dot-comp"></span>
-                      Band 6.0 - 6.5 (Khá / Đạt Chuẩn)
-                    </span>
-                    <span className="adm-rep-dist-count"><strong>96</strong> {isVi ? 'học viên' : 'students'} (30%)</span>
-                  </div>
-                  <div className="adm-rep-dist-bar-track">
-                    <div className="adm-rep-dist-bar-fill adm-rep-bar-comp"></div>
-                  </div>
-                </div>
-
-                <div className="adm-rep-dist-item">
-                  <div className="adm-rep-dist-info">
-                    <span className="adm-rep-dist-band-name">
-                      <span className="adm-rep-dist-dot adm-rep-dot-modest"></span>
-                      {isVi ? 'Dưới Band 6.0 (Cần hỗ trợ phụ đạo)' : 'Below 6.0 (Requires tutoring)'}
-                    </span>
-                    <span className="adm-rep-dist-count"><strong>32</strong> {isVi ? 'học viên' : 'students'} (10%)</span>
-                  </div>
-                  <div className="adm-rep-dist-bar-track">
-                    <div className="adm-rep-dist-bar-fill adm-rep-bar-modest"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tiến Bộ 4 Kỹ Năng */}
-            <div className="adm-rep-card">
-              <div className="adm-rep-card-header">
-                <h3 className="adm-rep-card-title">
-                  <TrendingUp size={18} color="#16a34a" />
-                  <span>{isVi ? 'Tăng Trưởng Điểm TB Theo 4 Kỹ Năng' : '4-Skill Average & Progression'}</span>
-                </h3>
-                <p className="adm-rep-card-desc">
-                  {isVi ? 'Điểm trung bình hiện tại so với bài test đầu vào toàn trung tâm' : 'Current center average vs entrance diagnostic test'}
-                </p>
-              </div>
-
-              <div className="adm-rep-skill-grid">
-                <div className="adm-rep-skill-card">
-                  <div className="adm-rep-skill-header">
-                    <span className="adm-rep-skill-name">Listening</span>
-                  </div>
-                  <span className="adm-rep-skill-score">7.2</span>
-                  <div className="adm-rep-skill-bar-track">
-                    <div className="adm-rep-skill-bar-fill"></div>
-                  </div>
-                  <div className="adm-rep-skill-footer">
-                    <span className="adm-rep-skill-growth">
-                      <ArrowUpRight size={12} /> +1.4
-                    </span>
-                    <span className="adm-rep-skill-baseline">{isVi ? 'Gốc 5.8' : 'Base 5.8'}</span>
-                  </div>
-                </div>
-
-                <div className="adm-rep-skill-card">
-                  <div className="adm-rep-skill-header">
-                    <span className="adm-rep-skill-name">Reading</span>
-                  </div>
-                  <span className="adm-rep-skill-score">7.1</span>
-                  <div className="adm-rep-skill-bar-track">
-                    <div className="adm-rep-skill-bar-fill"></div>
-                  </div>
-                  <div className="adm-rep-skill-footer">
-                    <span className="adm-rep-skill-growth">
-                      <ArrowUpRight size={12} /> +1.1
-                    </span>
-                    <span className="adm-rep-skill-baseline">{isVi ? 'Gốc 6.0' : 'Base 6.0'}</span>
-                  </div>
-                </div>
-
-                <div className="adm-rep-skill-card">
-                  <div className="adm-rep-skill-header">
-                    <span className="adm-rep-skill-name">Writing</span>
-                  </div>
-                  <span className="adm-rep-skill-score">6.5</span>
-                  <div className="adm-rep-skill-bar-track">
-                    <div className="adm-rep-skill-bar-fill"></div>
-                  </div>
-                  <div className="adm-rep-skill-footer">
-                    <span className="adm-rep-skill-growth">
-                      <ArrowUpRight size={12} /> +1.3
-                    </span>
-                    <span className="adm-rep-skill-baseline">{isVi ? 'Gốc 5.2' : 'Base 5.2'}</span>
-                  </div>
-                </div>
-
-                <div className="adm-rep-skill-card">
-                  <div className="adm-rep-skill-header">
-                    <span className="adm-rep-skill-name">Speaking</span>
-                  </div>
-                  <span className="adm-rep-skill-score">6.4</span>
-                  <div className="adm-rep-skill-bar-track">
-                    <div className="adm-rep-skill-bar-fill"></div>
-                  </div>
-                  <div className="adm-rep-skill-footer">
-                    <span className="adm-rep-skill-growth">
-                      <ArrowUpRight size={12} /> +1.4
-                    </span>
-                    <span className="adm-rep-skill-baseline">{isVi ? 'Gốc 5.0' : 'Base 5.0'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bảng Kết Quả Học Tập Theo Lớp */}
-          <div className="adm-table-card">
-            <div className="adm-table-header">
-              <div>
-                <h3 className="adm-table-title">
-                  {isVi ? 'Bảng Thống Kê Kết Quả Học Tập Theo Lớp Học' : 'Cohort Academic Performance Matrix'}
-                </h3>
-                <p className="adm-subtitle">
-                  {isVi ? 'Chi tiết điểm trung bình 4 kỹ năng, tỷ lệ đạt chuẩn và tiến độ nộp bài của từng lớp' : 'Per-class breakdown of 4-skill averages, syllabus completion, and target attainment'}
-                </p>
-              </div>
-            </div>
-
-            <div className="adm-rep-table-scroll">
-              <table className="adm-table">
-                <thead>
-                  <tr>
-                    <th>{isVi ? 'MÃ & TÊN LỚP' : 'CLASS'}</th>
-                    <th>{isVi ? 'GIÁO VIÊN' : 'INSTRUCTOR'}</th>
-                    <th>{isVi ? 'SĨ SỐ' : 'STUDENTS'}</th>
-                    <th>LISTENING</th>
-                    <th>READING</th>
-                    <th>WRITING</th>
-                    <th>SPEAKING</th>
-                    <th>OVERALL</th>
-                    <th>{isVi ? 'ĐẠT TARGET' : 'TARGET PASS'}</th>
-                    <th>{isVi ? 'TIẾN ĐỘ NỘP BÀI' : 'COMPLETION'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classPerformances.map((c) => (
-                    <tr key={c.code}>
-                      <td>
-                        <div className="adm-rep-class-title">{c.code}</div>
-                        <div className="adm-rep-class-sub">{c.name}</div>
-                      </td>
-                      <td>{c.teacher}</td>
-                      <td className="font-semibold">{c.students}</td>
-                      <td className="adm-rep-skill-cell">{c.listening}</td>
-                      <td className="adm-rep-skill-cell">{c.reading}</td>
-                      <td className="adm-rep-skill-cell">{c.writing}</td>
-                      <td className="adm-rep-skill-cell">{c.speaking}</td>
-                      <td className="text-center">
-                        <span className="adm-rep-overall-pill">{c.overall}</span>
-                      </td>
-                      <td className="text-center">
-                        <span className="adm-rep-target-pass-pill">
-                          {c.targetAttainment}%
-                        </span>
-                      </td>
-                      <td>
-                        <div className="adm-rep-progress-track">
-                          <div className="adm-rep-progress-fill"></div>
-                        </div>
-                        <span className="font-semibold text-on-surface">{c.submissionRate}%</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Spotlight: Top Performers & Students Needing Support */}
-          <div className="adm-rep-spotlight-grid">
-            {/* Top Performers */}
-            <div className="adm-rep-card">
-              <div className="adm-rep-card-header">
-                <h3 className="adm-rep-card-title">
-                  <Award size={18} color="#15803d" />
-                  <span>{isVi ? 'Học Viên Tiêu Biểu & Tiến Bộ Vượt Bậc' : 'Top Performing Students'}</span>
-                </h3>
-                <p className="adm-rep-card-desc">
-                  {isVi ? 'Học viên có điểm số cao nhất và đạt mức độ bứt phá band điểm ấn tượng' : 'Students demonstrating high band attainment and exceptional growth'}
-                </p>
-              </div>
-
-              <div className="adm-rep-student-list">
-                {topStudents.map((st, i) => {
-                  const avatarClass = i === 0 ? 'adm-rep-av-blue' : i === 1 ? 'adm-rep-av-violet' : 'adm-rep-av-emerald';
-                  const initials = st.name.split(' ').map(n => n[0]).slice(-2).join('');
-                  return (
-                    <div key={i} className="adm-rep-student-item">
-                      <div className="adm-rep-student-left">
-                        <div className={`adm-rep-student-avatar ${avatarClass}`}>
-                          {initials}
-                        </div>
-                        <div className="adm-rep-student-meta">
-                          <span className="adm-rep-student-name">{st.name}</span>
-                          <span className="adm-rep-student-sub">{st.classCode} • {st.status}</span>
-                        </div>
-                      </div>
-                      <span className="adm-rep-student-badge-pos">
-                        Overall {st.overall} ({st.growth})
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Students Needing Support */}
-            <div className="adm-rep-card">
-              <div className="adm-rep-card-header">
-                <h3 className="adm-rep-card-title">
-                  <AlertTriangle size={18} color="#d97706" />
-                  <span>{isVi ? 'Học Viên Cần Quan Tâm & Hỗ Trợ Kịp Thời' : 'Students Requiring Academic Attention'}</span>
-                </h3>
-                <p className="adm-rep-card-desc">
-                  {isVi ? 'Danh sách học viên có điểm dưới ngưỡng target hoặc thiếu nhiều bài tập' : 'Students flagged with sub-target results or missing homework submissions'}
-                </p>
-              </div>
-
-              <div className="adm-rep-student-list">
-                {atRiskStudents.map((st, i) => {
-                  const avatarClass = i === 0 ? 'adm-rep-av-amber' : i === 1 ? 'adm-rep-av-rose' : 'adm-rep-av-orange';
-                  const initials = st.name.split(' ').map(n => n[0]).slice(-2).join('');
-                  return (
-                    <div key={i} className="adm-rep-student-item">
-                      <div className="adm-rep-student-left">
-                        <div className={`adm-rep-student-avatar ${avatarClass}`}>
-                          {initials}
-                        </div>
-                        <div className="adm-rep-student-meta">
-                          <span className="adm-rep-student-name">{st.name}</span>
-                          <span className="adm-rep-student-sub">{st.classCode} • {st.issue}</span>
-                        </div>
-                      </div>
-                      <span className="adm-rep-student-badge-neg">
-                        Band {st.overall} • {st.action}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Compact AI Grading Performance Summary Callout (Secondary Role) */}
-          <div className="adm-rep-ai-banner">
-            <div className="adm-rep-ai-banner-left">
-              <span className="adm-rep-ai-banner-badge">
-                <Sparkles size={14} />
-                {isVi ? 'Hỗ Trợ Chấm Điểm Bởi AI Engine' : 'AI-Assisted Grading Telemetry'}
-              </span>
-              <h4 className="adm-rep-ai-banner-title">
-                {isVi ? 'Đánh Giá Sơ Bộ Hiệu Suất Chấm Điểm AI Trong Kỳ' : 'AI Assessment Support & Turnaround Telemetry'}
-              </h4>
-              <p className="adm-rep-ai-banner-desc">
-                {isVi 
-                  ? 'AI Engine đã đồng hành cùng giảng viên chấm 2,640 bài tập, đảm bảo độ sai lệch MAE trong ngưỡng an toàn ISO (±0.24 band) và tiết kiệm 880 giờ chấm bài để thầy cô tập trung hỗ trợ từng học viên.'
-                  : 'AI Engine assisted in grading 2,640 submissions, maintaining ISO-compliant variance (MAE ±0.24 band) and saving 880 hours for personalized student feedback.'}
-              </p>
-            </div>
-
-            <div className="adm-rep-ai-banner-right">
-              <div className="adm-rep-ai-banner-metrics">
-                <div className="adm-rep-ai-metric-box">
-                  <div className="adm-rep-ai-metric-label">{isVi ? 'Lượt chấm' : 'Graded'}</div>
-                  <div className="adm-rep-ai-metric-val">2,640</div>
-                </div>
-                <div className="adm-rep-ai-metric-box">
-                  <div className="adm-rep-ai-metric-label">{isVi ? 'Sai số MAE' : 'MAE'}</div>
-                  <div className="adm-rep-ai-metric-val">±0.24</div>
-                </div>
-                <div className="adm-rep-ai-metric-box">
-                  <div className="adm-rep-ai-metric-label">{isVi ? 'GV đồng thuận' : 'Consensus'}</div>
-                  <div className="adm-rep-ai-metric-val">85.8%</div>
-                </div>
-              </div>
-
-              <button 
-                type="button" 
-                className="btn btn-secondary adm-rep-header-btn"
-                onClick={() => setActiveTab('calibration')}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setRefreshKey(prev => prev + 1)}
               >
-                <span>{isVi ? 'Xem bảng đối soát AI' : 'View AI Calibration'}</span>
-                <ArrowRight size={14} />
+                {isVi ? 'Thử lại' : 'Retry'}
+              </Button>
+            </div>
+          ) : filteredClasses.length === 0 ? (
+            <div className="flex flex-col items-center">
+              <EmptyState
+                icon={<BookOpen size={36} />}
+                title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
+                description={
+                  selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
+                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                    : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
+                }
+              />
+              {(fromDate || toDate) && (
+                <div className="flex items-center gap-2 pb-6">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('30days')}
+                  >
+                    {isVi ? 'Xem 30 ngày qua' : 'View Last 30 Days'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('all')}
+                  >
+                    {isVi ? 'Xem toàn thời gian' : 'View All Time'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleResetFilters}
+                  >
+                    {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            (() => {
+              const { totalPages, safeCurrentPage, startIndex, endIndex } = computeReportPagination(
+                filteredClasses.length,
+                currentPage,
+                pageSize
+              );
+
+              const paginatedClasses = filteredClasses.slice(startIndex, endIndex);
+
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="adm-table">
+                      <thead>
+                        <tr>
+                          <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                          <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                          <th>{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'ASSIGNMENTS'}</th>
+                          <th>{isVi ? 'ĐIỂM TRUNG BÌNH' : 'AVERAGE SCORE'}</th>
+                          <th>{isVi ? 'TỶ LỆ NỘP BÀI' : 'COMPLETION'}</th>
+                          <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                          <th className="text-right">{isVi ? 'TIẾN ĐỘ' : 'ACTION'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedClasses.map((cls) => (
+                          <tr key={cls.classId} className="hover:bg-surface-hover/60 transition-colors">
+                            <td>
+                              <span className="badge badge-primary font-mono text-xs font-bold py-0.5 px-2">
+                                ENG-{cls.classId}
+                              </span>
+                            </td>
+                            <td className="font-semibold text-on-surface">{cls.className}</td>
+                            <td className="font-mono text-on-surface">{cls.assignedAssignmentCount} {isVi ? 'bài' : 'hw'}</td>
+                            <td className="font-bold font-mono" style={{ color: cls.averageScorePercent >= 80 ? palette.emerald : cls.averageScorePercent >= 60 ? palette.gold : 'inherit' }}>
+                              {cls.averageScorePercent}%
+                            </td>
+                            <td>
+                              <span className="badge badge-active font-mono text-xs font-bold">{cls.completionRatePercent}%</span>
+                            </td>
+                            <td>
+                              <span className={`badge ${cls.completionRatePercent >= 70 ? 'badge-active' : 'badge-onleave'}`}>
+                                {cls.completionRatePercent >= 70 ? (isVi ? 'Đạt mục tiêu' : 'On Target') : (isVi ? 'Cần cải thiện' : 'Needs Focus')}
+                              </span>
+                            </td>
+                            <td className="text-right">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleOpenClassProgress(cls)}
+                              >
+                                {isVi ? 'Chi tiết' : 'Progress'}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {filteredClasses.length > 0 && (
+                    <Pagination
+                      currentPage={safeCurrentPage}
+                      totalPages={totalPages}
+                      totalItems={filteredClasses.length}
+                      itemLabel={isVi ? 'lớp học' : 'classes'}
+                      isVi={isVi}
+                      onPageChange={setCurrentPage}
+                      pageSize={pageSize}
+                      onPageSizeChange={(newSize) => {
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                      }}
+                      pageSizeOptions={[5, 10, 20]}
+                      variant="table"
+                    />
+                  )}
+                </>
+              );
+
+            })()
+          )}
+        </div>
+      )}
+
+      {/* Class Progress Modal / Drawer */}
+      {inspectingClass && (
+        <div className="adm-drawer-backdrop" onClick={() => setInspectingClass(null)}>
+          <div className="adm-drawer max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-drawer-header">
+              <div>
+                <h2 className="adm-drawer-title">
+                  {isVi ? `Tiến Độ Chi Tiết: ${inspectingClass.className}` : `Cohort Progress: ${inspectingClass.className}`}
+                </h2>
+                <div className="text-xs text-muted mt-1 font-mono">
+                  ENG-{inspectingClass.classId}
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setInspectingClass(null)}
+                className="btn-ghost p-1 cursor-pointer"
+              >
+                <X size={20} />
               </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* TAB 2: ĐÁNH GIÁ HIỆU SUẤT AI (SECONDARY EVALUATION) */}
-      {activeTab === 'calibration' && (
-        <div className="adm-rep-content-stack">
-          {/* AI Metrics KPIs */}
-          <div className="adm-kpi-grid">
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'ĐỘ LỆCH TRUNG BÌNH (MAE)' : 'MEAN ABSOLUTE ERROR'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-blue">
-                  <Sparkles size={18} />
+            <div className="adm-drawer-body flex flex-col gap-4">
+              {loadingProgress ? (
+                <div className="p-8 text-center text-muted">
+                  <Loader2 size={28} className="animate-spin mx-auto mb-2" />
+                  <div>{isVi ? 'Đang tải chi tiết tiến độ lớp...' : 'Loading cohort progress...'}</div>
                 </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">0.24</span>
-                <span className="adm-kpi-badge positive">
-                  <CheckCircle2 size={12} />
-                  ISO Compliant
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? 'Đạt chuẩn ISO AI Assessment (< 0.5 band)' : 'Meets ISO AI Assessment standard (< 0.5 band)'}</span>
-              </div>
-            </div>
-
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'TỶ LỆ GV ĐỒNG THUẬN AI' : 'TEACHER CONSENSUS RATE'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-green">
-                  <CheckCircle2 size={18} />
+              ) : progressError ? (
+                <div className="adm-alert-error">
+                  {progressError}
                 </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">85.8%</span>
-                <span className="adm-kpi-badge positive">
-                  <ArrowUpRight size={12} />
-                  +3.4%
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? '+3.4% so với học kỳ trước' : '+3.4% compared to previous semester'}</span>
-              </div>
-            </div>
-
-            <div className="adm-kpi-card">
-              <div className="adm-kpi-header">
-                <span className="adm-kpi-title">{isVi ? 'TỔNG LƯỢT AI CHẤM (Q1)' : 'TOTAL AI GRADINGS'}</span>
-                <div className="adm-kpi-icon-wrapper adm-rep-kpi-icon-purple">
-                  <TrendingUp size={18} />
-                </div>
-              </div>
-              <div className="adm-kpi-value-row">
-                <span className="adm-kpi-value">2,640</span>
-                <span className="adm-kpi-badge neutral">
-                  -880 hrs
-                </span>
-              </div>
-              <div className="adm-kpi-footer">
-                <span>{isVi ? 'Tiết kiệm ~880 giờ chấm của giảng viên' : 'Saved ~880 grading hours for faculty'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* AI vs Teacher Calibration Matrix */}
-          <div className="adm-table-card">
-            <div className="adm-table-header">
-              <div>
-                <h3 className="adm-table-title">
-                  {isVi ? 'Bảng Đối Soát Hiệu Chuẩn AI Theo Kỹ Năng' : 'AI vs Faculty Calibration Breakdown by Skill'}
-                </h3>
-                <p className="adm-subtitle">
-                  {isVi ? 'So sánh điểm số AI đề xuất và điểm chốt thực tế của Giáo viên để kiểm soát chất lượng' : 'Comparative variance between AI prediction and Teacher finalized band'}
-                </p>
-              </div>
-            </div>
-
-            <div className="adm-rep-table-scroll">
-              <table className="adm-table">
-                <thead>
-                  <tr>
-                    <th>{isVi ? 'PHÂN LOẠI KỸ NĂNG' : 'SKILL MODULE'}</th>
-                    <th>{isVi ? 'LƯỢT CHẤM' : 'SAMPLES'}</th>
-                    <th>{isVi ? 'ĐIỂM AI TB' : 'AVG AI SCORE'}</th>
-                    <th>{isVi ? 'ĐIỂM GV TB' : 'AVG TEACHER'}</th>
-                    <th>{isVi ? 'ĐỘ LỆCH (MAE)' : 'MAE DELTA'}</th>
-                    <th>{isVi ? 'TỶ LỆ GV SỬA ĐIỂM' : 'OVERRIDE RATE'}</th>
-                    <th>{isVi ? 'ĐÁNH GIÁ ĐỘ CHÍNH XÁC' : 'ACCURACY STATUS'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calibrationData.map((item, i) => (
-                    <tr key={i}>
-                      <td className="font-semibold">{item.skill}</td>
-                      <td>{item.totalGraded}</td>
-                      <td className="font-semibold text-secondary">{item.avgAiScore}</td>
-                      <td className="font-semibold text-primary">{item.avgTeacherScore}</td>
-                      <td>
-                        <span className={`adm-badge ${item.mae < 0.1 ? 'adm-rep-mae-excellent' : item.mae < 0.4 ? 'adm-rep-mae-good' : 'adm-rep-mae-warning'}`}>
-                          ±{item.mae}
-                        </span>
-                      </td>
-                      <td>{item.overrideRate}%</td>
-                      <td>
-                        <span className={`adm-badge ${item.status === 'excellent' ? 'badge-active' : item.status === 'good' ? 'badge-active' : 'badge-warning'}`}>
-                          {item.status === 'excellent' ? (isVi ? 'Xuất sắc (>95%)' : 'Excellent') : item.status === 'good' ? (isVi ? 'Tốt (Ổn định)' : 'Good') : (isVi ? 'Cần hiệu chỉnh Prompt' : 'Needs Calibration')}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Outliers Section */}
-          <div className="adm-rep-card">
-            <h3 className="adm-rep-card-title">
-              <AlertTriangle size={18} className="adm-rep-alert-icon" />
-              <span>{isVi ? 'Các Ca Lệch Điểm Lớn (> 1.0 Band) Cần Rà Soát' : 'High Variance Outlier Cases (> 1.0 Band Deviation)'}</span>
-            </h3>
-            <p className="adm-rep-card-desc">
-              {isVi 
-                ? 'Nhật ký các bài nộp mà giáo viên can thiệp sửa điểm chênh lệch nhiều so với AI để đội ngũ kỹ thuật hiệu chỉnh prompt.' 
-                : 'Audited submissions where teacher score deviated significantly from AI prompt output.'}
-            </p>
-
-            <div className="adm-rep-outlier-list">
-              {outlierCases.map((out) => (
-                <div key={out.id} className="adm-rep-outlier-card">
-                  <div className="adm-rep-outlier-header">
-                    <span className="adm-rep-outlier-title">{out.assignmentTitle}</span>
-                    <span className={out.delta > 0 ? 'adm-rep-outlier-badge-pos' : 'adm-rep-outlier-badge-neg'}>
-                      AI: {out.aiScore} → GV: {out.teacherScore} ({out.delta > 0 ? `+${out.delta}` : out.delta})
-                    </span>
+              ) : classProgress ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-md bg-surface-low border-subtle">
+                      <div className="label-sm text-muted">{isVi ? 'Sĩ số' : 'Cohort Size'}</div>
+                      <div className="text-lg font-bold mt-1 text-surface">{classProgress.totalStudentCount}</div>
+                    </div>
+                    <div className="p-3 rounded-md bg-surface-low border-subtle">
+                      <div className="label-sm text-muted">{isVi ? 'Đã có điểm' : 'Graded'}</div>
+                      <div className="text-lg font-bold mt-1 text-success">{classProgress.scoredStudentCount}</div>
+                    </div>
+                    <div className="p-3 rounded-md bg-surface-low border-subtle">
+                      <div className="label-sm text-muted">{isVi ? 'Tỷ lệ hoàn thành' : 'Completion'}</div>
+                      <div className="text-lg font-bold mt-1 text-primary">{classProgress.completionRatePercent}%</div>
+                    </div>
+                    <div className="p-3 rounded-md bg-surface-low border-subtle">
+                      <div className="label-sm text-muted">{isVi ? 'Dưới trung bình' : 'Below Avg'}</div>
+                      <div className="text-lg font-bold mt-1 text-error">{classProgress.belowAverageCount}</div>
+                    </div>
                   </div>
-                  <div className="adm-rep-outlier-meta">
-                    {isVi ? 'Học viên: ' : 'Student: '}<strong>{out.studentName}</strong> • {isVi ? 'Kỹ năng: ' : 'Skill: '}<strong>{out.skill}</strong>
-                  </div>
-                  <div className="adm-rep-outlier-reason">
-                    <strong>{isVi ? 'Lý do giáo viên ghi nhận: ' : 'Teacher Justification: '}</strong>{out.reason}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* TAB 3: HIỆU SUẤT GIẢNG VIÊN */}
-      {activeTab === 'teachers' && (
-        <div className="adm-table-card">
-          <div className="adm-table-header">
-            <div>
-              <h3 className="adm-table-title">
-                {isVi ? 'Chỉ Số Hiệu Suất Giảng Viên & Chấm Chữa' : 'Teacher Grading Turnaround & Operations'}
-              </h3>
-              <p className="adm-subtitle">
-                {isVi ? 'Theo dõi thời gian trả bài và mức độ phối hợp chấm bài của từng giảng viên' : 'Turnaround SLA compliance and faculty grading turnaround times'}
-              </p>
+                  {/* Assignment Scores */}
+                  {classProgress.assignmentScores.length > 0 && (
+                    <div className="eh-card p-4">
+                      <h4 className="m-0 mb-3 text-sm font-bold text-surface">
+                        {isVi ? 'Điểm trung bình theo bài tập' : 'Assignment Averages'}
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        {classProgress.assignmentScores.map(as => (
+                          <div key={as.assignmentId} className="flex justify-between items-center text-sm pb-2 border-b-subtle">
+                            <span>{as.title}</span>
+                            <span className="font-mono font-bold text-primary">{as.averageScorePercent}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lagging Students */}
+                  {classProgress.laggingStudents.length > 0 && (
+                    <div className="eh-card p-4">
+                      <h4 className="m-0 mb-3 text-sm font-bold text-error flex items-center gap-2">
+                        <TrendingDown size={16} />
+                        <span>{isVi ? 'Học viên cần hỗ trợ thêm' : 'Students Needing Support'}</span>
+                      </h4>
+                      <div className="flex flex-col gap-2">
+                        {classProgress.laggingStudents.map(st => (
+                          <div key={st.studentId} className="flex justify-between items-center text-sm pb-2 border-b-subtle">
+                            <span>{st.fullName}</span>
+                            <span className="font-mono text-error font-semibold">{st.averageScorePercent}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="p-6 text-center text-muted">
+                  {isVi ? 'Không có thêm thông tin tiến độ cho lớp này.' : 'No additional progress data available.'}
+                </div>
+              )}
             </div>
-          </div>
-          <div className="adm-rep-table-scroll">
-            <table className="adm-table">
-              <thead>
-                <tr>
-                  <th>{isVi ? 'GIÁO VIÊN' : 'TEACHER'}</th>
-                  <th>{isVi ? 'LỚP PHỤ TRÁCH' : 'CLASSES'}</th>
-                  <th>{isVi ? 'BÀI ĐÃ CHẤM (Q1)' : 'GRADED SUBMISSIONS'}</th>
-                  <th>{isVi ? 'THỜI GIAN TRẢ BÀI TB' : 'AVG TURNAROUND'}</th>
-                  <th>{isVi ? 'ĐỒNG THUẬN ANNOTATION AI' : 'AI ANNOTATION ACCEPT'}</th>
-                  <th>{isVi ? 'ĐÁNH GIÁ VẬN HÀNH' : 'SLA STATUS'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teacherStats.map((tc, i) => (
-                  <tr key={i}>
-                    <td className="font-semibold">{tc.name}</td>
-                    <td>{tc.classes} {isVi ? 'lớp' : 'classes'}</td>
-                    <td className="font-semibold text-primary">{tc.graded} {isVi ? 'bài' : 'submissions'}</td>
-                    <td>
-                      <span className="adm-badge badge-active">{tc.avgHours}h (Đạt SLA &lt; 24h)</span>
-                    </td>
-                    <td>{tc.aiAcceptRate}%</td>
-                    <td>
-                      <span className="adm-badge badge-active adm-rep-badge-flex">
-                        <CheckCircle2 size={12} /> {isVi ? 'Đạt chuẩn SLA' : 'Compliant'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+            <div className="adm-drawer-footer">
+              <Button 
+                variant="secondary"
+                type="button" 
+                onClick={() => setInspectingClass(null)}
+              >
+                {isVi ? 'Đóng' : 'Close'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

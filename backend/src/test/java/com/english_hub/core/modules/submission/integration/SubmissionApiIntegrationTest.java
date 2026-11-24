@@ -32,9 +32,13 @@ import com.english_hub.core.modules.submission.domain.repository.AnswerRepositor
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
+import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataGradingRepository;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
+
+import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,29 +50,53 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 @Testcontainers
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Transactional
 class SubmissionApiIntegrationTest {
+
+	private static final String NULL_ANSWER_MESSAGE = "answers không được chứa phần tử null.";
+
+	private final EntityManager entityManager;
+	private final ObjectMapper objectMapper;
+	private final SpringDataGradingRepository gradingJpaRepository;
+
+	@Autowired
+	SubmissionApiIntegrationTest(EntityManager entityManager, ObjectMapper objectMapper,
+			SpringDataGradingRepository gradingJpaRepository) {
+		this.entityManager = entityManager;
+		this.objectMapper = objectMapper;
+		this.gradingJpaRepository = gradingJpaRepository;
+	}
 
 	@Container
 	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -232,12 +260,110 @@ class SubmissionApiIntegrationTest {
 		assertThat(gradings).hasSize(2);
 		assertThat(gradings).extracting(Grading::getMethod)
 				.containsExactlyInAnyOrder(GradingMethod.AUTO, GradingMethod.TEACHER_MANUAL);
+		assertThat(gradings).extracting(Grading::getMaxScoreSnapshot)
+				.allSatisfy(snapshot -> assertThat(snapshot).isEqualByComparingTo(BigDecimal.TEN));
 	}
 
 	@Test
 	void incrementsAttemptNumberForASecondAttempt() throws Exception {
 		assertAttemptNumber(1);
 		assertAttemptNumber(2);
+	}
+
+	@Test
+	void lowerCapPreservesExistingAttemptsAndAllowsFinishingAnInProgressAttempt() throws Exception {
+		long gradedId = startSubmissionAsStudentMember();
+		long reviewedModuleId = quizSubmissionModuleId(gradedId);
+		submitQuizModule(reviewedModuleId);
+		submitOfficialAsStudentMember(gradedId);
+		grade(gradedId);
+		OffsetDateTime reviewedAt = OffsetDateTime.parse("2026-11-15T09:00:00Z");
+		String transcript = "{\"text\":\"Reviewed fixture\"}";
+		var gradeToReview = gradingJpaRepository.findBySubmissionModuleId(reviewedModuleId).getFirst();
+		gradeToReview.updateTeacherGrade(gradeToReview.getFinalScore(), "Teacher feedback", teacherId, reviewedAt,
+				gradeToReview.getMaxScoreSnapshot());
+		gradeToReview.setAiTranscriptJson(transcript);
+		long inProgressId = startSubmissionAsStudentMember();
+
+		entityManager.flush();
+		entityManager.clear();
+		List<Long> attemptIds = List.of(gradedId, inProgressId);
+		List<Submission> attemptsBefore = attemptIds.stream()
+				.map(id -> submissionRepository.findById(id).orElseThrow()).toList();
+		List<SubmissionModule> modulesBefore = attemptIds.stream()
+				.flatMap(id -> submissionModuleRepository.findBySubmissionId(id).stream()).toList();
+		List<Long> moduleIds = modulesBefore.stream().map(SubmissionModule::getId).toList();
+		List<Answer> answersBefore = moduleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		var gradingsBefore = gradingJpaRepository.findBySubmissionModuleIdIn(moduleIds);
+		assertThat(attemptsBefore).extracting(Submission::getStatus)
+				.containsExactly(SubmissionStatus.GRADED, SubmissionStatus.IN_PROGRESS);
+		assertThat(modulesBefore).hasSize(4);
+		assertThat(answersBefore).hasSize(2);
+		assertThat(gradingsBefore).extracting(grading -> grading.getStatus().name())
+				.containsExactlyInAnyOrder(GradingStatus.COMPLETED.name(), GradingStatus.COMPLETED.name(),
+						GradingStatus.PENDING.name(), GradingStatus.PENDING.name());
+		var reviewedGrade = gradingsBefore.stream()
+				.filter(grading -> grading.getSubmissionModuleId().equals(reviewedModuleId)).findFirst().orElseThrow();
+		assertThat(reviewedGrade.getReviewedBy()).isEqualTo(teacherId);
+		assertThat(reviewedGrade.getReviewedAt()).isEqualTo(reviewedAt);
+		assertThat(reviewedGrade.getGradedAt()).isEqualTo(reviewedAt);
+		assertThat(objectMapper.readTree(reviewedGrade.getAiTranscript())).isEqualTo(objectMapper.readTree(transcript));
+
+		mockMvc.perform(put("/api/v1/assignments/{id}", publishedAssignmentId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"maxSubmissions\":1}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(1));
+
+		entityManager.flush();
+		entityManager.clear();
+		List<Submission> attemptsAfter = attemptIds.stream()
+				.map(id -> submissionRepository.findById(id).orElseThrow()).toList();
+		List<SubmissionModule> modulesAfter = attemptIds.stream()
+				.flatMap(id -> submissionModuleRepository.findBySubmissionId(id).stream()).toList();
+		List<Answer> answersAfter = moduleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		assertThat(attemptsAfter).usingRecursiveComparison().isEqualTo(attemptsBefore);
+		assertThat(modulesAfter).usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(modulesBefore);
+		assertThat(answersAfter).usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(answersBefore);
+		assertThat(gradingJpaRepository.findBySubmissionModuleIdIn(moduleIds))
+				.usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(gradingsBefore);
+
+		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Không thể bắt đầu làm bài tập này lúc này."));
+		assertThat(submissionRepository.countByAssignmentIdAndStudentId(publishedAssignmentId, studentMemberId))
+				.isEqualTo(attemptIds.size());
+		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+						.header("Authorization", bearer(studentClassmateId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.attemptNumber").value(1));
+
+		submitQuizModule(quizSubmissionModuleId(inProgressId));
+		submitOfficialAsStudentMember(inProgressId);
+
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(submissionRepository.findById(inProgressId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(submissionRepository.findById(gradedId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(attemptsBefore.getFirst());
+		List<SubmissionModule> gradedModules = submissionModuleRepository.findBySubmissionId(gradedId);
+		assertThat(gradedModules).usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(modulesBefore.stream().filter(module -> module.getSubmissionId().equals(gradedId)).toList());
+		List<Long> gradedModuleIds = gradedModules.stream().map(SubmissionModule::getId).toList();
+		List<Answer> gradedAnswers = gradedModuleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		assertThat(gradedAnswers).usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(answersBefore.stream().filter(answer -> gradedModuleIds.contains(answer.getSubmissionModuleId()))
+						.toList());
+		assertThat(gradingJpaRepository.findBySubmissionModuleIdIn(gradedModuleIds))
+				.usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(gradingsBefore.stream().filter(grading -> gradedModuleIds.contains(grading.getSubmissionModuleId()))
+						.toList());
 	}
 
 	@Test
@@ -451,20 +577,20 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void listSubmissionsRequiresAnAssignmentIdForATeacher() throws Exception {
+	void listSubmissionsRequiresAClassOrAssignmentIdForATeacher() throws Exception {
 		mockMvc.perform(get("/api/v1/submissions")
 						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));
+				.andExpect(jsonPath("$.error").value("classId hoặc assignmentId là bắt buộc đối với giáo viên."));
 	}
 
 	@Test
-	void teacherClassIdFilterDoesNotReplaceTheRequiredAssignmentId() throws Exception {
+	void teacherClassIdFilterRejectsAForeignClassWithoutAnAssignmentId() throws Exception {
 		mockMvc.perform(get("/api/v1/submissions")
 						.param("classId", String.valueOf(otherClassId))
 						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 	}
 
 	@Test
@@ -477,6 +603,113 @@ class SubmissionApiIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data", hasSize(1)))
 				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@Test
+	void listTeacherClassIncludesDraftButExcludesDeletedAndForeignAssignments() throws Exception {
+		startSubmissionAsStudentMember();
+		long draftId = assignment(classId, AssignmentStatus.DRAFT,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		long deletedId = assignment(classId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, true);
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(draftId, studentMemberId, 1);
+		submissionRepository.create(deletedId, studentMemberId, 1);
+		submissionRepository.create(foreignId, studentOtherId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(2)))
+				.andExpect(jsonPath("$.data[0].assignmentId").value(draftId))
+				.andExpect(jsonPath("$.data[1].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(2));
+
+		// The legacy assignment-only filter must still include soft-deleted assignments.
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("assignmentId", String.valueOf(deletedId))
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(deletedId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@Test
+	void listTeacherClassAndAssignmentIntersectWithoutCheckingForeignAssignmentOwnership() throws Exception {
+		startSubmissionAsStudentMember();
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(foreignId, studentOtherId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.param("assignmentId", publishedAssignmentId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		for (long assignmentId : List.of(foreignId, Long.MAX_VALUE)) {
+			mockMvc.perform(get("/api/v1/submissions")
+							.param("classId", classId.toString())
+							.param("assignmentId", String.valueOf(assignmentId))
+							.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.data", hasSize(0)))
+					.andExpect(jsonPath("$.pagination.total").value(0));
+		}
+	}
+
+	@Test
+	void listTeacherRejectsMissingClassEvenWithOwnAssignment() throws Exception {
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", String.valueOf(Long.MAX_VALUE))
+						.param("assignmentId", publishedAssignmentId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void listAdminClassFilterReturnsEmptyForMissingClass() throws Exception {
+		startSubmissionAsStudentMember();
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", String.valueOf(Long.MAX_VALUE))
+						.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+	}
+
+	@Test
+	void listStudentClassFilterKeepsOwnScopeAndRejectsOtherStudentId() throws Exception {
+		long ownId = startSubmissionAsStudentMember();
+		submissionRepository.create(publishedAssignmentId, studentClassmateId, 1);
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(foreignId, studentMemberId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].id").value(ownId))
+				.andExpect(jsonPath("$.data[0].studentId").value(studentMemberId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.param("studentId", studentClassmateId.toString())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden());
 	}
 
 	@Test
@@ -594,7 +827,38 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void submitModuleRejectsResubmission() throws Exception {
+	void submitModuleRejectsAnAttemptStartedBeforeTheDeadlineAfterItCloses() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		Assignment assignment = assignmentRepository.findById(publishedAssignmentId).orElseThrow();
+		assignment.updateFrom(
+				assignment.getClassId(),
+				assignment.getTitle(),
+				assignment.getDescription(),
+				assignment.getOpenAt(),
+				OffsetDateTime.now().minusMinutes(5),
+				assignment.getMaxSubmissions(),
+				assignment.isDeleted(),
+				assignment.getStatus());
+		assignmentRepository.saveAndFlush(assignment);
+		entityManager.clear();
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("Không thể nộp phần làm bài này vì đã quá hạn nộp bài."));
+
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void submitModuleAllowsResubmissionWhileSubmissionIsInProgress() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long submissionModuleId = quizSubmissionModuleId(submissionId);
 		String body = "{\"answers\":["
@@ -610,8 +874,8 @@ class SubmissionApiIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Phần làm bài này đã được nộp."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
 	}
 
 	@Test
@@ -628,6 +892,55 @@ class SubmissionApiIntegrationTest {
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài hoặc câu hỏi."));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"null-only", "null-first", "null-last"})
+	void submitModuleRejectsNullAnswerElementBeforeService(String scenario) throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String validAnswer = "{\"questionId\":" + quizQuestionOne
+				+ ",\"content\":{\"selectedOptionIds\":[1]}}";
+		String answers = "[null]";
+		int nullIndex = 0;
+		if (scenario.equals("null-first")) {
+			answers = "[null," + validAnswer + "]";
+		}
+		if (scenario.equals("null-last")) {
+			answers = "[" + validAnswer + ",null]";
+			nullIndex = 1;
+		}
+		String body = "{\"answers\":" + answers + "}";
+		SubmitModuleRequest parsed = objectMapper.readValue(body, SubmitModuleRequest.class);
+		assertThat(parsed.answers()).hasSize(scenario.equals("null-only") ? 1 : 2);
+		assertThat(parsed.answers().get(nullIndex)).isNull();
+		entityManager.flush();
+		entityManager.clear();
+		Submission before = submissionRepository.findById(submissionId).orElseThrow();
+		SubmissionModule moduleBefore = submissionModuleRepository.findById(submissionModuleId).orElseThrow();
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+
+		ResultActions result = performWithExceptionDetails("A.01 " + scenario,
+				post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body));
+		result.andExpect(status().isBadRequest());
+		MvcResult response = result.andReturn();
+		assertThat(response.getResolvedException()).isInstanceOf(MethodArgumentNotValidException.class);
+		MethodArgumentNotValidException exception =
+				(MethodArgumentNotValidException) response.getResolvedException();
+		assertThat(exception.getBindingResult().getFieldError("answers[" + nullIndex + "]")).isNotNull();
+		assertThat(objectMapper.readTree(response.getResponse().getContentAsString()))
+				.isEqualTo(objectMapper.readTree(objectMapper.writeValueAsString(
+						java.util.Map.of("error", NULL_ANSWER_MESSAGE))));
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionRepository.findById(submissionId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(before);
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(moduleBefore);
 	}
 
 	@Test
@@ -958,7 +1271,7 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void getSubmissionModuleDetailRejectsASubmissionThatIsNotSubmittedYet() throws Exception {
+	void getSubmissionModuleDetailAllowsSubmittedModuleWhenSubmissionIsInProgress() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long submissionModuleId = quizSubmissionModuleId(submissionId);
 		submitQuizModule(submissionModuleId);
@@ -970,8 +1283,9 @@ class SubmissionApiIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Phần làm bài chưa được nộp."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(submissionModuleId))
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
 	}
 
 	@Test
@@ -1103,6 +1417,31 @@ class SubmissionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài."));
 	}
 
+	private ResultActions performWithExceptionDetails(
+			String scenario, MockHttpServletRequestBuilder request) throws Exception {
+		try {
+			ResultActions result = mockMvc.perform(request);
+			MvcResult response = result.andReturn();
+			System.out.println("BE-68 " + scenario + " HTTP " + response.getResponse().getStatus());
+			printExceptionChain(scenario, response.getResolvedException());
+			return result;
+		} catch (Exception exception) {
+			printExceptionChain(scenario, exception);
+			throw exception;
+		}
+	}
+
+	private void printExceptionChain(String scenario, Throwable exception) {
+		if (exception == null) {
+			System.out.println("BE-68 " + scenario + " exception: none");
+		}
+		while (exception != null) {
+			System.out.println("BE-68 " + scenario + " exception: " + exception.getClass().getName()
+					+ ": " + exception.getMessage());
+			exception = exception.getCause();
+		}
+	}
+
 	private long startSubmissionAsStudentMember() throws Exception {
 		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
@@ -1163,10 +1502,18 @@ class SubmissionApiIntegrationTest {
 	}
 
 	private void assertAttemptNumber(int expected) throws Exception {
-		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.attemptNumber").value(expected));
+				.andExpect(jsonPath("$.attemptNumber").value(expected))
+				.andReturn().getResponse().getContentAsString();
+		long submissionId = jsonLong(response, "id");
+		List<SubmissionModule> modules = submissionModuleRepository.findBySubmissionId(submissionId);
+		List<Grading> gradings = gradingRepository.findBySubmissionModuleIds(
+				modules.stream().map(SubmissionModule::getId).toList());
+		assertThat(gradings).hasSize(2);
+		assertThat(gradings).extracting(Grading::getMaxScoreSnapshot)
+				.allSatisfy(snapshot -> assertThat(snapshot).isEqualByComparingTo(BigDecimal.TEN));
 	}
 
 	private long assignment(long classId, AssignmentStatus status, OffsetDateTime openAt, OffsetDateTime closeAt,
@@ -1226,5 +1573,93 @@ class SubmissionApiIntegrationTest {
 			throw new IllegalStateException("Field not found in response: " + json);
 		}
 		return Long.parseLong(matcher.group(1));
+	}
+
+	@Test
+	void audit17ClosedAssignmentMustRejectFileSubmit() throws Exception {
+		// Given: a PUBLISHED assignment with future closeAt, student starts a submission
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		// When: teacher closes the assignment (status → CLOSED, closeAt still in future)
+		mockMvc.perform(patch("/api/v1/assignments/{id}/status", publishedAssignmentId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"status\": \"CLOSED\"}")
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk());
+
+		entityManager.flush();
+		entityManager.clear();
+
+		// Assert — submit-module is rejected with ASSIGNMENT_CLOSED
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict());
+
+		// And: no answers written to the DB
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+
+		// Assert — final submit is rejected with ASSIGNMENT_CLOSED
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict());
+
+		// And: submission status must remain IN_PROGRESS (no data written)
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void publishedAssignmentAcceptsSubmissionBeforeCloseAt() throws Exception {
+		// Given: a PUBLISHED assignment with openAt in the past and closeAt in the future
+		long openAssignmentId = assignment(classId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(24),
+				2, false);
+		module(openAssignmentId, ModuleSkill.READING, ModuleTaskType.QUIZ, 1);
+
+		// When: student starts a submission — must be accepted
+		String startResponse = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", openAssignmentId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long submissionId = jsonLong(startResponse, "id");
+
+		// And: student does final submit — must also be accepted
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		// Then: submission is persisted and SUBMITTED
+		assertThat(submissionRepository.findById(submissionId)).isNotEmpty();
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+	}
+
+	@Test
+	void autoDispatchNotAffectedByClosedGuard() throws Exception {
+		// Given: a PUBLISHED assignment with a QUIZ module — auto-grading is triggered after
+		// submit-module; the CLOSED guard lives only in submitModule/submit, not in the
+		// auto-grading event listener, so a quiz submission on a PUBLISHED assignment must
+		// complete successfully without interference from the guard.
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		// When: student submits the quiz module on the still-PUBLISHED assignment
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		// Then: answers are persisted and module is SUBMITTED — auto-dispatch path is intact
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).hasSize(2);
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
 	}
 }

@@ -121,7 +121,7 @@ class StudentEvaluationApiIntegrationTest {
 	}
 
 	@Test
-	void createChecksCurrentTeacherAndMembershipThenOriginalAuthorCanEditAndDelete() throws Exception {
+	void classTransferMovesEditAndDeleteRightsToTheNewInChargeTeacher() throws Exception {
 		String body = "{\"classId\":" + classOneId + ",\"content\":\"Good progress\"}";
 
 		mockMvc.perform(post("/api/v1/students/{id}/evaluations", studentOneId)
@@ -146,15 +146,16 @@ class StudentEvaluationApiIntegrationTest {
 		classRepository.saveAndFlush(classEntity);
 
 		mockMvc.perform(put("/api/v1/evaluations/{id}", evaluationId)
-					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER))
-					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"content\":\"Edited by a different teacher\"}"))
-				.andExpect(status().isForbidden());
-
-		mockMvc.perform(put("/api/v1/evaluations/{id}", evaluationId)
 					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER))
 					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"content\":\"Updated by original teacher\"}"))
+					.content("{\"content\":\"Edited by the former teacher\"}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(put("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"content\":\"Updated by the new teacher\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.message").value("Cập nhật đánh giá thành công."));
 
@@ -162,7 +163,7 @@ class StudentEvaluationApiIntegrationTest {
 					.header("Authorization", bearer(studentOneId, UserRole.STUDENT)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(evaluationId))
-				.andExpect(jsonPath("$.content").value("Updated by original teacher"))
+				.andExpect(jsonPath("$.content").value("Updated by the new teacher"))
 				.andExpect(jsonPath("$.classId").doesNotExist())
 				.andExpect(jsonPath("$.teacherName").doesNotExist())
 				.andExpect(jsonPath("$.createdAt").doesNotExist());
@@ -174,11 +175,16 @@ class StudentEvaluationApiIntegrationTest {
 
 		mockMvc.perform(delete("/api/v1/evaluations/{id}", evaluationId)
 					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(delete("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.message").value("Đã xoá đánh giá."));
 
 		mockMvc.perform(get("/api/v1/evaluations/{id}", evaluationId)
-					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Không tìm thấy đánh giá."));
 	}
@@ -206,7 +212,7 @@ class StudentEvaluationApiIntegrationTest {
 					.param("classId", Long.toString(classOneId))
 					.param("page", "1")
 					.param("limit", "1")
-					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
+					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.length()").value(1))
 				.andExpect(jsonPath("$.data[0].id").value(newestId))
@@ -218,6 +224,18 @@ class StudentEvaluationApiIntegrationTest {
 				.andExpect(jsonPath("$.pagination.page").value(1))
 				.andExpect(jsonPath("$.pagination.limit").value(1))
 				.andExpect(jsonPath("$.pagination.total").value(2));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("classId", Long.toString(classOneId))
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.length()").value(0))
+				.andExpect(jsonPath("$.pagination.total").value(0));
 
 		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
 					.header("Authorization", bearer(studentOneId, UserRole.STUDENT)))
@@ -233,7 +251,10 @@ class StudentEvaluationApiIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
 					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.length()").value(3))
+				.andExpect(jsonPath("$.data[0].id").value(newestId))
+				.andExpect(jsonPath("$.pagination.total").value(3));
 
 		mockMvc.perform(get("/api/v1/students/{id}/evaluations", Long.MAX_VALUE)
 					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
@@ -354,7 +375,7 @@ class StudentEvaluationApiIntegrationTest {
 	}
 
 	@Test
-	void anotherTeacherCannotDeleteEvaluationAndAuthorCanStillReadIt() throws Exception {
+	void nonInChargeTeacherCannotDeleteWhileInChargeTeacherCanStillRead() throws Exception {
 		long evaluationId = saveEvaluation(
 				studentOneId, teacherOneId, classOneId, "Author's evaluation", "2026-09-22T10:00:00Z");
 
@@ -370,14 +391,32 @@ class StudentEvaluationApiIntegrationTest {
 	}
 
 	@Test
-	void adminCannotGetEvaluationDetail() throws Exception {
+	void onlyTeacherInChargeOfTheClassCanReadEvaluationDetail() throws Exception {
+		long evaluationId = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Owned class detail", "2026-09-22T10:00:00Z");
+
+		mockMvc.perform(get("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(get("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(evaluationId))
+				.andExpect(jsonPath("$.content").value("Owned class detail"));
+	}
+
+	@Test
+	void adminCanGetEvaluationDetail() throws Exception {
 		long evaluationId = saveEvaluation(
 				studentOneId, teacherOneId, classOneId, "Admin detail fixture", "2026-09-22T10:00:00Z");
 
 		mockMvc.perform(get("/api/v1/evaluations/{id}", evaluationId)
 					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
-				.andExpect(status().isForbidden())
-				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(evaluationId))
+				.andExpect(jsonPath("$.content").value("Admin detail fixture"));
 	}
 
 	@Test

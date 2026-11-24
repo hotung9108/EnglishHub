@@ -12,6 +12,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -60,12 +61,21 @@ public class S3StorageService implements StorageService, AutoCloseable {
 
 	@Override
 	public PresignedUpload generatePresignedPutUrl(String storageKey, String contentType) {
+		return generatePresignedPutUrl(storageKey, contentType, null);
+	}
+
+	@Override
+	public PresignedUpload generatePresignedPutUrl(String storageKey, String contentType, Long expectedContentLength) {
 		PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(PutObjectPresignRequest.builder()
 				.signatureDuration(PRESIGN_TTL)
-				.putObjectRequest(putObject -> putObject
-						.bucket(bucket)
-						.key(storageKey)
-						.contentType(contentType))
+				.putObjectRequest(putObject -> {
+					putObject.bucket(bucket)
+							.key(storageKey)
+							.contentType(contentType);
+					if (expectedContentLength != null && expectedContentLength > 0) {
+						putObject.contentLength(expectedContentLength);
+					}
+				})
 				.build());
 		return new PresignedUpload(
 				presigned.url().toString(),
@@ -74,14 +84,28 @@ public class S3StorageService implements StorageService, AutoCloseable {
 	}
 
 	@Override
-	public String generatePresignedGetUrl(String storageKey) {
+	public PresignedDownload generatePresignedDownload(String storageKey, Duration duration, String responseContentDisposition) {
+		Duration ttl = duration != null ? duration : PRESIGN_TTL;
+		GetObjectRequest.Builder getObjectBuilder = GetObjectRequest.builder()
+				.bucket(bucket)
+				.key(storageKey);
+		if (responseContentDisposition != null && !responseContentDisposition.isBlank()) {
+			getObjectBuilder.responseContentDisposition(responseContentDisposition);
+		}
 		PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(GetObjectPresignRequest.builder()
-				.signatureDuration(PRESIGN_TTL)
-				.getObjectRequest(getObject -> getObject
-						.bucket(bucket)
-						.key(storageKey))
+				.signatureDuration(ttl)
+				.getObjectRequest(getObjectBuilder.build())
 				.build());
-		return presigned.url().toString();
+		return new PresignedDownload(
+				presigned.url().toString(),
+				storageKey,
+				OffsetDateTime.ofInstant(presigned.expiration(), ZoneOffset.UTC));
+	}
+
+	@Override
+	public String generatePresignedGetUrl(String storageKey) {
+		PresignedDownload download = generatePresignedDownload(storageKey, PRESIGN_TTL, null);
+		return download != null ? download.downloadUrl() : null;
 	}
 
 	@Override
@@ -114,6 +138,28 @@ public class S3StorageService implements StorageService, AutoCloseable {
 			}
 			throw exception;
 		}
+	}
+
+	@Override
+	public Long getObjectSize(String storageKey) {
+		try {
+			return s3Client.headObject(HeadObjectRequest.builder().bucket(bucket).key(storageKey).build()).contentLength();
+		} catch (NoSuchKeyException exception) {
+			return null;
+		} catch (S3Exception exception) {
+			if (exception.statusCode() == 404) {
+				return null;
+			}
+			throw exception;
+		}
+	}
+
+	@Override
+	public void deleteObject(String storageKey) {
+		s3Client.deleteObject(DeleteObjectRequest.builder()
+				.bucket(bucket)
+				.key(storageKey)
+				.build());
 	}
 
 	@Override

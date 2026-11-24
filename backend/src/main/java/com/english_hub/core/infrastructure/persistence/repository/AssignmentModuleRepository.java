@@ -16,6 +16,8 @@ public interface AssignmentModuleRepository extends JpaRepository<AssignmentModu
 
 	List<AssignmentModule> findByAssignmentIdOrderByOrderIndexAsc(Long assignmentId);
 
+	List<AssignmentModule> findByAssignmentIdInOrderByAssignmentIdAscOrderIndexAsc(List<Long> assignmentIds);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
 	@Query("select module from AssignmentModule module where module.id = :id")

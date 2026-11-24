@@ -1,6 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
+import {
+  getStudentAssignmentActionRoute,
+  isModuleSubmittedOrGraded,
+} from '../utils/examStepper.utils';
 import { 
   PenTool, 
   Mic, 
@@ -8,129 +16,255 @@ import {
   Headphones, 
   FileText, 
   CheckCircle2, 
-  Clock, 
-  Hourglass, 
   Search, 
   Calendar, 
-  User, 
-  Sparkles,
-  Layers,
-  Check
+  Layers, 
+  AlertCircle, 
+  RefreshCw,
+  GraduationCap,
+  ChevronDown,
+  X
 } from 'lucide-react';
+import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
+import '../styles/student-ecosystem.css';
 
-type AssignmentStatus = 'not_started' | 'pending' | 'ai_processing' | 'graded';
+type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
 
-interface MockAssignment {
-  id: string;
-  classId: string;
+interface StudentAssignmentDisplay {
+  id: string | number;
+  classId: string | number;
+  className: string;
   title: string;
-  type: string; // e.g. 'Writing Task 2', 'Speaking Part 2', 'Reading', 'Listening'
-  status: AssignmentStatus;
+  type: string; // e.g. 'Writing', 'Speaking', 'Reading', 'Listening'
+  activeSkill?: string | null;
+  status: AssignmentDisplayStatus;
+  submissionId?: number;
   submittedOn?: string;
   deadline?: string;
-  teacherName: string;
-  hasAudio?: boolean;
+  teacherName?: string;
   score?: number;
-  accuracy?: string; // e.g. '38/40'
-  
+  accuracy?: string;
   aiScore?: number;
   daysLeft?: number;
   requirement?: string;
 }
 
-const MOCK_CLASSES = [
-  { id: '1', name: 'IELTS Intensive Band 6.5 - 7.5', code: 'ENG-IELTS-6.5A', teacher: 'ThS. Trần Thị Mai Lan' },
-  { id: '2', name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao', code: 'ENG-GRAM-ADV', teacher: 'Thầy Hoàng Minh Đức' },
-];
-
-const MOCK_ASSIGNMENTS: MockAssignment[] = [
-  {
-    id: 'a1', classId: '1', title: 'HW-01: Renewable Energy Essay (Writing Task 2)', type: 'Writing Task 2', status: 'pending',
-    submittedOn: '04/09/2026', deadline: '05/09/2026', teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a2', classId: '1', title: 'HW-02: Technology Cue Card (Speaking Part 2)', type: 'Speaking Part 2', status: 'ai_processing',
-    submittedOn: '04/09/2026', hasAudio: true, aiScore: 85, teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a3', classId: '1', title: 'HW-03: Maya Civilization Reading Passage', type: 'Reading', status: 'graded',
-    submittedOn: '03/09/2026', accuracy: '38/40', score: 9.0, teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a4', classId: '2', title: 'HW-04: Academic Vocabulary Listening Mock Test', type: 'Listening', status: 'graded',
-    submittedOn: '01/09/2026', accuracy: '36/40', score: 8.5, teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a5', classId: '2', title: 'HW-05: Environment Problem Solution Discussion (Speaking)', type: 'Speaking', status: 'not_started',
-    deadline: '08/09/2026', daysLeft: 2, requirement: 'Ghi âm tối thiểu 2 phút', teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a6', classId: '2', title: 'HW-06: Multiple Choice (Listening Part 3)', type: 'Listening', status: 'not_started',
-    deadline: '11/09/2026', daysLeft: 5, requirement: '1 task', teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a7', classId: '1', title: 'RD-01: The Evolution of Printing (Reading)', type: 'Reading', status: 'not_started',
-    deadline: '10/09/2026', daysLeft: 4, teacherName: 'Cô Mai Lan'
-  }
-];
-
 const StudentAssignments: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [rawAssignments, setRawAssignments] = useState<StudentAssignmentDisplay[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'not_started' | 'grading' | 'graded'>('all');
 
-  const getAssignmentRoute = (assignment: MockAssignment) => {
-    const typeLower = assignment.type.toLowerCase();
-    if (typeLower.includes('speaking')) {
-      return `/student/assignments/speaking/${assignment.id}`;
-    }
-    if (typeLower.includes('reading')) {
-      return `/student/assignments/reading/${assignment.id}`;
-    }
-    if (typeLower.includes('listening')) {
-      return `/student/assignments/listening/${assignment.id}`;
-    }
-    return `/student/assignments/${assignment.id}`;
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handleStatusFilterChange = (status: 'all' | 'not_started' | 'grading' | 'graded') => {
+    setActiveStatusFilter(status);
+    setCurrentPage(1);
   };
+
+  const handleClassFilterChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAssignmentsData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch student's classes
+        const classRes = await classService.list({ limit: 50 });
+        const fetchedClasses = classRes.data || [];
+        if (isMounted) setClasses(fetchedClasses);
+
+        // 2. Fetch student submissions once
+        let studentSubmissions: SubmissionListItem[] = [];
+        if (user?.id) {
+          try {
+            const subRes = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
+            studentSubmissions = subRes.data || [];
+          } catch {
+            studentSubmissions = [];
+          }
+        }
+
+        // 3. Fetch assignments across all enrolled classes and map in memory
+        const assignmentPromises = fetchedClasses.map(async (cls) => {
+          try {
+            const res = await assignmentService.listAssignments(cls.id, { limit: 50 });
+            const items = res.data || [];
+            return items.map((a: AssignmentSummary): StudentAssignmentDisplay => {
+              const classSubs = studentSubmissions.filter((s) => s.assignmentId === a.id);
+              let matchedSub: SubmissionListItem | undefined = undefined;
+              if (classSubs.length > 0) {
+                matchedSub = classSubs.find(s => isSubmissionGraded(s))
+                  || classSubs.find(s => getSubmissionFinalScore(s) !== null)
+                  || classSubs.find(s => s.status === 'SUBMITTED')
+                  || classSubs.find(s => s.status === 'IN_PROGRESS')
+                  || classSubs[0];
+              }
+
+              let displayStatus: AssignmentDisplayStatus = 'not_started';
+              let score: number | undefined = undefined;
+
+              if (matchedSub) {
+                const finalSc = getSubmissionFinalScore(matchedSub);
+                if (isSubmissionGraded(matchedSub) || finalSc !== null) {
+                  displayStatus = 'graded';
+                  score = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
+                } else if (matchedSub.status === 'SUBMITTED') {
+                  displayStatus = 'pending';
+                } else if (matchedSub.status === 'IN_PROGRESS') {
+                  displayStatus = 'in_progress';
+                }
+              }
+
+              // Determine skill type from a.skills or fallback to title
+              let skillType = 'General Task';
+              const firstSkill = a.skills?.[0]?.toUpperCase();
+              if (firstSkill === 'SPEAKING') {
+                skillType = 'Speaking';
+              } else if (firstSkill === 'WRITING') {
+                skillType = 'Writing';
+              } else if (firstSkill === 'READING') {
+                skillType = 'Reading';
+              } else if (firstSkill === 'LISTENING') {
+                skillType = 'Listening';
+              } else {
+                const lowerTitle = a.title.toLowerCase();
+                if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
+                else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
+                else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
+                else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+              }
+
+              // Determine active incomplete module skill when attempt is in_progress
+              let activeSkill: string | null = null;
+              if (displayStatus === 'in_progress') {
+                if (matchedSub?.modules && matchedSub.modules.length > 0) {
+                  const nextSubMod = matchedSub.modules.find(
+                    (sm) => !isModuleSubmittedOrGraded(sm)
+                  );
+                  activeSkill = nextSubMod?.skill ?? null;
+                } else if (skillType !== 'General Task') {
+                  activeSkill = skillType;
+                }
+              }
+
+              // Calculate days left
+              let daysLeft = 3;
+              if (a.closeAt) {
+                const diffMs = new Date(a.closeAt).getTime() - Date.now();
+                daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              }
+
+              return {
+                id: a.id,
+                classId: String(cls.id),
+                className: cls.name,
+                title: a.title,
+                type: skillType,
+                activeSkill,
+                status: displayStatus,
+                submissionId: matchedSub?.id,
+                submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
+                deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
+                teacherName: 'Giảng viên phụ trách',
+                score,
+                daysLeft,
+              };
+            });
+          } catch {
+            return [];
+          }
+        });
+
+        const assignmentResults = await Promise.all(assignmentPromises);
+        const combined = assignmentResults.flat();
+        if (isMounted) setRawAssignments(combined);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải danh sách bài tập. Vui lòng thử lại.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void fetchAssignmentsData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, reloadKey]);
+
 
   // Filtered by class & search query & status filter
   const filteredAssignments = useMemo(() => {
-    return MOCK_ASSIGNMENTS.filter((a) => {
-      const matchClass = selectedClassId === 'all' || a.classId === selectedClassId;
+    return rawAssignments.filter((a) => {
+      const matchClass = selectedClassId === 'all' || String(a.classId) === String(selectedClassId);
       const matchSearch = searchQuery.trim() === '' || 
         a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.teacherName.toLowerCase().includes(searchQuery.toLowerCase());
+        (a.teacherName && a.teacherName.toLowerCase().includes(searchQuery.toLowerCase()));
       
       let matchStatus = true;
       if (activeStatusFilter === 'not_started') {
         matchStatus = a.status === 'not_started';
       } else if (activeStatusFilter === 'grading') {
-        matchStatus = a.status === 'pending' || a.status === 'ai_processing';
+        matchStatus = a.status === 'pending' || a.status === 'ai_processing' || a.status === 'in_progress';
       } else if (activeStatusFilter === 'graded') {
         matchStatus = a.status === 'graded';
       }
 
       return matchClass && matchSearch && matchStatus;
     });
-  }, [selectedClassId, searchQuery, activeStatusFilter]);
+  }, [rawAssignments, selectedClassId, searchQuery, activeStatusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedAssignments = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredAssignments.slice(start, start + pageSize);
+  }, [filteredAssignments, safeCurrentPage, pageSize]);
 
   // Overall counts for stats cards based on class filter
   const classAssignments = useMemo(() => {
     return selectedClassId === 'all' 
-      ? MOCK_ASSIGNMENTS 
-      : MOCK_ASSIGNMENTS.filter(a => a.classId === selectedClassId);
-  }, [selectedClassId]);
+      ? rawAssignments 
+      : rawAssignments.filter(a => String(a.classId) === String(selectedClassId));
+  }, [rawAssignments, selectedClassId]);
 
   const stats = {
     notStarted: classAssignments.filter(a => a.status === 'not_started').length,
-    grading: classAssignments.filter(a => a.status === 'pending' || a.status === 'ai_processing').length,
+    grading: classAssignments.filter(a => a.status === 'pending' || a.status === 'ai_processing' || a.status === 'in_progress').length,
     graded: classAssignments.filter(a => a.status === 'graded').length,
   };
 
-  const selectedClass = MOCK_CLASSES.find(c => c.id === selectedClassId);
+  const selectedClass = classes.find(c => String(c.id) === String(selectedClassId));
 
   // Helper to render type icons & colors
   const getTypeBadge = (type: string) => {
@@ -138,676 +272,299 @@ const StudentAssignments: React.FC = () => {
     if (lower.includes('writing')) {
       return {
         icon: <PenTool size={18} strokeWidth={2.2} />,
-        bg: '#F5F3FF',
-        color: '#7C3AED',
+        skillClass: 'writing',
         label: type
       };
     }
     if (lower.includes('speaking')) {
       return {
         icon: <Mic size={18} strokeWidth={2.2} />,
-        bg: '#FFF1F2',
-        color: '#E11D48',
+        skillClass: 'speaking',
         label: type
       };
     }
     if (lower.includes('reading')) {
       return {
         icon: <BookOpen size={18} strokeWidth={2.2} />,
-        bg: '#EFF6FF',
-        color: '#2563EB',
+        skillClass: 'reading',
         label: type
       };
     }
     if (lower.includes('listening')) {
       return {
         icon: <Headphones size={18} strokeWidth={2.2} />,
-        bg: '#FFFBEB',
-        color: '#D97706',
+        skillClass: 'listening',
         label: type
       };
     }
     return {
       icon: <FileText size={18} strokeWidth={2.2} />,
-      bg: '#F1F5F9',
-      color: '#475569',
+      skillClass: 'default',
       label: type
     };
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '48px' }}>
+    <div className="std-eco-container">
       {/* 1. Page Header */}
-      <div style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', color: '#0F172A', margin: 0 }}>
-            {t('studentAssignments.title')}
+      <div className="std-eco-header">
+        <div className="std-eco-header-main">
+          <div className="std-eco-breadcrumb">
+            <span>{t('studentPortal') || 'Cổng Học viên'}</span>
+            <span className="std-eco-breadcrumb-separator">/</span>
+            <span className="current">{t('studentAssignments.title')}</span>
+          </div>
+          <h1 className="std-eco-title">
+            <span>{t('studentAssignments.title')}</span>
           </h1>
-          <span style={{ 
-            fontSize: '12px', 
-            fontWeight: 600, 
-            padding: '3px 10px', 
-            borderRadius: '9999px', 
-            backgroundColor: '#EEF2FF', 
-            color: '#4F46E5' 
-          }}>
-            {classAssignments.length} {t('studentAssignments.unitAssignments')}
-          </span>
-        </div>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-          {t('studentAssignments.subtitle')}
-        </p>
-      </div>
-
-      {/* 2. Stat Summary Cards (Mobbin Dashboard Cards) */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-        gap: '16px', 
-        marginBottom: '28px' 
-      }}>
-        {/* Card: Chưa làm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'not_started' ? 'all' : 'not_started')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'not_started' ? '2px solid #64748B' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'not_started' 
-              ? '0 10px 25px -5px rgba(100, 116, 139, 0.15)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'not_started') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'not_started') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusNotStarted')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A', lineHeight: 1 }}>
-              {stats.notStarted}
-            </div>
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
-              Cần hoàn thành
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#F1F5F9', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#475569' 
-          }}>
-            <Clock size={22} strokeWidth={2} />
-          </div>
-        </div>
-
-        {/* Card: Đang chấm điểm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'grading' ? 'all' : 'grading')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'grading' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'grading' 
-              ? '0 10px 25px -5px rgba(245, 158, 11, 0.2)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'grading') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(245, 158, 11, 0.12)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'grading') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusGrading')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#D97706', lineHeight: 1 }}>
-              {stats.grading}
-            </div>
-            <div style={{ fontSize: '12px', color: '#B45309', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }}></span>
-              Đang chấm & AI xử lý
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#FFFBEB', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#D97706' 
-          }}>
-            <Hourglass size={22} strokeWidth={2} />
-          </div>
-        </div>
-
-        {/* Card: Đã có điểm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'graded' ? 'all' : 'graded')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'graded' ? '2px solid #10B981' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'graded' 
-              ? '0 10px 25px -5px rgba(16, 185, 129, 0.2)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'graded') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(16, 185, 129, 0.12)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'graded') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusGraded')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#059669', lineHeight: 1 }}>
-              {stats.graded}
-            </div>
-            <div style={{ fontSize: '12px', color: '#047857', marginTop: '6px' }}>
-              Đã hoàn tất đánh giá
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#ECFDF5', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#059669' 
-          }}>
-            <CheckCircle2 size={22} strokeWidth={2} />
-          </div>
         </div>
       </div>
 
-      {/* 3. Filter Bar & Search (Mobbin Segmented Control & Clean Search) */}
-      <div style={{ 
-        display: 'flex', 
-        flexWrap: 'wrap', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        gap: '16px', 
-        marginBottom: '24px' 
-      }}>
-        {/* Class Filter Segmented Pills */}
-        <div style={{ 
-          display: 'inline-flex', 
-          alignItems: 'center', 
-          backgroundColor: '#F1F5F9', 
-          borderRadius: '9999px', 
-          padding: '4px', 
-          gap: '4px',
-          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
-        }}>
-          <button 
-            onClick={() => setSelectedClassId('all')}
-            style={{ 
-              padding: '6px 16px', 
-              borderRadius: '9999px', 
-              fontSize: '13px', 
-              fontWeight: selectedClassId === 'all' ? 600 : 500,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: selectedClassId === 'all' ? '#FFFFFF' : 'transparent',
-              color: selectedClassId === 'all' ? '#0F172A' : '#64748B',
-              boxShadow: selectedClassId === 'all' ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-              transition: 'all 0.18s ease'
-            }}
+      {/* Error Banner */}
+      {error && (
+        <div className="analytics-error-banner">
+          <div className="flex items-center gap-10">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleRetry}
+            icon={<RefreshCw size={14} />}
           >
-            Tất cả bài tập
+            {t('studentAssignments.retry')}
+          </Button>
+        </div>
+      )}
+
+      {/* 2. Top Summary Stat Cards */}
+      <div className="std-asg-stats-grid">
+        <MetricCard
+          title={t('studentAssignments.statNotStarted')}
+          value={isLoading ? '...' : stats.notStarted}
+        />
+        <MetricCard
+          title={t('studentAssignments.statGrading')}
+          value={isLoading ? '...' : stats.grading}
+        />
+        <MetricCard
+          title={t('studentAssignments.statGraded')}
+          value={isLoading ? '...' : stats.graded}
+        />
+      </div>
+
+      {/* 3. Filter Toolbar */}
+      <div className="std-asg-toolbar">
+        {/* Status Pills */}
+        <div className="std-eco-pills">
+          <button
+            type="button"
+            onClick={() => handleStatusFilterChange('all')}
+            className={`std-eco-pill ${activeStatusFilter === 'all' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabAll')} <span className="std-eco-pill-badge">{classAssignments.length}</span>
           </button>
-          {MOCK_CLASSES.map(c => (
-            <button 
-              key={c.id}
-              onClick={() => setSelectedClassId(c.id)}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '9999px', 
-                fontSize: '13px', 
-                fontWeight: selectedClassId === c.id ? 600 : 500,
-                cursor: 'pointer',
-                border: 'none',
-                backgroundColor: selectedClassId === c.id ? '#FFFFFF' : 'transparent',
-                color: selectedClassId === c.id ? '#0F172A' : '#64748B',
-                boxShadow: selectedClassId === c.id ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-                transition: 'all 0.18s ease'
-              }}
-            >
-              {c.code}
-            </button>
-          ))}
+
+          <button
+            type="button"
+            onClick={() => handleStatusFilterChange('not_started')}
+            className={`std-eco-pill ${activeStatusFilter === 'not_started' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabNotStarted')} <span className="std-eco-pill-badge">{stats.notStarted}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleStatusFilterChange('grading')}
+            className={`std-eco-pill ${activeStatusFilter === 'grading' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabGrading')} <span className="std-eco-pill-badge">{stats.grading}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleStatusFilterChange('graded')}
+            className={`std-eco-pill ${activeStatusFilter === 'graded' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabGraded')} <span className="std-eco-pill-badge">{stats.graded}</span>
+          </button>
         </div>
 
-        {/* Search & Active Status Filter Tag */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1', maxWidth: '380px', minWidth: '240px' }}>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              type="text" 
-              placeholder="Tìm theo tên bài, kỹ năng..." 
+        {/* Search & Class Dropdown */}
+        <div className="std-asg-toolbar-right">
+          <div className={`std-asg-select-wrap ${selectedClassId !== 'all' ? 'has-value' : ''}`}>
+            <GraduationCap size={15} className="std-asg-select-icon" />
+            <select
+              id="student-class-select"
+              value={selectedClassId}
+              onChange={(e) => handleClassFilterChange(e.target.value)}
+              className={`std-asg-select ${selectedClassId !== 'all' ? 'has-value' : ''}`}
+              aria-label={t('studentAssignments.filterClassLabel')}
+            >
+              <option value="all">{t('studentAssignments.filterAllClasses')}</option>
+              {classes.map(c => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="std-asg-select-arrow" />
+          </div>
+
+          <div className="std-eco-search-wrap">
+            <Search size={15} className="std-eco-search-icon" />
+            <input
+              type="text"
+              placeholder={t('studentAssignments.searchPlaceholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ 
-                width: '100%', 
-                padding: '8px 12px 8px 36px', 
-                borderRadius: '10px', 
-                border: '1px solid #E2E8F0', 
-                backgroundColor: '#FFFFFF',
-                fontSize: '13px',
-                color: '#0F172A',
-                outline: 'none',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#6366F1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.15)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#E2E8F0';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-              }}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="std-eco-search-input"
             />
           </div>
-          {activeStatusFilter !== 'all' && (
-            <button 
-              onClick={() => setActiveStatusFilter('all')}
-              style={{
-                fontSize: '12px',
-                color: '#64748B',
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Bỏ lọc trạng thái ✕
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 4. Active Course Info Banner (If specific class selected) */}
+      {/* Selected Class Filter Pill */}
       {selectedClass && (
-        <div style={{ 
-          backgroundColor: '#F8FAFC', 
-          border: '1px solid #E2E8F0', 
-          borderRadius: '12px', 
-          padding: '12px 18px', 
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '13px',
-          color: '#475569'
-        }}>
-          <Layers size={16} color="#64748B" />
-          <span>
-            <strong>{selectedClass.name}</strong> • Giảng viên: {selectedClass.teacher}
+        <div className="std-asg-active-class-bar">
+          <span className="std-asg-active-class-chip">
+            <Layers size={13} />
+            <span>{t('studentAssignments.viewingClassPrefix')}<strong>{selectedClass.name}</strong></span>
+            <button 
+              type="button"
+              onClick={() => handleClassFilterChange('all')}
+              className="std-asg-clear-class-btn"
+              title="Xem tất cả lớp"
+              aria-label="Xóa bộ lọc lớp"
+            >
+              <X size={12} strokeWidth={2.5} />
+            </button>
           </span>
         </div>
       )}
 
-      {/* 5. Assignment Cards List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {filteredAssignments.length === 0 ? (
-          <div style={{ 
-            backgroundColor: '#FFFFFF', 
-            borderRadius: '16px', 
-            padding: '48px 24px', 
-            textAlign: 'center', 
-            border: '1px dashed #CBD5E1' 
-          }}>
-            <FileText size={36} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontSize: '15px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-              Không tìm thấy bài tập phù hợp
-            </div>
-            <div style={{ fontSize: '13px', color: '#64748B' }}>
-              Hãy thử chọn lớp học khác hoặc thay đổi từ khóa tìm kiếm.
-            </div>
+      {/* 4. Assignments List */}
+      <div className="std-asg-list">
+        {isLoading ? (
+          <div className="flex flex-col gap-12">
+            <Skeleton height="88px" borderRadius="12px" />
+            <Skeleton height="88px" borderRadius="12px" />
+            <Skeleton height="88px" borderRadius="12px" />
           </div>
+        ) : filteredAssignments.length === 0 ? (
+          <EmptyState
+            icon={<FileText size={40} />}
+            title={t('studentAssignments.emptyTitle')}
+            description={t('studentAssignments.emptyDesc')}
+          />
         ) : (
-          filteredAssignments.map((assignment) => {
-            const typeBadge = getTypeBadge(assignment.type);
-            const classObj = MOCK_CLASSES.find(c => c.id === assignment.classId);
+          paginatedAssignments.map((assignment) => {
+            const badge = getTypeBadge(assignment.type);
+            const handleAction = () => {
+navigate(
+                getStudentAssignmentActionRoute({
+                  id: assignment.id,
+                  status: assignment.status,
+                  submissionId: assignment.submissionId,
+                  activeSkill: assignment.activeSkill,
+                  type: assignment.type,
+                })
+              );
+            };
 
             return (
-              <div 
-                key={assignment.id} 
-                onClick={() => {
-                  if (assignment.status === 'graded') {
-                    navigate(`/student/assignments/${assignment.id}/result`);
-                  } else if (assignment.status === 'not_started') {
-                    navigate(`/student/assignments/${assignment.id}/overview`);
-                  } else {
-                    navigate(getAssignmentRoute(assignment));
-                  }
-                }}
-                style={{ 
-                  backgroundColor: '#FFFFFF', 
-                  borderRadius: '16px', 
-                  padding: '18px 22px', 
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '16px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 10px 20px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.03)';
-                  e.currentTarget.style.borderColor = '#CBD5E1';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)';
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                }}
+              <div
+                key={assignment.id}
+                onClick={handleAction}
+                className="std-asg-card"
               >
-                {/* Left: Icon Box + Details */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1', minWidth: '280px' }}>
-                  {/* Skill Icon */}
-                  <div style={{ 
-                    width: '46px', 
-                    height: '46px', 
-                    borderRadius: '12px', 
-                    backgroundColor: typeBadge.bg, 
-                    color: typeBadge.color,
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    {typeBadge.icon}
+                {/* Left: Icon & Info */}
+                <div className="std-asg-card-left">
+                  <div className={`std-asg-icon-box ${badge.skillClass}`}>
+                    {badge.icon}
                   </div>
 
-                  {/* Content Info */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {/* Tags row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: 600, 
-                        padding: '2px 8px', 
-                        borderRadius: '6px', 
-                        backgroundColor: '#F1F5F9', 
-                        color: '#475569' 
-                      }}>
-                        {classObj?.code || 'ENG'}
-                      </span>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: 600, 
-                        padding: '2px 8px', 
-                        borderRadius: '6px', 
-                        backgroundColor: typeBadge.bg, 
-                        color: typeBadge.color 
-                      }}>
+                  <div className="std-asg-card-content">
+                    <div className="std-asg-card-header-row">
+                      <span className={`std-skill-tag ${badge.skillClass}`}>
                         {assignment.type}
                       </span>
-                      {assignment.daysLeft && assignment.daysLeft <= 3 && assignment.status === 'not_started' && (
-                        <span style={{ 
-                          fontSize: '11px', 
-                          fontWeight: 600, 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          backgroundColor: '#FEF2F2', 
-                          color: '#EF4444' 
-                        }}>
-                          {t('studentAssignments.badgeExpiring')}
-                        </span>
-                      )}
+                      <span className="std-asg-class-pill">
+                        <BookOpen size={11} />
+                        <span>{assignment.className}</span>
+                      </span>
                     </div>
 
-                    {/* Title */}
-                    <h3 style={{ 
-                      fontSize: '15px', 
-                      fontWeight: 600, 
-                      color: '#0F172A', 
-                      margin: 0,
-                      lineHeight: 1.4
-                    }}>
+                    <h3 className="std-asg-card-title">
                       {assignment.title}
                     </h3>
 
-                    {/* Meta info row */}
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#64748B', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '12px', 
-                      flexWrap: 'wrap' 
-                    }}>
-                      {/* Status-specific metadata */}
-                      {assignment.status === 'pending' && (
-                        <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={13} color="#94A3B8" /> {t('studentAssignments.submittedOn')}{assignment.submittedOn}
-                          </span>
-                          <span>•</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <User size={13} color="#94A3B8" /> {t('studentAssignments.teacherLabel')}{assignment.teacherName}
-                          </span>
-                          {assignment.deadline && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.deadlinePrefix')}{assignment.deadline}</span>
-                            </>
+                    {/* Metadata & Deadlines */}
+                    <div className="std-asg-card-meta">
+                      {assignment.submittedOn ? (
+                        <span className="std-asg-meta-item text-success">
+                          <CheckCircle2 size={13} />
+                          <span>{t('studentAssignments.submittedOn')}{assignment.submittedOn}</span>
+                        </span>
+                      ) : (
+                        <span className={`std-asg-meta-item ${assignment.daysLeft !== undefined && assignment.daysLeft <= 2 ? 'urgent' : ''}`}>
+                          <Calendar size={13} />
+                          <span>{t('studentAssignments.deadlinePrefix')}{assignment.deadline || t('studentAssignments.noDeadline')}</span>
+                          {assignment.daysLeft !== undefined && assignment.daysLeft > 0 && assignment.daysLeft <= 3 && (
+                            <span className="std-asg-urgent-badge">
+                              {assignment.daysLeft === 1 ? 'Hôm nay' : `Còn ${assignment.daysLeft} ngày`}
+                            </span>
                           )}
-                        </>
-                      )}
-
-                      {assignment.status === 'ai_processing' && (
-                        <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={13} color="#94A3B8" /> {t('studentAssignments.submittedOn')}{assignment.submittedOn}
-                          </span>
-                          <span>•</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#D97706' }}>
-                            <Sparkles size={13} color="#D97706" /> {t('studentAssignments.aiEngine')}
-                          </span>
-                        </>
-                      )}
-
-                      {assignment.status === 'graded' && (
-                        <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#059669' }}>
-                            <Check size={13} color="#059669" /> {t('studentAssignments.completedOn')}{assignment.submittedOn}
-                          </span>
-                          {assignment.accuracy && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.accuracyPrefix')}{assignment.accuracy}{t('studentAssignments.correctAnswers')}</span>
-                            </>
-                          )}
-                          {assignment.teacherName && (
-                            <>
-                              <span>•</span>
-                              <span>{assignment.teacherName}</span>
-                            </>
-                          )}
-                        </>
-                      )}
-
-                      {assignment.status === 'not_started' && (
-                        <>
-                          <span style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '4px', 
-                            color: assignment.daysLeft && assignment.daysLeft <= 3 ? '#DC2626' : '#64748B',
-                            fontWeight: assignment.daysLeft && assignment.daysLeft <= 3 ? 600 : 400
-                          }}>
-                            <Calendar size={13} color={assignment.daysLeft && assignment.daysLeft <= 3 ? '#DC2626' : '#94A3B8'} />
-                            {t('studentAssignments.duePrefix')}{assignment.deadline} {t('studentAssignments.daysLeftPrefix')}{assignment.daysLeft}{t('studentAssignments.daysLeftSuffix')}
-                          </span>
-                          {assignment.requirement && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.requirePrefix')}{assignment.requirement}</span>
-                            </>
-                          )}
-                        </>
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Clean Status Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Right: Clean Status Badge & Action */}
+                <div className="std-asg-card-right">
                   {(assignment.status === 'pending' || assignment.status === 'ai_processing') && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#B45309', 
-                      fontSize: '13px', 
-                      fontWeight: 600, 
-                      padding: '6px 14px', 
-                      backgroundColor: '#FFFBEB', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #FDE68A' 
-                    }}>
-                      <span style={{ 
-                        width: '7px', 
-                        height: '7px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#F59E0B', 
-                        display: 'inline-block' 
-                      }}></span>
-                      {t('studentAssignments.statusGrading')}
+                    <div className="std-asg-status-badge grading">
+                      {t('studentAssignments.statusPending')}
+                    </div>
+                  )}
+
+                  {assignment.status === 'in_progress' && (
+                    <div className="std-asg-status-badge in_progress">
+                      {t('studentAssignments.statusInProgress')}
                     </div>
                   )}
 
                   {assignment.status === 'graded' && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#059669', 
-                      fontSize: '13px', 
-                      fontWeight: 600, 
-                      padding: '6px 14px', 
-                      backgroundColor: '#ECFDF5', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #A7F3D0' 
-                    }}>
-                      <CheckCircle2 size={15} strokeWidth={2.2} />
+                    <div className="std-asg-status-badge graded">
                       {t('studentAssignments.statusGraded')}
                     </div>
                   )}
 
                   {assignment.status === 'not_started' && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#475569', 
-                      fontSize: '13px', 
-                      fontWeight: 600, 
-                      padding: '6px 14px', 
-                      backgroundColor: '#F1F5F9', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #E2E8F0' 
-                    }}>
-                      <Clock size={15} strokeWidth={2} />
+                    <div className="std-asg-status-badge not_started">
                       {t('studentAssignments.statusNotStarted')}
                     </div>
                   )}
 
-                  {/* Action CTA Button */}
-                  <button
-                    type="button"
-                    style={{
-                      padding: '7px 16px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                      border: assignment.status === 'not_started' ? 'none' : '1px solid #CBD5E1',
-                      backgroundColor: assignment.status === 'not_started' ? '#2563EB' : '#FFFFFF',
-                      color: assignment.status === 'not_started' ? '#FFFFFF' : '#334155',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
-                    }}
+                  <Button
+                    variant={assignment.status === 'not_started' ? 'primary' : 'secondary'}
+                    size="sm"
+                    className="std-asg-action-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (assignment.status === 'graded') {
-                        navigate(`/student/assignments/${assignment.id}/result`);
-                      } else if (assignment.status === 'not_started') {
-                        navigate(`/student/assignments/${assignment.id}/overview`);
-                      } else {
-                        navigate(getAssignmentRoute(assignment));
-                      }
+                      handleAction();
                     }}
                   >
                     {assignment.status === 'not_started'
-                      ? t('studentAssignments.btnStart')
+                      ? t('studentAssignments.btnStartNow')
                       : assignment.status === 'graded'
                         ? t('studentAssignments.btnFeedback')
-                        : t('studentAssignments.btnReview')}
-                  </button>
+                        : assignment.status === 'in_progress'
+                          ? t('studentAssignments.btnContinue')
+                          : t('studentAssignments.btnReview')}
+                  </Button>
                 </div>
               </div>
             );
@@ -815,33 +572,24 @@ const StudentAssignments: React.FC = () => {
         )}
       </div>
 
-      {/* 6. Footer / Synchronization info */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginTop: '28px',
-        paddingTop: '16px',
-        borderTop: '1px solid #F1F5F9',
-        fontSize: '13px', 
-        color: '#64748B',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-        <div>
-          {t('studentAssignments.paginationPrefix')}<strong>{filteredAssignments.length}</strong>{t('studentAssignments.paginationMid')}<strong>{classAssignments.length}</strong>{t('studentAssignments.paginationSuffix')}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', fontWeight: 500 }}>
-          <span style={{ 
-            width: '6px', 
-            height: '6px', 
-            borderRadius: '50%', 
-            backgroundColor: '#10B981', 
-            display: 'inline-block' 
-          }}></span>
-          {t('studentAssignments.syncStatus')}
-        </div>
-      </div>
+      {/* 5. Pagination */}
+      {!isLoading && filteredAssignments.length > 0 && (
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredAssignments.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel={isVi ? 'bài tập' : 'assignments'}
+          isVi={isVi}
+          variant="standalone"
+        />
+      )}
     </div>
   );
 };

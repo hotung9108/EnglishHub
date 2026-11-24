@@ -1,94 +1,155 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
-  X, Check, Lock, Unlock,
-  Shield, Mail, Phone, Edit3
+  X, Check, Lock, Unlock, Shield,
+  Mail, Phone, Edit3, Loader2, AlertCircle,
+  Key, Copy, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../hooks/useAuth';
 import { validateFullName } from '../utils/nameValidation';
-
-interface AccountUser {
-  id: string;
-  avatar: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: 'Student' | 'Teacher' | 'Admin';
-  status: 'Active' | 'Blocked';
-  joinedDate: string;
-}
+import { useUsers } from '../hooks/useUsers';
+import { useDebounce } from '../hooks/useDebounce';
+import { userService } from '../api/services/user.service';
+import type { UserListItem } from '../api/services/user.service';
+import { Button, EmptyState, Pagination, ConfirmModal } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 
 export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError } = useToast();
+  const { user: currentUser } = useAuth();
 
-  const [users, setUsers] = useState<AccountUser[]>([
-    { id: 'HV-8801', avatar: 'AJ', name: 'Alice Johnson', email: 'alice@center.edu.vn', phone: '0987-654-321', role: 'Student', status: 'Active', joinedDate: '2025-10-15' },
-    { id: 'GV-001', avatar: 'TL', name: 'Trần Thị Mai Lan', email: 'mailan@center.edu.vn', phone: '0912-345-678', role: 'Teacher', status: 'Active', joinedDate: '2024-08-20' },
-    { id: 'HV-8802', avatar: 'DP', name: 'David Pham', email: 'david@center.edu.vn', phone: '0933-111-222', role: 'Student', status: 'Blocked', joinedDate: '2025-11-01' },
-    { id: 'AD-001', avatar: 'NV', name: 'Nguyễn Văn Hùng', email: 'hung@center.edu.vn', phone: '0944-555-666', role: 'Admin', status: 'Active', joinedDate: '2024-01-10' },
-  ]);
-
+  const [roleFilter, setRoleFilter] = useState<'All' | 'STUDENT' | 'TEACHER' | 'ADMIN'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'All' | 'Student' | 'Teacher' | 'Admin'>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Blocked'>('All');
+  const [statusModalUser, setStatusModalUser] = useState<UserListItem | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserListItem | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ user: UserListItem; newPassword: string } | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
+
+  const {
+    users,
+    pagination,
+    isLoading,
+    error,
+    createUser,
+    updateUser,
+    setQuery,
+    setRole,
+    setPage,
+    setLimit,
+    refetch
+  } = useUsers({
+    initialPage: 1,
+    initialLimit: 10,
+    initialRole: undefined,
+  });
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
+  const isFirstSearchEffect = React.useRef(true);
+
+  useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      if (!debouncedSearchQuery.trim()) return;
+    }
+    setQuery(debouncedSearchQuery.trim());
+  }, [debouncedSearchQuery, setQuery]);
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<AccountUser | null>(null);
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    role: 'Student' as 'Student' | 'Teacher' | 'Admin',
-    status: 'Active' as 'Active' | 'Blocked'
+    password: '',
+    role: 'STUDENT' as 'STUDENT' | 'TEACHER' | 'ADMIN',
+    status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
 
-  const filteredUsers = users.filter(user => {
-    if (roleFilter !== 'All' && user.role !== roleFilter) return false;
-    if (statusFilter !== 'All' && user.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        user.name.toLowerCase().includes(q) ||
-        user.email.toLowerCase().includes(q) ||
-        user.id.toLowerCase().includes(q) ||
-        user.phone.includes(q)
-      );
-    }
-    return true;
-  });
+  const displayedUsers = useMemo(() => {
+    if (statusFilter === 'All') return users;
+    return users.filter(user => user.status === statusFilter);
+  }, [users, statusFilter]);
+
+  const handleRoleFilterChange = (role: 'All' | 'STUDENT' | 'TEACHER' | 'ADMIN') => {
+    setRoleFilter(role);
+    setRole(role === 'All' ? undefined : role);
+  };
+
+  const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
+    setStatusFilter(status);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setLimit(newSize);
+  };
+
+  function formatUserCode(id: number, role: string) {
+    const pad = String(id).padStart(4, '0');
+    if (role === 'ADMIN') return `AD-${pad}`;
+    if (role === 'TEACHER') return `GV-${pad}`;
+    return `HV-${pad}`;
+  }
+
+  function getAvatarInitials(name: string) {
+    if (!name.trim()) return 'U';
+    const parts = name.trim().split(/\s+/);
+    return parts.map(p => p[0]).slice(-2).join('').toUpperCase();
+  }
 
   const handleOpenCreateDrawer = () => {
     setEditingUser(null);
     setNameError('');
+    setEmailError('');
+    setActionError('');
     setFormData({
       name: '',
       email: '',
       phone: '',
-      role: 'Student',
-      status: 'Active'
+      password: '',
+      role: 'STUDENT',
+      status: 'ACTIVE'
     });
     setIsDrawerOpen(true);
   };
 
-  const handleOpenEditDrawer = (user: AccountUser) => {
+  const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
+    setEmailError('');
+    setActionError('');
     setFormData({
-      name: user.name,
+      name: user.fullName,
       email: user.email,
-      phone: user.phone,
+      phone: '',
+      password: '',
       role: user.role,
-      status: user.status
+      status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE'
     });
     setIsDrawerOpen(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim()) return;
+    if (!formData.name.trim()) return;
+    if (!editingUser && !formData.email.trim()) {
+      setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+      return;
+    }
 
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -96,46 +157,132 @@ export const Accounts: React.FC = () => {
       return;
     }
     setNameError('');
+    setActionError('');
     const cleanName = valResult.normalized;
 
-    if (editingUser) {
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? {
-        ...u,
-        ...formData,
-        name: cleanName
-      } : u));
-    } else {
-      const newId = formData.role === 'Admin' ? `AD-00${users.length + 1}` : formData.role === 'Teacher' ? `GV-00${users.length + 1}` : `HV-880${users.length + 1}`;
-      const initials = cleanName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
-      const newUser: AccountUser = {
-        id: newId,
-        avatar: initials,
-        name: cleanName,
-        email: formData.email,
-        phone: formData.phone || 'Chưa cập nhật',
-        role: formData.role,
-        status: formData.status,
-        joinedDate: new Date().toISOString().split('T')[0]
-      };
-      setUsers(prev => [newUser, ...prev]);
-    }
-    setIsDrawerOpen(false);
-  };
-
-  const handleToggleStatus = (id: string) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === id) {
-        return { ...u, status: u.status === 'Active' ? 'Blocked' : 'Active' };
+    try {
+      setActionLoading(true);
+      if (editingUser) {
+        const isEditingSelf = Boolean(currentUser && editingUser.id === currentUser.id);
+        await updateUser(editingUser.id, {
+          fullName: cleanName,
+          phone: formData.phone || undefined,
+          role: isEditingSelf ? undefined : formData.role
+        });
+        if (editingUser.status !== formData.status) {
+          await userService.updateStatus(editingUser.id, formData.status);
+        }
+      } else {
+        const defaultPassword = formData.role === 'ADMIN' 
+          ? 'Admin123!' 
+          : formData.role === 'TEACHER' 
+            ? 'Teacher123!' 
+            : 'Student123!';
+        const password = formData.password.trim() || defaultPassword;
+        if (formData.role === 'ADMIN') {
+          await createUser({
+            role: 'ADMIN',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password
+          });
+        } else if (formData.role === 'TEACHER') {
+          await createUser({
+            role: 'TEACHER',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password
+          });
+        } else {
+          await createUser({
+            role: 'STUDENT',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password,
+            parentPhone: formData.phone || undefined
+          });
+        }
       }
-      return u;
-    }));
+      await refetch();
+      setIsDrawerOpen(false);
+      toastSuccess(
+        editingUser
+          ? (isVi ? 'Cập nhật tài khoản thành công!' : 'Account updated successfully!')
+          : (isVi ? 'Tạo tài khoản thành công!' : 'Account created successfully!')
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi lưu tài khoản.' : 'Failed to save account.';
+      setActionError(msg);
+      toastError(msg);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const getRoleBadgeStyle = (role: string) => {
+  const handleToggleStatus = async (user: UserListItem) => {
+    const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+    try {
+      await userService.updateStatus(user.id, nextStatus);
+      await refetch();
+      toastSuccess(
+        isVi
+          ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${user.email} thành công.`
+          : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} account ${user.email}.`
+      );
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể thay đổi trạng thái tài khoản.' : 'Failed to update account status.');
+    }
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!resetPasswordUser) return;
+    setIsResettingPassword(true);
+    try {
+      const res = await userService.resetPassword(resetPasswordUser.id);
+      const targetUser = resetPasswordUser;
+      setResetPasswordUser(null);
+      setResetPasswordResult({
+        user: targetUser,
+        newPassword: res.newPassword,
+      });
+      toastSuccess(
+        isVi 
+          ? `Đặt lại mật khẩu cho ${targetUser.email} thành công!`
+          : `Successfully reset password for ${targetUser.email}!`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : isVi ? 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.' : 'Failed to reset password. Please try again.';
+      toastError(msg);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetPasswordResult?.newPassword) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(resetPasswordResult.newPassword);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = resetPasswordResult.newPassword;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toastError(isVi ? 'Không thể sao chép mật khẩu.' : 'Failed to copy password.');
+    }
+  };
+
+  const getRoleClass = (role: string) => {
     switch (role) {
-      case 'Admin': return { background: '#0f172a', color: '#ffffff' };
-      case 'Teacher': return { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
-      default: return { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' };
+      case 'ADMIN': return 'role-admin';
+      case 'TEACHER': return 'role-teacher';
+      default: return 'role-student';
     }
   };
 
@@ -145,53 +292,52 @@ export const Accounts: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Users size={28} color="var(--primary)" />
             {t('accounts.title')}
-            <span className="adm-title-badge">{users.length} {isVi ? 'tài khoản' : 'accounts'}</span>
           </h1>
-          <p className="adm-subtitle">
-            {isVi ? 'Quản lý tài khoản người dùng, phân quyền truy cập và kiểm soát trạng thái đăng nhập.' : 'Directory of users across all roles, permission assignments, and active status.'}
-          </p>
         </div>
 
-        <button 
-          className="btn btn-primary"
-          onClick={handleOpenCreateDrawer}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <UserPlus size={16} />
-          <span>{t('accounts.addAccount')}</span>
-        </button>
+        <div className="adm-actions">
+          <Button 
+            variant="primary"
+            onClick={handleOpenCreateDrawer}
+            icon={<UserPlus size={16} />}
+          >
+            {t('accounts.addAccount')}
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}
       <div className="adm-filter-bar">
         {/* Role & Status Pills */}
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 items-center flex-wrap">
           <div className="adm-pills">
-            {(['All', 'Student', 'Teacher', 'Admin'] as const).map(role => (
+            {(['All', 'STUDENT', 'TEACHER', 'ADMIN'] as const).map(role => (
               <button
                 key={role}
-                onClick={() => setRoleFilter(role)}
+                type="button"
+                onClick={() => handleRoleFilterChange(role)}
                 className={`adm-pill ${roleFilter === role ? 'active' : ''}`}
               >
-                <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role}</span>
+                <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role === 'STUDENT' ? 'Student' : role === 'TEACHER' ? 'Teacher' : 'Admin'}</span>
                 <span className="adm-pill-badge">
-                  {role === 'All' ? users.length : users.filter(u => u.role === role).length}
+                  {role === 'All' 
+                    ? pagination.total 
+                    : (roleFilter === role ? pagination.total : users.filter(u => u.role === role).length)}
                 </span>
               </button>
             ))}
           </div>
 
           <div className="adm-pills">
-            {(['All', 'Active', 'Blocked'] as const).map(status => (
+            {(['All', 'ACTIVE', 'LOCKED'] as const).map(status => (
               <button
                 key={status}
-                onClick={() => setStatusFilter(status)}
+                type="button"
+                onClick={() => handleStatusFilterChange(status)}
                 className={`adm-pill ${statusFilter === status ? 'active' : ''}`}
-                style={{ fontSize: '12px', padding: '4px 10px' }}
               >
-                <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'Active' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
+                <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
               </button>
             ))}
           </div>
@@ -205,140 +351,173 @@ export const Accounts: React.FC = () => {
             className="adm-search-input"
             placeholder={t('accounts.searchPlaceholder')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
-          <span className="adm-search-shortcut">⌘F</span>
         </div>
       </div>
 
+      {/* Error notification if load failed */}
+      {error && (
+        <div className="adm-alert-error">
+          <AlertCircle size={18} />
+          <span>{error.message || (isVi ? 'Không thể tải danh sách tài khoản từ hệ thống.' : 'Failed to load users from server.')}</span>
+        </div>
+      )}
+
       {/* Modern Data Table */}
       <div className="adm-table-card">
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th>{t('accounts.colIdAvatar')}</th>
-              <th>{t('accounts.colEmailPhone')}</th>
-              <th>{t('accounts.colRole')}</th>
-              <th>{t('accounts.colStatus')}</th>
-              <th>{isVi ? 'NGÀY TẠO' : 'JOINED DATE'}</th>
-              <th style={{ textAlign: 'right' }}>{t('accounts.colActions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map(user => (
-              <tr key={user.id}>
-                <td>
-                  <div className="adm-cell-user">
-                    <div 
-                      className="adm-avatar"
-                      style={{ 
-                        backgroundColor: user.role === 'Admin' ? '#0f172a' : user.role === 'Teacher' ? '#2563eb' : '#059669',
-                        position: 'relative'
-                      }}
-                    >
-                      {user.avatar}
-                      <span 
-                        style={{
-                          position: 'absolute',
-                          bottom: '-1px',
-                          right: '-1px',
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          backgroundColor: user.status === 'Active' ? '#22c55e' : '#ef4444',
-                          border: '2px solid white'
-                        }}
-                      />
-                    </div>
-                    <div className="adm-avatar-info">
-                      <div className="adm-avatar-name">{user.name}</div>
-                      <div className="adm-avatar-meta font-mono">{user.id}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--on-surface)' }}>{user.email}</span>
-                    <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{user.phone}</span>
-                  </div>
-                </td>
-                <td>
-                  <span 
-                    className="badge" 
-                    style={{ 
-                      ...getRoleBadgeStyle(user.role),
-                      padding: '4px 10px', 
-                      borderRadius: 'var(--radius-full)', 
-                      fontSize: '11.5px',
-                      fontWeight: 700 
-                    }}
-                  >
-                    {user.role}
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge ${user.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
-                    {user.status === 'Active' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                  </span>
-                </td>
-                <td className="font-mono text-on-surface-variant" style={{ fontSize: '12.5px' }}>
-                  {user.joinedDate}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', gap: '8px' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleOpenEditDrawer(user)}
-                      title={t('accounts.actionEdit')}
-                      style={{ padding: '6px 10px' }}
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleToggleStatus(user.id)}
-                      title={user.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}
-                      style={{ padding: '6px 10px', color: user.status === 'Active' ? '#dc2626' : '#16a34a' }}
-                    >
-                      {user.status === 'Active' ? <Lock size={14} /> : <Unlock size={14} />}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {isLoading ? (
+          <div className="p-8 text-center text-muted">
+            <Loader2 size={32} className="animate-spin mx-auto mb-3" />
+            <div>{isVi ? 'Đang tải danh sách tài khoản...' : 'Loading accounts...'}</div>
+          </div>
+        ) : displayedUsers.length === 0 ? (
+          <EmptyState
+            icon={<Users size={32} />}
+            title={isVi ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
+            description={searchQuery 
+              ? (isVi ? 'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc' : 'Try adjusting your search query or filters') 
+              : (isVi ? 'Hệ thống hiện chưa có tài khoản nào trong danh mục này' : 'No accounts currently exist in this category')}
+          />
+        ) : (
+          <>
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{t('accounts.colIdAvatar')}</th>
+                  <th>{t('accounts.colEmailPhone')}</th>
+                  <th>{t('accounts.colRole')}</th>
+                  <th>{t('accounts.colStatus')}</th>
+                  <th className="text-right">{t('accounts.colActions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedUsers.map(user => {
+                  const code = formatUserCode(user.id, user.role);
+                  const initials = getAvatarInitials(user.fullName);
+                  const isActive = user.status === 'ACTIVE';
+
+                  return (
+                    <tr key={user.id}>
+                      <td>
+                        <div className="adm-cell-user">
+                          <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
+                            {initials}
+                            <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
+                          </div>
+                          <div className="adm-avatar-info">
+                            <div className="adm-avatar-name">{user.fullName}</div>
+                            <div className="adm-avatar-meta font-mono">{code}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-0">
+                          <span className="text-sm text-surface">{user.email}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
+                          {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <div className="inline-flex gap-2">
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenEditDrawer(user)}
+                            title={t('accounts.actionEdit')}
+                            icon={<Edit3 size={14} />}
+                          />
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            disabled={currentUser?.id === user.id}
+                            onClick={() => {
+                              if (currentUser?.id === user.id) {
+                                toastError(isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.' : 'Please use your personal profile to change your own password.');
+                                return;
+                              }
+                              setResetPasswordUser(user);
+                            }}
+                            title={currentUser?.id === user.id 
+                              ? (isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình' : 'Please use your personal profile to change your password')
+                              : t('accounts.actionResetPassword')}
+                            aria-label={t('accounts.actionResetPassword')}
+                            icon={<Key size={14} />}
+                          />
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setStatusModalUser(user)}
+                            title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
+                            className={isActive ? 'text-error' : 'text-success'}
+                            icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              pageSize={pagination.limit}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={(page) => setPage(page)}
+              onPageSizeChange={handlePageSizeChange}
+              itemLabel={isVi ? 'tài khoản' : 'accounts'}
+              isVi={isVi}
+              variant="table"
+            />
+          </>
+        )}
       </div>
 
-      {/* Slide-over Drawer (Mobbin / Linear Sheet Pattern) */}
+      {/* Slide-over Drawer for Create & Edit */}
       {isDrawerOpen && (
         <div className="adm-drawer-backdrop" onClick={() => setIsDrawerOpen(false)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
-            {/* Drawer Header */}
             <div className="adm-drawer-header">
               <h2 className="adm-drawer-title">
                 {editingUser 
-                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.name}` : `Edit Account: ${editingUser.name}`)
-                  : (isVi ? 'Khởi Tạo Tài Khoản Người Dùng Mới' : 'Create New User Account')}
+                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`)
+                  : (isVi ? 'Thêm Tài Khoản Mới' : 'Add New Account')}
               </h2>
               <button 
+                type="button" 
+                className="btn-ghost p-1 cursor-pointer"
                 onClick={() => setIsDrawerOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Drawer Body Form */}
-            <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <form onSubmit={handleSaveUser} className="flex flex-col flex-1">
               <div className="adm-drawer-body">
+                {actionError && (
+                  <div className="adm-alert-error">
+                    {actionError}
+                  </div>
+                )}
+
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    {t('accounts.colName')} <span style={{ color: 'var(--error)' }}>*</span>
+                    {t('accounts.colName')} <span className="text-error">*</span>
                   </label>
                   <input 
                     type="text" 
-                    className="input"
+                    className={`input ${nameError ? 'border-error' : ''}`}
                     placeholder="Nguyễn Văn A..."
                     value={formData.name}
                     onChange={(e) => {
@@ -353,15 +532,14 @@ export const Accounts: React.FC = () => {
                         setNameError('');
                       }
                     }}
-                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
                   {nameError ? (
-                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="text-error text-xs mt-1 block">
                       {nameError}
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="text-muted text-xs mt-1 block">
                       {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
                     </span>
                   )}
@@ -369,35 +547,62 @@ export const Accounts: React.FC = () => {
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    Email <span style={{ color: 'var(--error)' }}>*</span>
+                    Email <span className="text-error">*</span>
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail size={16} className="text-on-surface-variant" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <div className="adm-input-icon-wrap">
+                    <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className="input"
+                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''} ${emailError ? 'border-error' : ''}`}
                       placeholder="user@center.edu.vn"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      style={{ paddingLeft: '36px', width: '100%' }}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        if (emailError) setEmailError('');
+                      }}
+                      onBlur={() => {
+                        if (!editingUser && !formData.email.trim()) {
+                          setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+                        }
+                      }}
+                      disabled={!!editingUser}
                       required
                     />
                   </div>
+                  {emailError && (
+                    <span className="text-error text-xs mt-1 block">
+                      {emailError}
+                    </span>
+                  )}
                 </div>
+
+                {!editingUser && (
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">
+                      {isVi ? 'Mật khẩu ban đầu' : 'Initial Password'}
+                    </label>
+                    <input 
+                      type="password" 
+                      className="input"
+                      placeholder={isVi ? 'Để trống dùng mặc định' : 'Leave empty for default'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
                     {isVi ? 'Số điện thoại' : 'Phone Number'}
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={16} className="text-on-surface-variant" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <div className="adm-input-icon-wrap">
+                    <Phone size={16} className="adm-input-icon" />
                     <input 
                       type="text" 
-                      className="input"
+                      className="input adm-input-with-icon"
                       placeholder="0912-345-678"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      style={{ paddingLeft: '36px', width: '100%' }}
                     />
                   </div>
                 </div>
@@ -405,15 +610,29 @@ export const Accounts: React.FC = () => {
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
                     <label className="adm-form-label">{t('accounts.colRole')}</label>
-                    <select 
-                      className="input"
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'Student' | 'Teacher' | 'Admin' })}
-                    >
-                      <option value="Student">Student (Học viên)</option>
-                      <option value="Teacher">Teacher (Giáo viên)</option>
-                      <option value="Admin">Admin (Quản trị viên)</option>
-                    </select>
+                    {(() => {
+                      const isEditingSelf = Boolean(editingUser && currentUser && editingUser.id === currentUser.id);
+                      return (
+                        <>
+                          <select 
+                            className={`input ${isEditingSelf ? 'opacity-80 cursor-not-allowed' : ''}`}
+                            value={formData.role}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
+                            disabled={isEditingSelf}
+                            title={isEditingSelf ? (isVi ? 'Không thể tự thay đổi vai trò của chính mình' : 'Cannot change your own role') : undefined}
+                          >
+                            <option value="STUDENT">Student (Học viên)</option>
+                            <option value="TEACHER">Teacher (Giáo viên)</option>
+                            <option value="ADMIN">Admin (Quản trị viên)</option>
+                          </select>
+                          {isEditingSelf && (
+                            <span className="text-muted text-xs mt-1 block">
+                              {isVi ? 'Không thể tự thay đổi vai trò của chính mình' : 'Cannot change your own role'}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div className="adm-form-group">
@@ -421,40 +640,215 @@ export const Accounts: React.FC = () => {
                     <select 
                       className="input"
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'Active' | 'Blocked' })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'LOCKED' })}
                     >
-                      <option value="Active">{isVi ? 'Hoạt động (Active)' : 'Active'}</option>
-                      <option value="Blocked">{isVi ? 'Tạm khóa (Blocked)' : 'Blocked'}</option>
+                      <option value="ACTIVE">{isVi ? 'Hoạt động (Active)' : 'Active'}</option>
+                      <option value="LOCKED">{isVi ? 'Tạm khóa (Blocked)' : 'Blocked'}</option>
                     </select>
                   </div>
                 </div>
 
-                <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-container-low)', fontSize: '13px', color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Shield size={15} color="var(--primary)" />
+                <div className="p-3 rounded-md bg-surface-low text-xs text-muted leading-relaxed">
+                  <div className="font-semibold text-surface mb-1 flex items-center gap-2">
+                    <Shield size={15} className="text-primary" />
                     {isVi ? 'Chính sách bảo mật tài khoản' : 'Security Credential Policy'}
                   </div>
                   {isVi 
-                    ? 'Tài khoản mới sẽ nhận mật khẩu tạm thời gửi qua email và bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên.' 
-                    : 'A temporary credentials email will be dispatched and must be refreshed on initial login.'}
+                    ? 'Tài khoản mới sẽ có hiệu lực trực tiếp trên cơ sở dữ liệu hệ thống.' 
+                    : 'Created user credentials will sync directly with the production authentication service.'}
                 </div>
               </div>
 
-              {/* Drawer Footer */}
               <div className="adm-drawer-footer">
-                <button 
+                <Button 
+                  variant="secondary"
                   type="button" 
-                  className="btn btn-secondary" 
                   onClick={() => setIsDrawerOpen(false)}
+                  disabled={actionLoading}
                 >
                   {isVi ? 'Hủy' : 'Cancel'}
-                </button>
-                <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Check size={16} />
-                  <span>{isVi ? 'Lưu tài khoản' : 'Save User'}</span>
-                </button>
+                </Button>
+                <Button 
+                  variant="primary"
+                  type="submit" 
+                  loading={actionLoading}
+                  icon={<Check size={16} />}
+                >
+                  {editingUser ? (isVi ? 'Lưu thay đổi' : 'Save Changes') : (isVi ? 'Lưu tài khoản' : 'Save User')}
+                </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Two-Step Confirmation Modal for Account Status Change */}
+      {statusModalUser && (
+        <ConfirmModal
+          isOpen={Boolean(statusModalUser)}
+          title={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi ? 'Xác nhận khóa tài khoản' : 'Lock User Account')
+              : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock User Account')
+          }
+          message={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn khóa tài khoản "${statusModalUser.fullName || statusModalUser.email}"? Người dùng này sẽ bị tạm dừng quyền truy cập và không thể đăng nhập vào hệ thống.`
+                  : `Are you sure you want to lock account "${statusModalUser.fullName || statusModalUser.email}"? The user will lose access to EnglishHub until unlocked.`)
+              : (isVi
+                  ? `Khôi phục quyền truy cập hệ thống cho tài khoản "${statusModalUser.fullName || statusModalUser.email}"?`
+                  : `Restore system access for "${statusModalUser.fullName || statusModalUser.email}"?`)
+          }
+          confirmText={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+              : (isVi ? 'Mở khóa' : 'Unlock Account')
+          }
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant={statusModalUser.status === 'ACTIVE' ? 'danger' : 'primary'}
+          isLoading={isUpdatingStatus}
+          onConfirm={async () => {
+            setIsUpdatingStatus(true);
+            try {
+              await handleToggleStatus(statusModalUser);
+              setStatusModalUser(null);
+            } finally {
+              setIsUpdatingStatus(false);
+            }
+          }}
+          onCancel={() => setStatusModalUser(null)}
+        />
+      )}
+
+      {/* Two-Step Confirmation Modal for Password Reset */}
+      {resetPasswordUser && (
+        <ConfirmModal
+          isOpen={Boolean(resetPasswordUser)}
+          title={t('accounts.resetPasswordConfirmTitle')}
+          message={
+            isVi
+              ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản "${resetPasswordUser.fullName || resetPasswordUser.email}"? Một mật khẩu ngẫu nhiên mới sẽ được tạo và hiển thị để bạn sao chép gửi cho người dùng.`
+              : `Are you sure you want to reset the password for "${resetPasswordUser.fullName || resetPasswordUser.email}"? A new random password will be generated and displayed for you to copy and send to the user.`
+          }
+          confirmText={isVi ? 'Đặt lại mật khẩu' : 'Reset Password'}
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant="primary"
+          isLoading={isResettingPassword}
+          onConfirm={handleConfirmResetPassword}
+          onCancel={() => {
+            if (!isResettingPassword) setResetPasswordUser(null);
+          }}
+        />
+      )}
+
+      {/* Success Modal Showing Generated Temporary Password */}
+      {resetPasswordResult && (
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-success-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99990,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            padding: '16px',
+            animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onClick={() => {
+            setResetPasswordResult(null);
+            setCopied(false);
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--surface, #FFFFFF)',
+              color: 'var(--text-primary, #171412)',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--border-color, #EAE6DF)',
+              width: '100%',
+              maxWidth: '460px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color, #EAE6DF)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success, #16A34A)' }}>
+                <CheckCircle2 size={20} />
+                <h3 id="reset-password-success-title" style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #171412)' }}>
+                  {t('accounts.resetPasswordSuccessTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+                className="btn-ghost"
+                style={{ padding: '4px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-secondary, #736B63)' }}
+                aria-label={isVi ? 'Đóng' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #736B63)', lineHeight: 1.5 }}>
+                {t('accounts.resetPasswordSuccessDesc')}
+              </p>
+
+              <div style={{ padding: '12px', background: 'var(--surface-dim, #F5F5F4)', borderRadius: '8px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary, #736B63)', marginBottom: '8px', fontWeight: 500 }}>
+                  {isVi ? 'Tài khoản:' : 'Account:'} {resetPasswordResult.user.fullName} ({resetPasswordResult.user.email})
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--surface, #FFFFFF)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                  <code style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-primary, #0284C7)', userSelect: 'all', letterSpacing: '0.5px' }}>
+                    {resetPasswordResult.newPassword}
+                  </code>
+                  <Button
+                    variant={copied ? 'primary' : 'secondary'}
+                    size="sm"
+                    icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                    onClick={handleCopyPassword}
+                    title={copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  >
+                    {copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  </Button>
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-warning, #D97706)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <span>
+                  {isVi 
+                    ? 'Lưu ý: Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.' 
+                    : 'Notice: This temporary password is only displayed once.'}
+                </span>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, #EAE6DF)', paddingTop: '14px' }}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+              >
+                {isVi ? 'Đã hiểu' : 'Got it'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

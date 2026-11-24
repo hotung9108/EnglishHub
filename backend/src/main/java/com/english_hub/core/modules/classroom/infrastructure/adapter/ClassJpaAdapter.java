@@ -1,7 +1,11 @@
 package com.english_hub.core.modules.classroom.infrastructure.adapter;
 
+import com.english_hub.core.common.ApiException;
+import com.english_hub.core.common.config.CacheConfig;
 import com.english_hub.core.common.domain.UserRole;
+import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
@@ -12,6 +16,7 @@ import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassJpaRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassMemberJpaRepository;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -26,12 +31,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /** JPA adapter for the ClassRepository domain port. */
 @Repository
 public class ClassJpaAdapter implements ClassRepository {
+
+	private static final String LOCKED_TEACHER_MESSAGE =
+			"Không thể gán giáo viên đang bị khóa tài khoản vào lớp học.";
 
 	private final ClassJpaRepository jpaRepository;
 	private final ClassMemberJpaRepository classMemberJpaRepository;
@@ -67,6 +77,20 @@ public class ClassJpaAdapter implements ClassRepository {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = CacheConfig.CLASS_ACCESS, key = "#classId + ':' + #userId")
+	public Optional<ClassAccess> findAccess(long classId, long userId) {
+		List<Object[]> rows = jpaRepository.findAccessRow(classId, userId);
+		if (rows.isEmpty()) {
+			return Optional.empty();
+		}
+		Object[] row = rows.get(0);
+		Long teacherId = row[0] == null ? null : ((Number) row[0]).longValue();
+		boolean studentMember = row.length > 1 && Boolean.TRUE.equals(row[1]);
+		return Optional.of(new ClassAccess(classId, teacherId, studentMember));
+	}
+
+	@Override
 	public List<EnglishClass> findAll() {
 		return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
 	}
@@ -82,12 +106,14 @@ public class ClassJpaAdapter implements ClassRepository {
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public EnglishClass save(EnglishClass entity) {
 		ClassEntity saved = jpaRepository.save(mapper.toEntity(entity));
 		return mapper.toDomain(saved);
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public void deleteById(Long id) {
 		jpaRepository.deleteById(id);
 	}
@@ -118,12 +144,35 @@ public class ClassJpaAdapter implements ClassRepository {
 
 	@Override
 	public boolean teacherExists(Long teacherId) {
-		return teacherProfileRepository.existsById(teacherId);
+		if (!teacherProfileRepository.existsById(teacherId)) {
+			return false;
+		}
+
+		Optional<User> user = userJpaRepository.findByIdAndDeletedFalse(teacherId);
+		if (user.isEmpty()) {
+			return false;
+		}
+
+		User teacher = user.get();
+		if (teacher.getStatus() == UserStatus.LOCKED) {
+			throw ApiException.badRequest(LOCKED_TEACHER_MESSAGE);
+		}
+		return teacher.getStatus() == UserStatus.ACTIVE;
 	}
 
 	@Override
 	public boolean studentExists(Long studentId) {
 		return studentProfileRepository.existsById(studentId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public boolean existsByNameIgnoreCase(String name) {
+		Specification<ClassEntity> specification = (root, query, criteriaBuilder) ->
+				criteriaBuilder.equal(
+						criteriaBuilder.upper(root.get("name")),
+						criteriaBuilder.upper(criteriaBuilder.literal(name)));
+		return jpaRepository.count(specification) > 0;
 	}
 
 	@Transactional(readOnly = true)

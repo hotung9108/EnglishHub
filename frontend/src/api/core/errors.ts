@@ -50,9 +50,10 @@ export class ValidationError extends ApiClientError {
   constructor(
     message = 'Dữ liệu không hợp lệ.',
     errors?: Array<{ field?: string; message?: string }>,
-    rawError?: unknown
+    rawError?: unknown,
+    statusCode: 400 | 422 = 400
   ) {
-    super(message, 400, rawError, errors);
+    super(message, statusCode, rawError, errors);
     this.name = 'ValidationError';
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
@@ -82,9 +83,38 @@ export class TimeoutError extends ApiClientError {
   }
 }
 
+export class RequestCanceledError extends ApiClientError {
+  constructor(message = 'Yêu cầu đã được hủy.', rawError?: unknown) {
+    super(message, 0, rawError);
+    this.name = 'RequestCanceledError';
+    Object.setPrototypeOf(this, RequestCanceledError.prototype);
+  }
+}
+
+export function isRequestCanceled(error: unknown): boolean {
+  if (!error) return false;
+  if (error instanceof RequestCanceledError) return true;
+  if (axios.isCancel(error)) return true;
+  if (error instanceof Error) {
+    if (error.name === 'CanceledError' || error.name === 'AbortError' || error.name === 'RequestCanceledError') return true;
+    if (error.message === 'Yêu cầu đã được hủy.' || error.message.includes('canceled') || error.message.includes('aborted')) return true;
+  }
+  if (typeof error === 'object' && error !== null) {
+    const errObj = error as { code?: string; name?: string; message?: string; rawError?: unknown };
+    if (errObj.code === 'ERR_CANCELED' || errObj.name === 'CanceledError' || errObj.name === 'AbortError' || errObj.name === 'RequestCanceledError') return true;
+    if (errObj.message === 'Yêu cầu đã được hủy.') return true;
+    if (errObj.rawError && isRequestCanceled(errObj.rawError)) return true;
+  }
+  return false;
+}
+
 export function parseApiError(error: unknown): ApiClientError {
   if (error instanceof ApiClientError) {
     return error;
+  }
+
+  if (isRequestCanceled(error)) {
+    return new RequestCanceledError('Yêu cầu đã được hủy.', error);
   }
 
   if (axios.isAxiosError(error)) {
@@ -94,6 +124,11 @@ export function parseApiError(error: unknown): ApiClientError {
     if (axiosErr.code === 'ECONNABORTED' || (typeof axiosErr.message === 'string' && axiosErr.message.includes('timeout'))) {
       return new TimeoutError('Yêu cầu vượt quá thời gian phản hồi.', axiosErr);
     }
+    // Canceled / Aborted requests should never be treated as NetworkError
+    if (axios.isCancel(error) || axiosErr.code === 'ERR_CANCELED' || axiosErr.name === 'CanceledError') {
+      return new RequestCanceledError('Yêu cầu đã được hủy.', axiosErr);
+    }
+
     if (!axiosErr.response) {
       return new NetworkError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.', axiosErr);
     }
@@ -121,7 +156,7 @@ export function parseApiError(error: unknown): ApiClientError {
         return new NotFoundError(message, axiosErr);
       case 400:
       case 422:
-        return new ValidationError(message, validationErrors, axiosErr);
+        return new ValidationError(message, validationErrors, axiosErr, status);
       case 409:
         return new ConflictError(message, axiosErr);
       default:

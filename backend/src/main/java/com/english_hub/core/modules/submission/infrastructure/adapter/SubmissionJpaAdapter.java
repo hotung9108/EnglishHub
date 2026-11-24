@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.submission.infrastructure.adapter;
 
+import com.english_hub.core.infrastructure.persistence.entity.Assignment;
 import com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
 import com.english_hub.core.modules.submission.domain.model.Submission;
@@ -10,6 +11,8 @@ import com.english_hub.core.modules.submission.infrastructure.mapper.SubmissionP
 import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataSubmissionRepository;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -103,6 +106,15 @@ public class SubmissionJpaAdapter implements SubmissionRepository {
 			SubmissionFilter filter) {
 		return (root, query, criteriaBuilder) -> {
 			List<Predicate> predicates = new ArrayList<>();
+			if (filter.classId() != null) {
+				Subquery<Long> assignmentIds = query.subquery(Long.class);
+				Root<Assignment> assignment = assignmentIds.from(Assignment.class);
+				assignmentIds.select(assignment.get("id"));
+				assignmentIds.where(
+						criteriaBuilder.equal(assignment.get("classId"), filter.classId()),
+						criteriaBuilder.isFalse(assignment.get("deleted")));
+				predicates.add(root.get("assignmentId").in(assignmentIds));
+			}
 			if (filter.assignmentId() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("assignmentId"), filter.assignmentId()));
 			}

@@ -1,104 +1,145 @@
-import React, { useState, useMemo } from 'react';
-import { Search, BookOpen, CheckCircle2, GraduationCap, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, BookOpen, X, RotateCcw, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import StudentClassCard from '../components/classes/StudentClassCard';
 import type { StudentClassInfo } from '../components/classes/StudentClassCard';
-
-const MOCK_CLASSES: StudentClassInfo[] = [
-  {
-    id: '1',
-    code: 'ENG-IELTS-6.5A',
-    name: 'IELTS Intensive Band 6.5 - 7.5',
-    instructorName: 'Cô Trần Thị Mai Lan',
-    status: 'active',
-    stats: {
-      assigned: 15,
-      pending: 2,
-      avgScore: 7.2
-    }
-  },
-  {
-    id: '2',
-    code: 'ENG-GRAM-ADV',
-    name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao',
-    instructorName: 'Thầy Hoàng Minh Đức',
-    status: 'active',
-    stats: {
-      assigned: 8,
-      pending: 0,
-      avgScore: 8.0
-    }
-  },
-  {
-    id: '3',
-    code: 'ENG-TOEIC-750',
-    name: 'Luyện thi TOEIC Cấp tốc Mục tiêu 750+',
-    instructorName: 'Cô Nguyễn Thu Trang',
-    status: 'active',
-    stats: {
-      assigned: 12,
-      pending: 1,
-      avgScore: 7.8
-    }
-  },
-  {
-    id: '4',
-    code: 'ENG-SPK-WS',
-    name: 'IELTS Speaking & Pronunciation Workshop',
-    instructorName: 'Thầy Mark Reynolds',
-    status: 'active',
-    stats: {
-      assigned: 6,
-      pending: 0,
-      avgScore: 7.5
-    }
-  },
-  {
-    id: '5',
-    code: 'ENG-IELTS-5.0',
-    name: 'IELTS Pre-Intermediate Khóa 12',
-    instructorName: 'Thầy Hoàng Minh Đức',
-    status: 'completed',
-    hasCertificate: true,
-    stats: {
-      assigned: 20,
-      pending: 0,
-      result: 'Tốt',
-      finalScore: 7.5
-    }
-  },
-  {
-    id: '6',
-    code: 'ENG-COMM-B2',
-    name: 'Tiếng Anh Giao tiếp Chuyên sâu Trình độ B2',
-    instructorName: 'Thầy Mark Reynolds',
-    status: 'completed',
-    hasCertificate: true,
-    stats: {
-      assigned: 15,
-      pending: 0,
-      result: 'Xuất sắc',
-      finalScore: 8.0
-    }
-  }
-];
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
+import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
+import '../styles/student-classes.css';
+import '../styles/student-ecosystem.css';
 
 const StudentClasses: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [classesList, setClassesList] = useState<StudentClassInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+
+  const handleFilterChange = (f: 'all' | 'active' | 'completed') => {
+    setFilter(f);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    setCurrentPage(1);
+  };
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchClasses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [classesRes, submissionsRes] = await Promise.allSettled([
+          classService.list({ limit: 100 }),
+          submissionService.listSubmissions({ studentId: user?.id, limit: 100 })
+        ]);
+
+        if (!isMounted) return;
+
+        const rawClasses: ClassSummary[] = classesRes.status === 'fulfilled'
+          ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+          : [];
+        const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+          ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+          : [];
+
+        if (rawClasses.length > 0) {
+          // Fetch assignments for each class
+          const assignmentsByClass = await Promise.all(
+            rawClasses.map(async (c) => {
+              try {
+                const res = await assignmentService.listAssignments(c.id);
+                return { classId: c.id, assignments: res.data || [] };
+              } catch {
+                return { classId: c.id, assignments: [] as AssignmentSummary[] };
+              }
+            })
+          );
+
+          if (!isMounted) return;
+
+          const mapped: StudentClassInfo[] = rawClasses.map(c => {
+            const classAssignments = assignmentsByClass.find(item => item.classId === c.id)?.assignments || [];
+            const classSubmissions = submissions.filter(s => {
+              return classAssignments.some(a => a.id === s.assignmentId || a.id === s.id);
+            });
+
+            const graded = classSubmissions.filter(s => isSubmissionGraded(s));
+            const avgScore = graded.length > 0 
+              ? parseFloat((graded.reduce((acc, curr) => acc + (getSubmissionFinalScore(curr) || 0), 0) / (graded.length * 10)).toFixed(1))
+              : undefined;
+
+            const isCompleted = c.status === 'COMPLETED';
+
+            return {
+              id: String(c.id),
+              code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
+              name: c.name,
+              instructorName: 'Giáo viên phụ trách',
+              status: isCompleted ? 'completed' : 'active',
+              hasCertificate: isCompleted,
+              stats: {
+                assigned: classAssignments.length,
+                pending: Math.max(0, classAssignments.length - classSubmissions.length),
+                avgScore: avgScore ?? 0,
+                result: isCompleted ? 'Đạt' : undefined,
+                finalScore: isCompleted ? avgScore : undefined
+              }
+            };
+          });
+
+          setClassesList(mapped);
+        } else {
+          setClassesList([]);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load student classes', err);
+        setError('Không thể tải danh sách lớp học từ máy chủ.');
+        setClassesList([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchClasses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, reloadKey]);
+
   const counts = useMemo(() => ({
-    all: MOCK_CLASSES.length,
-    active: MOCK_CLASSES.filter(c => c.status === 'active').length,
-    completed: MOCK_CLASSES.filter(c => c.status === 'completed').length,
-    certificates: MOCK_CLASSES.filter(c => c.hasCertificate).length
-  }), []);
+    all: classesList.length,
+    active: classesList.filter(c => c.status === 'active').length,
+    completed: classesList.filter(c => c.status === 'completed').length,
+    certificates: classesList.filter(c => c.hasCertificate).length
+  }), [classesList]);
 
   const filteredClasses = useMemo(() => {
-    return MOCK_CLASSES.filter(c => {
+    return classesList.filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             c.instructorName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -106,8 +147,21 @@ const StudentClasses: React.FC = () => {
       if (filter === 'active') return matchesSearch && c.status === 'active';
       if (filter === 'completed') return matchesSearch && c.status === 'completed';
       return matchesSearch;
+    }).sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'active' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
     });
-  }, [searchTerm, filter]);
+  }, [classesList, searchTerm, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClasses.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredClasses.slice(start, start + pageSize);
+  }, [filteredClasses, safeCurrentPage, pageSize]);
 
   const handleViewClass = (id: string) => {
     navigate(`/student/classes/${id}`);
@@ -117,195 +171,73 @@ const StudentClasses: React.FC = () => {
     navigate(`/student/classes/${id}`);
   };
 
+  if (loading) {
+    return (
+      <div className="std-eco-container pb-48">
+        <Skeleton height="36px" width="240px" borderRadius="8px" className="mb-24" />
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} height="110px" borderRadius="12px" />
+          ))}
+        </div>
+        <div className="student-classes-grid">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} height="260px" borderRadius="14px" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '48px' }}>
+    <div className="std-eco-container pb-48">
       {/* 1. Page Header */}
-      <div style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--on-surface)', margin: 0 }}>
+      <div className="std-eco-header">
+        <div>
+          <h1 className="std-eco-title">
             {t('studentClasses.title')}
           </h1>
-          <span style={{ 
-            fontSize: '12px', 
-            fontWeight: 600, 
-            padding: '3px 10px', 
-            borderRadius: 'var(--radius-full)', 
-            backgroundColor: 'var(--primary-fixed)', 
-            color: 'var(--primary)' 
-          }}>
-            {counts.all} {counts.all > 1 ? 'lớp học' : 'lớp'}
-          </span>
         </div>
-        <p style={{ fontSize: '14px', color: 'var(--on-surface-variant)', margin: 0, lineHeight: 1.5 }}>
-          {t('studentClasses.subtitle')}
-        </p>
       </div>
 
-      {/* 2. Overview Metric Cards (Mobbin Dashboard Style) */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-        gap: '16px', 
-        marginBottom: '28px' 
-      }}>
-        {/* Active Classes Card */}
-        <div 
+      {error && (
+        <div className="analytics-error-banner">
+          <div className="flex items-center gap-12">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <Button variant="secondary" size="sm" icon={<RotateCcw size={14} />} onClick={handleReload}>
+            Thử lại
+          </Button>
+        </div>
+      )}
+
+      {/* 2. Overview Metric Cards */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <MetricCard
+          title={isVi ? 'Tất cả lớp học' : 'All Classes'}
+          value={counts.all}
+          onClick={() => setFilter('all')}
+          className="cursor-pointer"
+        />
+        <MetricCard
+          title={t('studentClasses.filterActive')}
+          value={counts.active}
           onClick={() => setFilter('active')}
-          style={{ 
-            backgroundColor: 'var(--surface)',
-            borderRadius: 'var(--radius-lg)', 
-            padding: '20px 24px', 
-            border: filter === 'active' ? '2px solid var(--secondary)' : '1px solid var(--outline-variant)',
-            boxShadow: filter === 'active' 
-              ? '0 10px 25px -5px rgba(5, 150, 105, 0.18)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (filter !== 'active') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (filter !== 'active') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.04)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentClasses.filterActive')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--on-surface)', lineHeight: 1 }}>
-              {counts.active}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '6px' }}>
-              Khóa học đang tham gia
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: 'var(--secondary-fixed)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: 'var(--secondary)' 
-          }}>
-            <BookOpen size={22} strokeWidth={2.2} />
-          </div>
-        </div>
-
-        {/* Completed Classes Card */}
-        <div 
+          className="cursor-pointer"
+        />
+        <MetricCard
+          title={t('studentClasses.filterCompleted')}
+          value={counts.completed}
           onClick={() => setFilter('completed')}
-          style={{ 
-            backgroundColor: 'var(--surface)',
-            borderRadius: 'var(--radius-lg)', 
-            padding: '20px 24px', 
-            border: filter === 'completed' ? '2px solid var(--primary)' : '1px solid var(--outline-variant)',
-            boxShadow: filter === 'completed' 
-              ? '0 10px 25px -5px rgba(37, 99, 235, 0.18)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (filter !== 'completed') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (filter !== 'completed') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.04)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentClasses.filterCompleted')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--on-surface)', lineHeight: 1 }}>
-              {counts.completed}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '6px' }}>
-              Đã kết thúc khóa học
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: 'var(--primary-fixed)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: 'var(--primary)' 
-          }}>
-            <CheckCircle2 size={22} strokeWidth={2.2} />
-          </div>
-        </div>
-
-        {/* Certificates Card */}
-        <div 
+          className="cursor-pointer"
+        />
+        <MetricCard
+          title={isVi ? 'Chứng chỉ hoàn thành' : 'Certificates'}
+          value={counts.certificates}
           onClick={() => setFilter('completed')}
-          style={{ 
-            backgroundColor: 'var(--surface)',
-            borderRadius: 'var(--radius-lg)', 
-            padding: '20px 24px', 
-            border: '1px solid var(--outline-variant)',
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.08)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.04)';
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              Chứng chỉ hoàn thành
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--on-surface)', lineHeight: 1 }}>
-              {counts.certificates}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '6px' }}>
-              Chứng nhận chính thức
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: 'var(--tertiary-container)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: 'var(--tertiary)' 
-          }}>
-            <GraduationCap size={22} strokeWidth={2.2} />
-          </div>
-        </div>
+          className="cursor-pointer"
+        />
       </div>
 
       {/* 3. Filter Bar & Search */}
@@ -314,19 +246,19 @@ const StudentClasses: React.FC = () => {
         <div className="student-classes-segmented-tabs">
           <button 
             className={`student-classes-tab-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
           >
             Tất cả ({counts.all})
           </button>
           <button 
             className={`student-classes-tab-btn ${filter === 'active' ? 'active' : ''}`}
-            onClick={() => setFilter('active')}
+            onClick={() => handleFilterChange('active')}
           >
             {t('studentClasses.filterActive')} ({counts.active})
           </button>
           <button 
             className={`student-classes-tab-btn ${filter === 'completed' ? 'active' : ''}`}
-            onClick={() => setFilter('completed')}
+            onClick={() => handleFilterChange('completed')}
           >
             {t('studentClasses.filterCompleted')} ({counts.completed})
           </button>
@@ -339,24 +271,12 @@ const StudentClasses: React.FC = () => {
             type="text" 
             placeholder={t('studentClasses.searchPlaceholder')}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
           {searchTerm && (
             <button 
               onClick={() => setSearchTerm('')}
-              style={{
-                position: 'absolute',
-                right: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'none',
-                border: 'none',
-                color: 'var(--on-surface-variant)',
-                cursor: 'pointer',
-                padding: '2px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
+              className="student-classes-search-clear"
             >
               <X size={15} />
             </button>
@@ -366,48 +286,53 @@ const StudentClasses: React.FC = () => {
 
       {/* 4. Classes Grid */}
       {filteredClasses.length === 0 ? (
-        <div style={{ 
-          backgroundColor: 'var(--surface)', 
-          borderRadius: 'var(--radius-lg)', 
-          padding: '48px 24px', 
-          textAlign: 'center', 
-          border: '1px dashed var(--outline-variant)',
-          marginTop: '24px'
-        }}>
-          <BookOpen size={36} color="var(--on-surface-variant)" style={{ margin: '0 auto 12px' }} />
-          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>
-            Không tìm thấy lớp học phù hợp
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '16px' }}>
-            Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.
-          </div>
-          <button 
-            onClick={() => { setSearchTerm(''); setFilter('all'); }}
-            style={{
-              padding: '6px 16px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--primary-fixed)',
-              color: 'var(--primary)',
-              border: 'none',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
-            Đặt lại bộ lọc
-          </button>
-        </div>
+        <EmptyState
+          icon={<BookOpen size={40} />}
+          title={classesList.length === 0 
+            ? (isVi ? 'Bạn chưa tham gia lớp học nào' : 'You have not joined any classes yet')
+            : (isVi ? 'Không tìm thấy lớp học phù hợp' : 'No matching classes found')}
+          description={classesList.length === 0 
+            ? (isVi ? 'Bạn chưa tham gia lớp học nào. Vui lòng liên hệ Quản trị viên để được phân lớp.' : 'You have not joined any classes yet. Please contact an Administrator to be enrolled.')
+            : (isVi ? 'Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.' : 'Try changing your search term or filter status.')}
+          action={classesList.length > 0 ? (
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={() => { setSearchTerm(''); setFilter('all'); }}
+            >
+              {isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
+            </Button>
+          ) : undefined}
+        />
       ) : (
-        <div className="student-classes-grid">
-          {filteredClasses.map(classInfo => (
-            <StudentClassCard 
-              key={classInfo.id} 
-              classInfo={classInfo} 
-              onViewClass={handleViewClass}
-              onViewMaterials={handleViewMaterials}
-            />
-          ))}
-        </div>
+        <>
+          <div className="student-classes-grid">
+            {paginatedClasses.map(classInfo => (
+              <StudentClassCard 
+                key={classInfo.id} 
+                classInfo={classInfo} 
+                onViewClass={handleViewClass}
+                onViewMaterials={handleViewMaterials}
+              />
+            ))}
+          </div>
+
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredClasses.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[6, 9, 12, 18]}
+            itemLabel={isVi ? 'lớp học' : 'classes'}
+            isVi={isVi}
+            variant="standalone"
+          />
+        </>
       )}
     </div>
   );

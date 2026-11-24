@@ -1,467 +1,1134 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  ChevronRight, 
+  ChevronRight,
   Play, 
   Pause, 
   RotateCcw, 
   Mic, 
   MicOff, 
-  FileText, 
-  Eye, 
-  Trash2, 
-  Send, 
-  Sparkles, 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  MessageSquare, 
-  Music
+  AlertCircle,
+  RefreshCw,
+  Loader2,
+  UploadCloud,
+  FileAudio,
+  Trash2,
+  Headphones
 } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
+import { parseApiError } from '../api';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmissionListItem, type SubmitModulePayload } from '../api/services/submission.service';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { Button } from '../components/common';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  getSkillLabel,
+  getExamPageRedirectRoute,
+  resolveEffectiveModules
+} from '../utils/examStepper.utils';
+import { normalizeStorageUrl } from '../utils/storage.utils';
+import '../styles/student-exam.css';
+import '../styles/student-speaking.css';
+
+export interface PreviousAudioState {
+  downloadUrl: string;
+  fileName?: string;
+  mimeType?: string;
+}
 
 const StudentAssignmentSpeaking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { user } = useAuth();
+  const { warning: toastWarning, error: toastError, success: toastSuccess } = useToast();
+  const isReviewMode = searchParams.get('mode') === 'review';
 
-  // State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showEmptyConfirmModal, setShowEmptyConfirmModal] = useState(false);
+
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+
+  // Real Audio Recorder Hook
+  const {
+    isRecording,
+    recordingDuration,
+    audioBlob,
+    audioUrl,
+    backendMimeType,
+    permissionError,
+    startRecording,
+    stopRecording,
+    resetRecording,
+  } = useAudioRecorder();
+
+  // Audio Playback State
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [personalNotes, setPersonalNotes] = useState('');
-  const [isNotesSaved, setIsNotesSaved] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(true);
-  const [hasPdfScript, setHasPdfScript] = useState(true);
+  const [playbackSeconds, setPlaybackSeconds] = useState(0);
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+  // Previous Audio Submission State (Review Mode or Re-editing)
+  const [previousAudio, setPreviousAudio] = useState<PreviousAudioState | null>(null);
+  const [isLoadingPrevAudio, setIsLoadingPrevAudio] = useState(false);
+  const [isPrevPlaying, setIsPrevPlaying] = useState(false);
+  const [prevPlaybackSeconds, setPrevPlaybackSeconds] = useState(0);
+  const [prevDuration, setPrevDuration] = useState(0);
+  const prevAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  // Audio Input Mode (Mic vs Upload - UC017 / FE-91)
+  const [audioInputMode, setAudioInputMode] = useState<'mic' | 'upload'>('mic');
+  const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
+  const [uploadedAudioUrl, setUploadedAudioUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
+    if (file.size > MAX_AUDIO_SIZE) {
+      toastError('Dung lượng tệp âm thanh không được vượt quá 25MB.');
+      return;
+    }
+
+    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/webm', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'];
+    const isExtensionValid = /\.(mp3|wav|m4a|webm|mp4)$/i.test(file.name);
+    if (!validTypes.includes(file.type) && !isExtensionValid) {
+      toastError('Định dạng tệp âm thanh không được hỗ trợ. Vui lòng tải lên tệp .mp3, .wav, .m4a hoặc .webm.');
+      return;
+    }
+
+    setError(null);
+    if (uploadedAudioUrl) {
+      URL.revokeObjectURL(uploadedAudioUrl);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setUploadedAudioFile(file);
+    setUploadedAudioUrl(objectUrl);
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
+  const handleRemoveUploadedAudio = () => {
+    if (uploadedAudioUrl) {
+      URL.revokeObjectURL(uploadedAudioUrl);
+    }
+    setUploadedAudioFile(null);
+    setUploadedAudioUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+  };
+
+
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : 1;
+  }, [id]);
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
+
+  // Load assignment and submission data
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch assignment details
+        let currentAssignment: AssignmentDetail | null = null;
+        try {
+          currentAssignment = await assignmentService.getAssignment(numericId);
+          if (isMounted) setAssignment(currentAssignment);
+        } catch {
+          currentAssignment = {
+            id: numericId,
+            title: `Speaking Practice #${id || '1'}`,
+            status: 'PUBLISHED',
+            modules: [{ id: 1, skill: 'SPEAKING' }]
+          };
+          if (isMounted) setAssignment(currentAssignment);
+        }
+
+        // 2. Fetch speaking module details & initial submission in parallel
+        const urlModId = searchParams.get('moduleId');
+        const matchedMod = urlModId && Number.isFinite(Number(urlModId))
+          ? currentAssignment?.modules?.find((m) => m.id === Number(urlModId))
+          : null;
+        const speakingMod = matchedMod || currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+        const moduleId = speakingMod?.id || currentAssignment?.modules?.[0]?.id;
+        const urlSubmissionId = searchParams.get('submissionId');
+
+        const [modRes, initialSubRes] = await Promise.allSettled([
+          moduleId ? moduleService.getModule(moduleId) : Promise.reject('No module'),
+          urlSubmissionId && Number.isFinite(Number(urlSubmissionId))
+            ? submissionService.getSubmission(Number(urlSubmissionId))
+            : user?.id
+            ? submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10
+              })
+            : Promise.reject('No submission query')
+        ]);
+
+        if (!isMounted) return;
+
+        if (modRes.status === 'fulfilled') {
+          setModuleDetail(modRes.value);
+        }
+
+        // 3. Resolve or start submission attempt
+        const resolvePreviousAudio = async (sub: SubmissionDetail) => {
+          const urlModId = searchParams.get('moduleId');
+          const matchedSubMod = urlModId && Number.isFinite(Number(urlModId))
+            ? sub?.modules?.find((m) => m.moduleId === Number(urlModId))
+            : null;
+          const speakingSubMod = matchedSubMod || sub?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING') || sub?.modules?.[0];
+
+          if (speakingSubMod?.id && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED' || isReviewMode)) {
+            try {
+              setIsLoadingPrevAudio(true);
+              let downloadUrl = '';
+              let rawFileName = 'speaking_submitted.mp3';
+              let mimeType = 'audio/webm';
+
+              try {
+                const dlRes = await submissionService.getAudioDownloadUrl(speakingSubMod.id);
+                if (dlRes?.downloadUrl) {
+                  downloadUrl = normalizeStorageUrl(dlRes.downloadUrl);
+                  rawFileName = dlRes.fileName || dlRes.storageKey?.split('/').pop() || 'speaking_submitted.mp3';
+                  mimeType = dlRes.mimeType || 'audio/webm';
+                }
+              } catch {
+                const detail = await submissionService.getSubmissionModuleDetail(speakingSubMod.id);
+                const audioAns = detail.answers?.find((a) => a.audioStorageKey || a.audioDownloadUrl);
+                if (audioAns?.audioDownloadUrl) {
+                  downloadUrl = normalizeStorageUrl(audioAns.audioDownloadUrl);
+                  rawFileName = audioAns.audioStorageKey?.split('/').pop() || 'speaking_submitted.mp3';
+                  mimeType = audioAns.audioMimeType || 'audio/webm';
+                }
+              }
+
+              if (downloadUrl && isMounted) {
+                setPreviousAudio({
+                  downloadUrl,
+                  fileName: rawFileName,
+                  mimeType
+                });
+              }
+            } catch (err) {
+              console.warn('Could not load previous speaking submission details:', err);
+            } finally {
+              if (isMounted) {
+                setIsLoadingPrevAudio(false);
+              }
+            }
+          }
+        };
+
+        if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+          if (initialSubRes.status === 'fulfilled' && 'id' in initialSubRes.value) {
+            const sub = initialSubRes.value as SubmissionDetail;
+            const redirectRoute = getExamPageRedirectRoute(
+              sub,
+              'SPEAKING',
+              numericId,
+              currentAssignment?.modules,
+              moduleId,
+              isReviewMode
+            );
+            if (redirectRoute) {
+              navigate(redirectRoute, { replace: true });
+              return;
+            }
+            setSubmission(sub);
+            void resolvePreviousAudio(sub);
+          } else if (initialSubRes.status === 'rejected') {
+            const apiErr = parseApiError(initialSubRes.reason);
+            setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+          }
+        } else if (user?.id) {
+          try {
+            let subs: SubmissionListItem[] = [];
+            if (initialSubRes.status === 'fulfilled' && 'data' in initialSubRes.value) {
+              subs = initialSubRes.value.data || [];
+            } else {
+              const subList = await submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10
+              });
+              subs = subList.data || [];
+            }
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              const redirectRoute = getExamPageRedirectRoute(
+                sub,
+                'SPEAKING',
+                numericId,
+                currentAssignment?.modules,
+                moduleId,
+                isReviewMode
+              );
+              if (redirectRoute) {
+                navigate(redirectRoute, { replace: true });
+                return;
+              }
+              setSubmission(sub);
+              void resolvePreviousAudio(sub);
+            } else {
+              const completedItem = subs.find(
+                (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
+              );
+              if (completedItem) {
+                if (isMounted) {
+                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
+                }
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (!isMounted) return;
+                const redirectRoute = getExamPageRedirectRoute(
+                  sub,
+                  'SPEAKING',
+                  numericId,
+                  currentAssignment?.modules,
+                  moduleId,
+                  isReviewMode
+                );
+                if (redirectRoute) {
+                  navigate(redirectRoute, { replace: true });
+                  return;
+                }
+                setSubmission(sub);
+                void resolvePreviousAudio(sub);
+              } else if (currentAssignment?.status) {
+                if (isMounted) {
+                  const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                  setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+                }
+              }
+            }
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải đề bài nói.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate, isReviewMode]);
+
+  // Handle Play/Pause for recorded audio or uploaded audio
+  const effectiveAudioUrl = audioInputMode === 'mic' ? audioUrl : uploadedAudioUrl;
+  const effectiveBlobOrFile: Blob | File | null = audioInputMode === 'mic' ? audioBlob : uploadedAudioFile;
+  const effectiveMimeType = audioInputMode === 'mic' 
+    ? backendMimeType 
+    : (uploadedAudioFile?.type || 'audio/mpeg');
+
+  const togglePlay = () => {
+    if (!audioPlayerRef.current || !effectiveAudioUrl) return;
+
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
       setIsPlaying(false);
+    } else {
+      if (isPrevPlaying && prevAudioPlayerRef.current) {
+        prevAudioPlayerRef.current.pause();
+        setIsPrevPlaying(false);
+      }
+      audioPlayerRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((playErr) => {
+        console.warn('Playback error:', playErr);
+        setIsPlaying(false);
+      });
     }
   };
 
-  const handleSaveNotes = () => {
-    setIsNotesSaved(true);
-    setTimeout(() => setIsNotesSaved(false), 3000);
+  // Toggle Recording with real MediaRecorder
+  const toggleRecording = async () => {
+    setError(null);
+    if (!isRecording) {
+      if (assignment?.status && assignment.status !== 'PUBLISHED') {
+        const statusLabel = assignment.status === 'DRAFT' ? 'Nháp (DRAFT)' : assignment.status;
+        toastWarning(`Bài tập này đang ở trạng thái ${statusLabel}, chưa thể thực hiện ghi âm làm bài.`);
+        return;
+      }
+      if (isPlaying && audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        setIsPlaying(false);
+      }
+      if (isPrevPlaying && prevAudioPlayerRef.current) {
+        prevAudioPlayerRef.current.pause();
+        setIsPrevPlaying(false);
+      }
+      try {
+        await startRecording();
+      } catch (recErr: unknown) {
+        const msg = recErr instanceof Error ? recErr.message : 'Không thể kích hoạt microphone.';
+        setError(msg);
+      }
+    } else {
+      stopRecording();
+    }
   };
 
-  const handleSubmitAssignment = () => {
-    setIsSubmitted(true);
-    alert(t('studentSpeaking.notesSaved') || 'Bài tập đã được cập nhật thành công!');
+  // Previous Audio Playback Handlers
+  const togglePrevPlay = () => {
+    if (!prevAudioPlayerRef.current || !previousAudio?.downloadUrl) return;
+
+    if (isPrevPlaying) {
+      prevAudioPlayerRef.current.pause();
+      setIsPrevPlaying(false);
+    } else {
+      if (isPlaying && audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        setIsPlaying(false);
+      }
+      prevAudioPlayerRef.current.play().then(() => {
+        setIsPrevPlaying(true);
+      }).catch((playErr) => {
+        console.warn('Playback error for previous audio:', playErr);
+        setIsPrevPlaying(false);
+      });
+    }
   };
+
+  const handlePrevSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const seekTime = Number(e.target.value);
+    if (prevAudioPlayerRef.current && Number.isFinite(seekTime)) {
+      prevAudioPlayerRef.current.currentTime = seekTime;
+      setPrevPlaybackSeconds(seekTime);
+    }
+  };
+
+  const handleResetPrevPlay = () => {
+    if (prevAudioPlayerRef.current) {
+      prevAudioPlayerRef.current.pause();
+      prevAudioPlayerRef.current.currentTime = 0;
+    }
+    setIsPrevPlaying(false);
+    setPrevPlaybackSeconds(0);
+  };
+
+  const handlePrevTimeUpdate = () => {
+    if (prevAudioPlayerRef.current) {
+      setPrevPlaybackSeconds(Math.floor(prevAudioPlayerRef.current.currentTime));
+    }
+  };
+
+  const handlePrevLoadedMetadata = () => {
+    if (prevAudioPlayerRef.current && Number.isFinite(prevAudioPlayerRef.current.duration)) {
+      setPrevDuration(Math.floor(prevAudioPlayerRef.current.duration));
+    }
+  };
+
+  const handlePrevEnded = () => {
+    setIsPrevPlaying(false);
+    setPrevPlaybackSeconds(0);
+  };
+
+  const handleKeepPreviousAudio = () => {
+    if (prevAudioPlayerRef.current) {
+      prevAudioPlayerRef.current.pause();
+    }
+    navigate(`/student/assignments/${id}/overview`, { replace: true });
+  };
+
+  // Reset recording to re-record
+  const handleResetRecording = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setPlaybackSeconds(0);
+    resetRecording();
+  };
+
+
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
+  // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
+  const handleSubmitAssignment = async () => {
+    if (assignment?.status === 'CLOSED') {
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
+
+    if (isRecording) {
+      toastWarning('Vui lòng bấm dừng ghi âm và nghe lại bản ghi trước khi nộp bài.');
+      return;
+    }
+
+    if (!submission) {
+      toastError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
+
+    // Kịch bản học viên chưa ghi âm bài nói và chưa tải tệp -> hiển thị Modal cảnh báo xác nhận nộp rỗng
+    if (!effectiveBlobOrFile) {
+      setShowEmptyConfirmModal(true);
+      return;
+    }
+
+    await doSubmitAssignment(effectiveBlobOrFile, effectiveMimeType);
+  };
+
+  const doSubmitAssignment = async (blobToSubmit: Blob | File | null, mimeTypeToUse?: string) => {
+    setIsSubmitting(true);
+    setError(null);
+    setShowEmptyConfirmModal(false);
+
+    try {
+      const subId = submission?.id;
+      const urlModId = searchParams.get('moduleId');
+      const matchedSubMod = urlModId && Number.isFinite(Number(urlModId))
+        ? submission?.modules?.find((m) => m.moduleId === Number(urlModId))
+        : null;
+      const speakingSubMod = matchedSubMod || submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
+
+      if (!subModuleId) {
+        throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
+      }
+
+      if (speakingSubMod && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED') && !isReviewMode) {
+        navigate(`/student/submissions/${subId}`, { replace: true });
+        return;
+      }
+
+      let uploadedAudioStorageKey: string | undefined = undefined;
+
+      // Step 1: Upload audio using consolidated 2-in-1 helper if student recorded or uploaded
+      if (blobToSubmit) {
+        const uploadRes = await submissionService.uploadAudio(subModuleId, blobToSubmit, mimeTypeToUse || backendMimeType);
+        uploadedAudioStorageKey = uploadRes.storageKey;
+      }
+
+      // Step 2: Submit module (with audioStorageKey if recorded, or empty if skipped)
+      const submitPayload: SubmitModulePayload = {};
+      if (uploadedAudioStorageKey) {
+        submitPayload.audioStorageKey = uploadedAudioStorageKey;
+      }
+      await submissionService.submitModule(subModuleId, submitPayload);
+
+      const currentSubModules = (submission?.modules || []).map((m) =>
+        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+      );
+      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
+
+      // Step 3: Check if other modules in submission are already completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+
+      if (isReviewMode || allOthersDone) {
+        const msg = isReviewMode
+          ? 'Cập nhật phần thi Speaking thành công! Đang chuyển đến màn hình xem lại bài làm...'
+          : 'Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...';
+        toastSuccess(msg);
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
+        }, 1200);
+      } else {
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          const msg = `Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`;
+          toastSuccess(msg);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          setTimeout(() => {
+            navigate(nextRoute, { replace: true });
+          }, 1200);
+        } else {
+          const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
+          toastSuccess(msg);
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
+          }, 1200);
+        }
+      }
+    } catch (err: unknown) {
+      const apiErr = parseApiError(err);
+      const msg = apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+      toastError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const recordedAudioReady = Boolean(
+    audioInputMode === 'mic' ? (audioBlob && audioUrl) : (uploadedAudioFile && uploadedAudioUrl)
+  );
+  const activeError = permissionError || error;
 
   return (
-    <div className="speaking-container">
-      {/* Breadcrumbs & Navigation */}
-      <div className="speaking-breadcrumbs">
-        <button 
-          className="speaking-back-btn" 
-          onClick={() => navigate('/student/assignments')}
-          type="button"
-        >
-          <ArrowLeft size={14} />
-          <span>{t('studentSpeaking.backToList')}</span>
-        </button>
-        <span className="speaking-breadcrumb-divider">/</span>
-        <span>{t('studentSpeaking.system')}</span>
-        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
-        <span 
-          className="speaking-breadcrumb-link"
-          onClick={() => navigate('/student/classes')}
-          role="button"
-          tabIndex={0}
-        >
-          {t('studentSpeaking.myClasses')}
-        </span>
-        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
-        <span className="speaking-breadcrumb-link">ENG-IELTS-6.5A</span>
-        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
-        <span style={{ fontWeight: 600, color: 'var(--on-surface)' }}>
-          Speaking 1 ({id || 'HW-02'})
-        </span>
+    <div className="exam-page">
+      {/* Hidden audio element for previewing the recorded sound */}
+      <audio
+        ref={audioPlayerRef}
+        src={effectiveAudioUrl || undefined}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setPlaybackSeconds(0);
+        }}
+        onTimeUpdate={() => {
+          if (audioPlayerRef.current) {
+            setPlaybackSeconds(Math.floor(audioPlayerRef.current.currentTime));
+          }
+        }}
+      />
+
+      {/* Unified Exam Header */}
+      <div className="exam-header">
+        <div className="exam-header-left">
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={ArrowLeft}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
+          >
+            Tổng quan bài thi
+          </Button>
+          
+          <div className="exam-breadcrumbs">
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/dashboard')}>
+              Trang chủ
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/assignments')}>
+              Danh sách bài tập
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-title">
+              {assignment?.title || `Speaking #${id}`}
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-skill-badge exam-skill-badge-speaking">
+              Kỹ năng Nói
+            </span>
+          </div>
+        </div>
+
+        {effectiveModules.length > 1 && (
+          <div className="exam-header-right">
+            <ExamStepper
+              variant="compact"
+              modules={effectiveModules}
+              submissionModules={submission?.modules}
+              currentSkill="SPEAKING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isAccessible && step.status !== 'ACTIVE') {
+                  const baseRoute = getSkillRoute(skill, numericId, submission?.id, step.module.id);
+                  const targetUrl = step.isCompleted ? `${baseRoute}&mode=review` : baseRoute;
+                  navigate(targetUrl);
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Task Header Banner */}
-      <section className="speaking-header-banner">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div className="speaking-title-group">
-            <h1 className="speaking-title">SPEAKING 1: Urban Environment & Pollution</h1>
-            <span className="speaking-skill-badge">IELTS Speaking Part 2</span>
-          </div>
-          <div className="speaking-meta-row">
-            <span className="speaking-meta-item">
-              <Calendar size={14} color="#ef4444" />
-              <strong>Due:</strong> Jan 05, 2026
-            </span>
-            <span>•</span>
-            <span className="speaking-meta-item">
-              <Clock size={14} />
-              <strong>Posted:</strong> Jan 01, 2026
-            </span>
-            <span>•</span>
-            <span className="speaking-meta-item">
-              <strong>Giảng viên:</strong> Cô Trần Thị Mai Lan
-            </span>
-          </div>
-        </div>
+      <div className="exam-workspace-full">
 
-        <div>
-          {isSubmitted ? (
-            <span className="speaking-status-pill submitted">
-              <span className="speaking-status-dot"></span>
-              {t('studentSpeaking.statusSubmitted')}
-            </span>
-          ) : (
-            <span className="speaking-status-pill draft">
-              <span className="speaking-status-dot"></span>
-              {t('studentSpeaking.statusDraft')}
-            </span>
-          )}
+      {activeError && (
+        <div className="speaking-error-banner">
+          <div className="speaking-error-msg">
+            <AlertCircle size={18} />
+            <span>{activeError}</span>
+          </div>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleRetry}
+            icon={RefreshCw}
+          >
+            Thử lại
+          </Button>
         </div>
-      </section>
+      )}
 
-      {/* 2-Column Main Workspace */}
-      <div className="speaking-workspace-grid">
-        
-        {/* Left Column: Prompt, STT, Recorder, Comments */}
-        <div className="speaking-column-left">
-          
-          {/* Card 1: Transcription & Prompt */}
+
+      {/* Main 2-Column Grid */}
+      <div className="speaking-grid">
+        {/* Left Column (Main Stage) */}
+        <div className="speaking-main-col">
+          {/* Card 1: Cue Card / Prompt */}
           <section className="speaking-card">
             <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                <span className="speaking-card-title-dot"></span>
-                TRANSCRIPTION &amp; QUESTION PROMPT
-              </h2>
-              <span className="speaking-cue-timing">{t('studentSpeaking.prepTime')}</span>
+              <div className="speaking-card-header-main">
+                <h1 className="speaking-cue-title">
+                  {isLoading ? 'Đang tải đề thi...' : (assignment?.title || 'Describe a difficult environmental issue')}
+                </h1>
+              </div>
             </div>
 
             <div className="speaking-card-body">
-              {/* Question Cue Card */}
-              <div className="speaking-cue-card">
-                <div className="speaking-cue-top">
-                  <span className="speaking-cue-tag">{t('studentSpeaking.topicCard')}</span>
-                  <span className="speaking-cue-timing">Part 2 Cue Card</span>
+              <div className="speaking-cue-description">
+                {moduleDetail?.instructions || (
+                  <>
+                    You should say:<br />
+                    • What the environmental problem is and where it is occurring<br />
+                    • What causes this issue and who is most affected by it<br />
+                    • What actions have been taken so far by local authorities<br />
+                    • And explain what you believe is the most effective long-term solution to address it.
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Card: Previous Audio Submission (Review Mode or Re-editing) */}
+          {isLoadingPrevAudio ? (
+            <div className="speaking-card p-4 flex items-center justify-center gap-2 text-sm text-muted">
+              <Loader2 size={18} className="animate-spin text-primary" />
+              <span>Đang tải bài nói đã nộp trước đó...</span>
+            </div>
+          ) : previousAudio ? (
+            <section className="speaking-card speaking-prev-card" aria-label="Bài nói đã nộp trước đó">
+              <div className="speaking-card-header flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Headphones size={18} className="text-primary" />
+                  <h2 className="speaking-card-title m-0">Bài nói đã nộp trước đó</h2>
                 </div>
-                <h3 className="speaking-cue-question">
-                  {t('studentSpeaking.questionPrompt')}
-                </h3>
-                <div className="speaking-cue-hint-label">{t('studentSpeaking.youShouldSay')}</div>
-                <ul className="speaking-cue-list">
-                  <li>{t('studentSpeaking.prompt1')}</li>
-                  <li>{t('studentSpeaking.prompt2')}</li>
-                  <li>{t('studentSpeaking.prompt3')}</li>
-                  <li>{t('studentSpeaking.prompt4')}</li>
-                </ul>
+                <span className="speaking-prev-badge">
+                  Bản ghi hiện tại
+                </span>
               </div>
 
-              {/* AI Live STT Transcription Box */}
-              <div className="speaking-stt-box">
-                <div className="speaking-stt-header">
-                  <div className="speaking-stt-badge">
-                    <span className="speaking-stt-tag">STT</span>
-                    <span>{t('studentSpeaking.transcriptionTitle')}</span>
-                  </div>
-                  <span className="speaking-confidence-badge">
-                    <Sparkles size={14} />
-                    {t('studentSpeaking.confidence')}: 98.2%
-                  </span>
-                </div>
+              <div className="speaking-card-body">
+                <div className="speaking-prev-player">
+                  <audio
+                    ref={prevAudioPlayerRef}
+                    src={previousAudio.downloadUrl}
+                    preload="metadata"
+                    onTimeUpdate={handlePrevTimeUpdate}
+                    onLoadedMetadata={handlePrevLoadedMetadata}
+                    onEnded={handlePrevEnded}
+                  />
 
-                <div className="speaking-stt-paragraphs">
-                  <p>
-                    <span className="speaking-stt-timestamp">[00:02 - 00:35]</span>
-                    "Today I would like to talk about air pollution, which has become a severe environmental dilemma in my hometown, Hanoi. Over the past decade, rapid urbanization combined with a surge in private vehicular usage has drastically deteriorated our ambient air quality."
-                  </p>
-                  <p>
-                    <span className="speaking-stt-timestamp">[00:36 - 01:14]</span>
-                    "The primary catalyst behind this alarming situation is the high concentration of fine particulate matter, specifically PM2.5, emitted by heavy traffic congestion and surrounding industrial zones. Consequently, residents frequently encounter respiratory disorders such as chronic bronchitis."
-                  </p>
-                  <p>
-                    <span className="speaking-stt-timestamp">[01:15 - 01:58]</span>
-                    "To mitigate this crisis, I strongly advocate for widespread transition toward renewable public transportation networks, along with stricter emission regulations for industrial manufacturers. Personal initiatives like tree planting in residential communities could also play a substantial role."
-                  </p>
-                </div>
-              </div>
-
-              {/* Speech Recorder & Audio Visualizer Component */}
-              <div className="speaking-audio-widget">
-                <div className="speaking-audio-content">
-                  <div className="speaking-audio-left">
-                    <button 
-                      className="speaking-play-btn" 
-                      onClick={togglePlay}
-                      title={isPlaying ? 'Tạm dừng' : 'Phát bản ghi'}
+                  <div className="speaking-prev-controls">
+                    <button
                       type="button"
+                      className="speaking-prev-reset-btn"
+                      onClick={handleResetPrevPlay}
+                      title="Nghe lại từ đầu"
                     >
-                      {isPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
+                      <RotateCcw size={16} />
                     </button>
-                    <div>
-                      <div className="speaking-audio-title">{t('studentSpeaking.audioName')}</div>
-                      <div className="speaking-audio-meta">{t('studentSpeaking.audioDuration')}</div>
+
+                    <button
+                      type="button"
+                      className={`speaking-prev-play-btn ${isPrevPlaying ? 'is-playing' : ''}`}
+                      onClick={togglePrevPlay}
+                      title={isPrevPlaying ? 'Tạm dừng' : 'Nghe bài nói đã nộp'}
+                    >
+                      {isPrevPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    </button>
+
+                    <div className="speaking-prev-timeline">
+                      <input
+                        type="range"
+                        min={0}
+                        max={prevDuration || 100}
+                        value={prevPlaybackSeconds}
+                        onChange={handlePrevSeek}
+                        className="speaking-prev-seek"
+                        aria-label="Thanh trượt thời lượng bài nói cũ"
+                      />
+                      <div className="speaking-prev-time-label">
+                        <span>{formatTime(prevPlaybackSeconds)}</span>
+                        <span>/</span>
+                        <span>{formatTime(prevDuration)}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Waveform Visualizer */}
-                  <div className={`waveform-container ${isPlaying ? 'playing' : ''}`}>
-                    <span className="waveform-bar" style={{ height: 12 }}></span>
-                    <span className="waveform-bar" style={{ height: 22 }}></span>
-                    <span className="waveform-bar" style={{ height: 28 }}></span>
-                    <span className="waveform-bar" style={{ height: 16 }}></span>
-                    <span className="waveform-bar" style={{ height: 24 }}></span>
-                    <span className="waveform-bar" style={{ height: 30 }}></span>
-                    <span className="waveform-bar" style={{ height: 18 }}></span>
-                    <span className="waveform-bar" style={{ height: 26 }}></span>
-                    <span className="waveform-bar" style={{ height: 14 }}></span>
-                    <span className="waveform-bar" style={{ height: 20 }}></span>
-                    <span className="waveform-bar" style={{ height: 25 }}></span>
-                    <span className="waveform-bar" style={{ height: 15 }}></span>
-                  </div>
-
-                  {/* Audio Controls */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button 
-                      className={`speaking-action-btn ${isRecording ? 're-record' : ''}`}
-                      onClick={toggleRecording}
-                      type="button"
-                    >
-                      {isRecording ? (
-                        <>
-                          <MicOff size={14} />
-                          {t('studentSpeaking.stopRecord')}
-                        </>
-                      ) : (
-                        <>
-                          <Mic size={14} />
-                          {t('studentSpeaking.startRecord')}
-                        </>
-                      )}
-                    </button>
-                    <button 
-                      className="speaking-action-btn re-record"
-                      onClick={() => alert('Chế độ thu âm lại đã kích hoạt. Bạn có 1 phút chuẩn bị và 2 phút nói.')}
-                      type="button"
-                    >
-                      <RotateCcw size={14} />
-                      {t('studentSpeaking.reRecord')}
-                    </button>
+                  <div className="speaking-prev-meta">
+                    <FileAudio size={15} className="text-muted shrink-0" />
+                    <span className="truncate max-w-[260px]" title={previousAudio.fileName}>
+                      {previousAudio.fileName}
+                    </span>
+                    <span className="speaking-prev-dot">•</span>
+                    <span>{previousAudio.mimeType || 'audio/mpeg'}</span>
                   </div>
                 </div>
               </div>
+            </section>
+          ) : null}
 
-            </div>
-          </section>
-
-          {/* Card 2: Comments & Instructions */}
+          {/* Card 2: Voice Studio / Recorder & File Upload (UC017 / FE-91) */}
           <section className="speaking-card">
-            <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                <MessageSquare size={16} color="var(--primary)" />
-                {t('studentSpeaking.commentsTitle')}
-              </h2>
-              <span className="speaking-cue-timing">{t('studentSpeaking.commentsSubtitle')}</span>
-            </div>
-
-            <div className="speaking-card-body">
-              {/* Teacher Guidance Note */}
-              <div className="teacher-note-card">
-                <div className="teacher-avatar">ML</div>
-                <div className="teacher-note-content">
-                  <div className="teacher-note-header">
-                    <span className="teacher-note-name">{t('studentSpeaking.teacherGuidanceTitle')}</span>
-                    <span className="teacher-note-time">01/01/2026 09:30</span>
-                  </div>
-                  <p className="teacher-note-body">
-                    "Các em chú ý ở đề bài Speaking 1 này, tiêu chí <strong>Fluency &amp; Coherence</strong> được chấm rất kỹ. Tránh ngập ngừng lâu quá 3 giây. Nên vận dụng các cụm liên kết như <em>'In terms of...', 'As far as I am concerned...', 'Consequently'</em> để cấu trúc câu trả lời mạch lạc theo đúng khung 2 phút nhé!"
-                  </p>
+            <div className="speaking-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="speaking-card-title m-0">
+                  {audioInputMode === 'mic' ? 'Ghi âm trực tiếp' : 'Tải tệp âm thanh'}
+                </h2>
+                <div className="speaking-mode-toggle">
+                  <button
+                    type="button"
+                    className={`speaking-mode-btn ${audioInputMode === 'mic' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      if (isPlaying && audioPlayerRef.current) {
+                        audioPlayerRef.current.pause();
+                        setIsPlaying(false);
+                      }
+                      setAudioInputMode('mic');
+                    }}
+                  >
+                    <Mic size={14} />
+                    <span>Microphone</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`speaking-mode-btn ${audioInputMode === 'upload' ? 'is-active' : ''}`}
+                    onClick={() => {
+                      if (isRecording) {
+                        stopRecording();
+                      }
+                      if (isPlaying && audioPlayerRef.current) {
+                        audioPlayerRef.current.pause();
+                        setIsPlaying(false);
+                      }
+                      setAudioInputMode('upload');
+                    }}
+                  >
+                    <UploadCloud size={14} />
+                    <span>Tải tệp âm thanh</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Personal Notes Textarea */}
-              <div className="speaking-notes-box">
-                <label className="speaking-notes-label" htmlFor="personal-notes">
-                  {t('studentSpeaking.studentNotesLabel')}
-                </label>
-                <textarea 
-                  id="personal-notes"
-                  className="speaking-notes-textarea"
-                  rows={4}
-                  placeholder={t('studentSpeaking.studentNotesPlaceholder')}
-                  value={personalNotes}
-                  onChange={(e) => setPersonalNotes(e.target.value)}
-                />
-                <div className="speaking-notes-footer">
-                  <span>{t('studentSpeaking.studentNotesNotice')}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {isNotesSaved && (
-                      <span style={{ color: 'var(--secondary)', fontWeight: 600 }}>
-                        ✓ {t('studentSpeaking.notesSaved')}
-                      </span>
-                    )}
-                    <button 
-                      className="speaking-btn-link"
-                      onClick={handleSaveNotes}
-                      type="button"
-                    >
-                      {t('studentSpeaking.btnSaveNotes')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </section>
-
-        </div>
-
-        {/* Right Column: Submission & Grading */}
-        <div className="speaking-column-right">
-          
-          {/* Card 1: Your Submission */}
-          <section className="speaking-card">
-            <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                {t('studentSpeaking.yourSubmission')}
-              </h2>
-              <span className="speaking-status-pill submitted">
-                {t('studentSpeaking.statusSubmitted')}
+              <span className={`speaking-card-timing ${isRecording ? 'recording' : ''}`}>
+                {audioInputMode === 'mic'
+                  ? isRecording 
+                    ? `Đang thu âm: ${formatTime(recordingDuration)}` 
+                    : recordedAudioReady 
+                      ? `Đã thu âm: ${formatTime(recordingDuration)}` 
+                      : ''
+                  : uploadedAudioFile
+                    ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB`
+                    : ''}
               </span>
             </div>
 
             <div className="speaking-card-body">
-              {/* PDF Script Attachment */}
-              {hasPdfScript && (
-                <div className="submission-file-box">
-                  <div className="submission-file-icon">
-                    <FileText size={20} />
-                    <span>PDF</span>
+              {audioInputMode === 'mic' ? (
+                <div className="speaking-recorder-wrapper">
+                  {/* Audio Waveform visualization */}
+                  <div className="speaking-waveform">
+                    {[40, 20, 60, 90, 45, 75, 30, 85, 95, 60, 40, 70, 80, 50, 65, 35, 90, 75, 60, 45, 80, 70, 50, 40].map((h, i) => (
+                      <div 
+                        key={i} 
+                        className={`speaking-waveform-bar ${isRecording ? 'recording' : ''}`}
+                        style={{ height: isRecording ? `${h}%` : '20%' }}
+                      />
+                    ))}
                   </div>
-                  <div className="submission-file-details">
-                    <div className="submission-file-name" title="Speaking_Task1_Script.pdf">
-                      Speaking_Task1_Script.pdf
-                    </div>
-                    <div className="submission-file-meta">{t('studentSpeaking.uploadedByUser')}</div>
-                    <div className="submission-file-actions">
-                      <span className="submission-file-size">1.4 MB</span>
-                      <button 
-                        className="speaking-btn-link" 
-                        onClick={() => alert('Mở xem trước file PDF dàn ý!')}
-                        type="button"
-                      >
-                        <Eye size={12} style={{ display: 'inline', marginRight: 2 }} />
-                        {t('studentSpeaking.preview')}
-                      </button>
-                    </div>
+
+                  {/* Recorder Controls */}
+                  <div className="speaking-recorder-controls">
+                    <button 
+                      type="button"
+                      className="speaking-btn-icon" 
+                      onClick={handleResetRecording}
+                      disabled={isRecording || !recordedAudioReady}
+                      title="Thu âm lại từ đầu"
+                    >
+                      <RotateCcw size={18} />
+                    </button>
+
+                    <button 
+                      type="button"
+                      className={`speaking-btn-record ${isRecording ? 'active' : ''}`}
+                      onClick={() => void toggleRecording()}
+                      title={isRecording ? 'Dừng thu âm' : 'Bắt đầu thu âm'}
+                    >
+                      {isRecording ? <MicOff size={28} /> : <Mic size={28} />}
+                    </button>
+
+                    <button 
+                      type="button"
+                      className="speaking-btn-icon" 
+                      onClick={togglePlay}
+                      disabled={!recordedAudioReady || isRecording}
+                      title={isPlaying ? 'Tạm dừng phát' : 'Phát lại bản ghi'}
+                    >
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    </button>
                   </div>
-                  <button 
-                    className="submission-remove-btn" 
-                    onClick={() => setHasPdfScript(false)}
-                    title="Xóa tệp này"
-                    type="button"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+
+                  <div className="speaking-recorder-hint">
+                    {isRecording ? (
+                      <span className="speaking-status-recording">
+                        Đang ghi âm... ({formatTime(recordingDuration)})
+                      </span>
+                    ) : recordedAudioReady ? (
+                      <span className="speaking-status-ready">
+                        {isPlaying
+                          ? `Đang phát lại (${formatTime(playbackSeconds)} / ${formatTime(recordingDuration)})`
+                          : `Đã ghi âm (${formatTime(recordingDuration)}) • Bấm Play để nghe lại hoặc Nộp bài`}
+                      </span>
+                    ) : (
+                      <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Mode Upload File */
+                <div className="p-4 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-center bg-surface hover:bg-surface-variant/20 transition-colors">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".mp3,.wav,.m4a,.webm,audio/*"
+                    onChange={handleAudioFileChange}
+                    className="hidden"
+                    id="speaking-audio-file-input"
+                  />
+
+                  {!uploadedAudioFile ? (
+                    <label
+                      htmlFor="speaking-audio-file-input"
+                      className="flex flex-col items-center cursor-pointer p-4 w-full"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                        <UploadCloud size={24} />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground mb-1">
+                        Bấm để chọn hoặc kéo thả tệp âm thanh bài nói
+                      </span>
+                      <span className="text-xs text-muted">
+                        Hỗ trợ định dạng .mp3, .wav, .m4a, .webm (Dung lượng tối đa 25MB)
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="w-full flex flex-col items-center p-2">
+                      <div className="flex items-center justify-between w-full p-3 rounded-lg bg-surface-variant/40 border border-border mb-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+                            <FileAudio size={20} />
+                          </div>
+                          <div className="text-left overflow-hidden">
+                            <div className="text-sm font-semibold text-foreground truncate max-w-[280px]">
+                              {uploadedAudioFile.name}
+                            </div>
+                            <div className="text-xs text-muted">
+                              {(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB • {uploadedAudioFile.type || 'audio file'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={togglePlay}
+                            className="p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors"
+                            title={isPlaying ? 'Tạm dừng' : 'Nghe thử'}
+                          >
+                            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveUploadedAudio}
+                            className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+                            title="Xóa tệp này và chọn tệp khác"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <span className="text-xs text-muted">
+                        {isPlaying ? 'Đang phát âm thanh...' : 'Tệp âm thanh đã sẵn sàng. Bạn có thể nghe thử hoặc bấm nộp bài.'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+          </section>
+        </div>
 
-              {/* Audio Attachment Box */}
-              <div className="audio-attachment-box">
-                <div className="audio-attachment-icon">
-                  <Music size={18} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="submission-file-name" title="speaking_audio_v1.mp3">
-                    speaking_audio_v1.mp3
+        {/* Right Column: Submission & Grading */}
+        <div className="speaking-side-col">
+          {/* Card 1: Submission */}
+          <section className="speaking-card">
+            <div className="speaking-card-header">
+              <h2 className="speaking-card-title">
+                Bài nộp
+              </h2>
+            </div>
+
+            <div className="speaking-card-body">
+              {/* Audio file block */}
+              <div className="submission-file-box">
+                <div className="submission-file-info">
+                  <div className="submission-file-title truncate max-w-[200px]" title={audioInputMode === 'mic' ? `speaking_attempt_${numericId}.webm` : (uploadedAudioFile?.name || '')}>
+                    {recordedAudioReady 
+                      ? (audioInputMode === 'mic'
+                          ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}`
+                          : uploadedAudioFile?.name)
+                      : previousAudio
+                        ? (previousAudio.fileName || 'speaking_submitted.mp3')
+                        : 'chua_co_ban_ghi.webm'}
                   </div>
-                  <div className="submission-file-meta">2.8 MB • Audio/Mpeg</div>
+                  <div className="submission-file-meta">
+                    {recordedAudioReady
+                      ? (audioInputMode === 'mic' && audioBlob
+                          ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB (Mic mới)`
+                          : uploadedAudioFile
+                            ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB (Tệp mới)`
+                            : '')
+                      : previousAudio
+                        ? 'Bản ghi trước đó (Đã lưu)'
+                        : 'Chưa có bản ghi âm hoặc tệp'}
+                  </div>
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--secondary)', fontWeight: 600 }}>
-                  <CheckCircle2 size={14} style={{ display: 'inline', marginRight: 4 }} />
-                  Đã tải lên
+                <span className={`submission-file-status ${recordedAudioReady ? 'ready' : (previousAudio ? 'saved' : 'pending')}`}>
+                  {recordedAudioReady ? 'Bản ghi mới' : (previousAudio ? 'Đã có bài' : 'Chưa có bài')}
                 </span>
               </div>
 
               {/* Submit CTA */}
-              <button 
-                className="btn-submit-speaking"
-                onClick={handleSubmitAssignment}
-                type="button"
-              >
-                <Send size={16} />
-                {t('studentSpeaking.btnSubmitAssignment')}
-              </button>
-
-              <div className="speaking-submit-note">
-                {t('studentSpeaking.submitNote')}
-              </div>
+              {recordedAudioReady ? (
+                <button 
+                  className="btn-submit-speaking"
+                  onClick={handleSubmitAssignment}
+                  disabled={isSubmitting || !submission}
+                  type="button"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang nộp bài...</span>
+                    </>
+                  ) : (
+                    <span>{isReviewMode ? 'Cập nhật bài nói' : 'Nộp bài'}</span>
+                  )}
+                </button>
+              ) : previousAudio ? (
+                <div className="flex flex-col gap-2 w-full mt-2">
+                  <button 
+                    className="btn-submit-speaking"
+                    onClick={handleKeepPreviousAudio}
+                    type="button"
+                  >
+                    <span>Giữ nguyên & Quay lại</span>
+                  </button>
+                  <p className="text-xs text-center text-muted m-0">
+                    Bản ghi trước đó sẽ được giữ nguyên cho bài nộp tổng.
+                  </p>
+                </div>
+              ) : (
+                <button 
+                  className="btn-submit-speaking"
+                  onClick={handleSubmitAssignment}
+                  disabled={isSubmitting || !recordedAudioReady || !submission}
+                  type="button"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang nộp bài...</span>
+                    </>
+                  ) : (
+                    <span>Nộp bài</span>
+                  )}
+                </button>
+              )}
             </div>
           </section>
-
-          {/* Card 2: Grading */}
-          <section className="speaking-card">
-            <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                {t('studentSpeaking.gradingTitle')}
-              </h2>
-              <span className="speaking-cue-timing">{t('studentSpeaking.gradingScale')}</span>
-            </div>
-
-            <div className="speaking-card-body" style={{ gap: '12px' }}>
-              <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.totalPoints')}</span>
-                <span className="grading-val-total">100</span>
-              </div>
-
-              {/* Criteria breakdown */}
-              <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaPronunciation')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaFluency')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaLexical')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaGrammar')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
-              </div>
-
-              {/* Current Score Display */}
-              <div className="grading-current-grade">
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--on-surface)' }}>
-                    {t('studentSpeaking.currentGrade')}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
-                    {t('studentSpeaking.pendingGrade')}
-                  </div>
-                </div>
-                <div className="grading-score-display">-- / 100</div>
-              </div>
-
-              {/* Evaluator Profile */}
-              <div className="evaluator-profile-box">
-                <div className="evaluator-avatar">ML</div>
-                <div>
-                  <div className="evaluator-role">{t('studentSpeaking.evaluatorTitle')}</div>
-                  <div className="evaluator-name">{t('studentSpeaking.evaluatorName')}</div>
-                </div>
-              </div>
-            </div>
-          </section>
-
         </div>
-
       </div>
+    </div>
+
+      {/* Modal xác nhận nộp Speaking rỗng khi không có bản ghi âm */}
+      {showEmptyConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Xác nhận nộp bài không ghi âm
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Bạn chưa thực hiện ghi âm bài nói. Bạn có chắc chắn muốn nộp bài trống (nhận 0 điểm phần này) để tiếp tục không?
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowEmptyConfirmModal(false)}
+                disabled={isSubmitting}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void doSubmitAssignment(null)}
+                loading={isSubmitting}
+              >
+                Tiếp tục nộp bài
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,4 @@
 # syntax=docker/dockerfile:1
-#
-# Dockerfile này chỉ dùng để BUILD IMAGE VÀ CHẠY LOCAL trên máy dev
-# (không dùng để push lên registry hay deploy).
 
 # =========================
 # Stage 1: Build
@@ -15,12 +12,24 @@ COPY gradle ./gradle
 COPY build.gradle settings.gradle ./
 RUN chmod +x gradlew
 
-# Tải trước Gradle wrapper & dependencies (tắt log thừa, chỉ chạy lại khi build.gradle / gradle đổi)
-RUN ./gradlew --no-daemon dependencies -q || true
+# Tải trước Gradle wrapper & dependencies với BuildKit Cache Mounts và cấu hình retry khi kết nối Maven Central
+RUN --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/wrapper \
+    ./gradlew --no-daemon --stacktrace \
+      -Dorg.gradle.internal.http.socketTimeout=60000 \
+      -Dorg.gradle.internal.http.connectionTimeout=60000 \
+      -Dorg.gradle.internal.repository.max.retries=5 \
+      dependencies -q || true
 
-# Copy source code và build (bỏ clean, bật biên dịch đa luồng parallel, console plain)
+# Copy source code và build (bật biên dịch đa luồng parallel, console plain, tái sử dụng BuildKit cache)
 COPY src ./src
-RUN ./gradlew --no-daemon bootJar -x test --parallel --console=plain
+RUN --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/wrapper \
+    ./gradlew --no-daemon --stacktrace \
+      -Dorg.gradle.internal.http.socketTimeout=60000 \
+      -Dorg.gradle.internal.http.connectionTimeout=60000 \
+      -Dorg.gradle.internal.repository.max.retries=5 \
+      bootJar -x test --parallel --console=plain
 
 # =========================
 # Stage 2: Runtime
@@ -40,3 +49,4 @@ ENV SPRING_PROFILES_ACTIVE=dev
 EXPOSE 8080
 
 ENTRYPOINT ["sh", "-c", "java -jar app.jar"]
+

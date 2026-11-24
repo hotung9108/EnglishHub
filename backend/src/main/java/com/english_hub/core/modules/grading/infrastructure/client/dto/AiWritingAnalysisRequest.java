@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record AiWritingAnalysisRequest(
 		long submissionModuleId,
 		String content,
+		String documentUrl,
 		String moduleInstructions,
 		String aiInstructionSnapshot,
 		double maxScore,
@@ -17,8 +18,31 @@ public record AiWritingAnalysisRequest(
 			String content,
 			String moduleInstructions,
 			String aiInstructionSnapshot,
+			double maxScore,
+			String model,
+			String aiProvider
+	) {
+		this(submissionModuleId, content, null, moduleInstructions, aiInstructionSnapshot, maxScore, model, aiProvider);
+	}
+
+	public AiWritingAnalysisRequest(
+			long submissionModuleId,
+			String content,
+			String documentUrl,
+			String moduleInstructions,
+			String aiInstructionSnapshot,
 			double maxScore
 	) {
-		this(submissionModuleId, content, moduleInstructions, aiInstructionSnapshot, maxScore, null, null);
+		this(submissionModuleId, content, documentUrl, moduleInstructions, aiInstructionSnapshot, maxScore, null, null);
+	}
+
+	public AiWritingAnalysisRequest(
+			long submissionModuleId,
+			String content,
+			String moduleInstructions,
+			String aiInstructionSnapshot,
+			double maxScore
+	) {
+		this(submissionModuleId, content, null, moduleInstructions, aiInstructionSnapshot, maxScore, null, null);
 	}
 }

@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.question.presentation.rest.dto.correctanswer;
 
+import com.english_hub.core.modules.question.domain.model.QuestionType;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
@@ -14,8 +15,13 @@ import java.util.Map;
 @ValidMultipleChoiceAnswer
 public record MultipleChoiceCorrectAnswer(
 		@NotNull(message = "options là bắt buộc.")
-		@Size(min = 4, max = 4, message = "options phải có đúng 4 lựa chọn.")
-		List<@Valid QuestionOption> options) implements CorrectAnswer {
+		@Size(min = 2, message = "options phải có ít nhất 2 lựa chọn.")
+		List<@NotNull(message = "options không được chứa phần tử null.") @Valid QuestionOption> options) implements CorrectAnswer {
+
+	@Override
+	public QuestionType questionType() {
+		return QuestionType.MULTIPLE_CHOICE;
+	}
 
 	@Override
 	public Map<String, Object> toMap() {

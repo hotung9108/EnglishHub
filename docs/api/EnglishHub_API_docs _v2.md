@@ -65,7 +65,8 @@ Yêu cầu quên mật khẩu: hệ thống gửi mã OTP tới email của ngư
 
 **Response:** `ForgotPasswordResponse`
 
-> ⚠️ `ForgotPasswordResponse.debugOtp` là field phục vụ debug, chỉ nên xuất hiện ở môi trường dev/staging. Client không được phụ thuộc vào field này.
+> 📧 Mã OTP được gửi tới email của người dùng qua EmailJS; response **không** còn trả về mã OTP.
+> Nếu dịch vụ email không cấu hình hoặc gửi thất bại, API trả `502 Bad Gateway`.
 
 ---
 
@@ -252,6 +253,12 @@ Xoá thành viên khỏi lớp học.
 ### GET `/api/v1/classes/{classId}/assignments`
 Lấy danh sách bài tập của một lớp (có phân trang, lọc trạng thái).
 
+**Quyền truy cập:** `ADMIN`, giáo viên phụ trách lớp (`TEACHER`) và học viên là thành viên lớp (`STUDENT`). Tài khoản phải đang hoạt động và chưa bị xóa mềm.
+
+- `ADMIN` được đọc danh sách của lớp tồn tại, không phụ thuộc giáo viên phụ trách, membership hoặc trạng thái lớp. Lớp không tồn tại trả `404`.
+- Khi không truyền `status`, danh sách bao gồm `DRAFT`, `PUBLISHED`, `CLOSED` theo truy vấn hiện có; bài tập đã xóa mềm không được trả về. `ADMIN` vì vậy thấy cả bài `DRAFT`.
+- Quyền này chỉ áp dụng cho GET danh sách: `ADMIN` chưa được đọc chi tiết qua GET `/api/v1/assignments/{assignmentId}` và chưa có quyền tạo, sửa, xóa hoặc đổi trạng thái bài tập.
+
 **Path Params:** `classId` (int64)
 
 **Query Params:**
@@ -369,17 +376,47 @@ Xoá module.
 ---
 
 ### POST `/api/v1/modules/{moduleId}/audio`
-Upload file audio cho module (multipart/form-data).
+Lấy presigned PUT URL để upload audio bài nghe cho module `LISTENING` (chỉ giáo viên sở hữu).
+Client sau đó PUT bytes thô trực tiếp lên `uploadUrl` với `Content-Type` trùng khớp, rồi gọi
+`POST /api/v1/modules/{moduleId}/audio/confirm`.
 
 **Path Params:** `moduleId` (int64)
 
-**Request Body:** `multipart/form-data`
+**Request Body:** `application/json`
 
 | Field | Kiểu | Mô tả |
-|-------|------|--------|
-| `file` | binary | File audio cần upload |
+|-------|------|-------|
+| `mimeType` | string | Một trong `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`, `audio/wave`, `audio/mp4`, `audio/m4a`, `audio/x-m4a` |
 
-**Response:** `AudioUploadResponse`
+**Response:** `AudioUploadUrlResponse` (`{ message, uploadUrl, storageKey, expiresAt, sourceAudioUploadStatus }`, trạng thái `UPLOADING`)
+
+---
+
+### POST `/api/v1/modules/{moduleId}/audio/confirm`
+Kiểm tra object trong kho lưu trữ và cập nhật trạng thái module (chỉ giáo viên sở hữu).
+
+**Path Params:** `moduleId` (int64)
+
+**Request Body:** `application/json`
+
+| Field | Kiểu | Mô tả |
+|-------|------|-------|
+| `storageKey` | string | `storageKey` trả về từ bước upload-url |
+
+**Response:** `AudioUploadConfirmResponse` (`sourceAudioUploadStatus` = `READY` nếu đã upload, `FAILED` nếu chưa; HTTP `200` trong cả hai trường hợp)
+
+---
+
+### GET `/api/v1/modules/{moduleId}/audio`
+Stream bytes audio bài nghe. Giáo viên sở hữu và học sinh thành viên lớp được phép; `ADMIN` và
+user ngoài lớp nhận `403`. Trả `404` khi module chưa có audio.
+
+**Path Params:** `moduleId` (int64)
+
+**Response:** bytes audio với `Content-Type` đã lưu và `Cache-Control: private, max-age=3600`
+
+> Luồng đầy đủ (kèm ví dụ client và upload file bài nộp): xem
+> [`docs/api/file-upload-guide-module-audio-and-submission-files.md`](./file-upload-guide-module-audio-and-submission-files.md).
 
 ---
 
@@ -1111,7 +1148,6 @@ Tiến bộ của một học viên.
 |-------|------|--------|
 | `message` | string | Thông báo |
 | `email` | string | Email nhận OTP |
-| `debugOtp` | string | OTP trả về để debug (chỉ dev/staging, không dùng ở production) |
 
 ---
 
@@ -1256,6 +1292,7 @@ Tiến bộ của một học viên.
 | `title` | string | Tiêu đề |
 | `status` | string | Trạng thái |
 | `closeAt` | string (date-time) | Thời điểm đóng |
+| `skills` | string[] | Các kỹ năng `READING`, `LISTENING`, `WRITING`, `SPEAKING` lấy từ module thật của bài tập, loại trùng và giữ thứ tự `orderIndex` của module. Trả `[]` khi bài chưa có module, không bao giờ `null`. |
 
 ---
 
@@ -1349,12 +1386,23 @@ Tiến bộ của một học viên.
 
 ---
 
-#### `AudioUploadResponse`
+#### `AudioUploadUrlResponse`
+| Field | Kiểu | Mô tả |
+|-------|------|--------|
+| `message` | string | Thông báo |
+| `uploadUrl` | string | Presigned PUT URL để upload trực tiếp |
+| `storageKey` | string | Storage key dùng cho bước confirm |
+| `expiresAt` | string (date-time) | Thời điểm presigned URL hết hạn |
+| `sourceAudioUploadStatus` | string | Trạng thái upload (`UPLOADING`) |
+
+---
+
+#### `AudioUploadConfirmResponse`
 | Field | Kiểu | Mô tả |
 |-------|------|--------|
 | `message` | string | Thông báo |
 | `sourceAudioStorageKey` | string | Key lưu trữ file audio |
-| `sourceAudioUploadStatus` | string | Trạng thái upload |
+| `sourceAudioUploadStatus` | string | `READY` hoặc `FAILED` |
 
 ---
 

@@ -99,8 +99,41 @@ public class User extends BaseEntity<Long> {
 		return !deleted && status == UserStatus.ACTIVE;
 	}
 
+	/**
+	 * Returns a detached copy of this user.
+	 *
+	 * <p>{@link com.english_hub.core.modules.user.infrastructure.cache.UserSnapshotCache}
+	 * shares one instance between concurrent requests, so callers that mutate
+	 * (profile update, password change) must work on a copy to keep the cached
+	 * snapshot immutable.</p>
+	 */
+	public User copy() {
+		return new User(
+				getId(),
+				fullName,
+				email,
+				phone,
+				avatarUrl,
+				passwordHash,
+				role,
+				status,
+				deleted,
+				specialization,
+				studentCode,
+				dateOfBirth,
+				parentPhone,
+				getCreatedAt(),
+				getUpdatedAt());
+	}
+
 	public boolean isAdmin() {
 		return role == UserRole.ADMIN;
+	}
+
+	public void changeRole(UserRole newRole) {
+		if (newRole != null) {
+			this.role = newRole;
+		}
 	}
 
 	public void updateFullName(String fullName) {
@@ -108,7 +141,7 @@ public class User extends BaseEntity<Long> {
 	}
 
 	public void updatePhone(String phone) {
-		this.phone = phone;
+		this.phone = PhoneValidator.validateAndNormalize(phone);
 	}
 
 	public void updateAvatarUrl(String avatarUrl) {
@@ -125,7 +158,7 @@ public class User extends BaseEntity<Long> {
 			String parentPhone) {
 		this.studentCode = studentCode;
 		this.dateOfBirth = dateOfBirth;
-		this.parentPhone = parentPhone;
+		this.parentPhone = PhoneValidator.validateAndNormalize(parentPhone);
 	}
 
 	public void changePassword(String passwordHash) {

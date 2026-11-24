@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "trello": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "atlassian-trello-mcp"
+      ],
+      "env": {
+        "TRELLO_API_KEY": "YOUR_TRELLO_API_KEY_HERE",
+        "TRELLO_TOKEN": "YOUR_TRELLO_TOKEN_HERE"
+      }
+    }
+  }
+}

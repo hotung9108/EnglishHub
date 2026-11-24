@@ -10,6 +10,7 @@ export interface SubmissionModuleGradingResponse {
   method: GradingMethod;
   status: GradingStatus;
   finalScore: number | null;
+  finalFeedback?: string | null;
 }
 
 export interface GradingDetailResponse {
@@ -30,7 +31,7 @@ export interface GradingDetailResponse {
 
 export interface AiGradingAnnotation {
   id: number;
-  answerId: number;
+  answerId?: number;
   source: 'AI' | 'TEACHER';
   reviewStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   startOffset: number;
@@ -40,6 +41,29 @@ export interface AiGradingAnnotation {
   suggestedFix?: string | null;
 }
 
+export interface SpeakingCriteriaScores {
+  fluencyAndCoherence?: number;
+  fluencyCohesion?: number; // legacy fallback
+  lexicalResource?: number;
+  grammaticalRangeAndAccuracy?: number;
+  grammaticalRange?: number; // legacy fallback
+  pronunciation?: number;
+  overallScore?: number;
+}
+
+export interface WritingCriteriaScores {
+  taskResponse?: number;
+  taskAchievement?: number; // legacy fallback
+  coherenceAndCohesion?: number;
+  coherenceCohesion?: number; // legacy fallback
+  lexicalResource?: number;
+  grammaticalRangeAndAccuracy?: number;
+  grammaticalRange?: number; // legacy fallback
+  overallScore?: number;
+}
+
+export type CriteriaScores = SpeakingCriteriaScores & WritingCriteriaScores & Record<string, number | undefined>;
+
 export interface AiGradingSuggestionResponse {
   submissionModuleId: number;
   gradingId: number;
@@ -48,7 +72,7 @@ export interface AiGradingSuggestionResponse {
   suggestedScore: number | null;
   maxScore: number | null;
   aiFeedback: string | null;
-  criteriaScores: Record<string, number> | null;
+  criteriaScores: CriteriaScores | null;
   metrics: Record<string, number> | null;
   annotations: AiGradingAnnotation[];
   transcript: unknown | null;
@@ -79,6 +103,16 @@ export interface GradingSummaryResponse {
   id: number;
   status: GradingStatus;
   finalScore: number | null;
+  submissionModuleId?: number;
+  assignmentId?: number;
+  assignmentTitle?: string;
+  classId?: number;
+  className?: string;
+  teacherId?: number;
+  teacherName?: string;
+  studentId?: number;
+  studentName?: string;
+  gradedAt?: string | null;
 }
 
 export interface GradingPagination {
@@ -100,6 +134,24 @@ export interface StudentGradingResult {
   maxScoreSnapshot: number | null;
   finalFeedback: string | null;
   gradedAt: string | null;
+  aiTranscript?: unknown | null;
+}
+
+export function parseAiTranscriptField(raw: unknown): unknown {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return raw;
+      }
+    }
+  }
+  return raw;
 }
 
 export class GradingService {
@@ -142,8 +194,12 @@ export class GradingService {
     return this.http.put<GradingMessageResponse>(`/gradings/${id}`, payload, options);
   }
 
-  getById(id: number, options?: ApiRequestOptions): Promise<GradingDetailResponse> {
-    return this.http.get<GradingDetailResponse>(`/gradings/${id}`, options);
+  async getById(id: number, options?: ApiRequestOptions): Promise<GradingDetailResponse> {
+    const detail = await this.http.get<GradingDetailResponse>(`/gradings/${id}`, options);
+    if (detail && detail.aiTranscript !== undefined && detail.aiTranscript !== null) {
+      detail.aiTranscript = parseAiTranscriptField(detail.aiTranscript);
+    }
+    return detail;
   }
 
   listGradings(
@@ -175,6 +231,7 @@ export class GradingService {
       maxScoreSnapshot: detail.maxScoreSnapshot,
       finalFeedback: detail.finalFeedback,
       gradedAt: detail.gradedAt,
+      aiTranscript: detail.aiTranscript,
     };
   }
 }

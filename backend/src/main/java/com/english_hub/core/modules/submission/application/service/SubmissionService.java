@@ -3,6 +3,8 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.module.domain.service.AutoGradeEligibility;
+import com.english_hub.core.modules.submission.application.mapper.AnswerContentMapper;
+import com.english_hub.core.modules.submission.application.mapper.QuestionCorrectAnswerMapper;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
@@ -38,10 +40,13 @@ import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +55,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,13 +70,19 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class SubmissionService {
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(SubmissionService.class);
+
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
+	private static final String ASSIGNMENT_CLOSED_MESSAGE = "Bài tập đã đóng";
 	private static final String CANNOT_START_MESSAGE = "Không thể bắt đầu làm bài tập này lúc này.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
+	private static final String SUBMISSION_DEADLINE_PASSED_MESSAGE =
+			"Không thể nộp phần làm bài này vì đã quá hạn nộp bài.";
 	private static final String SUBMISSION_NOT_FOUND_MESSAGE = "Không tìm thấy lượt làm bài.";
 	private static final String INVALID_PARAM_MESSAGE = "Dữ liệu không hợp lệ.";
 	private static final String INVALID_STATUS_MESSAGE = "status không hợp lệ.";
-	private static final String TEACHER_ASSIGNMENT_REQUIRED_MESSAGE = "assignmentId là bắt buộc đối với giáo viên.";
+	private static final String TEACHER_ASSIGNMENT_REQUIRED_MESSAGE = "classId hoặc assignmentId là bắt buộc đối với giáo viên.";
 	private static final String ALREADY_SUBMITTED_MESSAGE = "Phần làm bài này đã được nộp.";
 	private static final String INVALID_ANSWER_CONTENT_MESSAGE = "Nội dung câu trả lời không hợp lệ.";
 	private static final String MODULE_OR_QUESTION_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài hoặc câu hỏi.";
@@ -80,6 +95,10 @@ public class SubmissionService {
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
+	private static final Duration SUBMISSION_DOWNLOAD_TTL = Duration.ofMinutes(30);
+	public static final long MAX_SUBMISSION_FILE_SIZE_BYTES = 10L * 1024 * 1024;
+	private static final String FILE_SIZE_NON_POSITIVE_MESSAGE = "Dung lượng file phải lớn hơn 0 byte.";
+	private static final String FILE_SIZE_EXCEEDED_MESSAGE = "Dung lượng file vượt quá giới hạn tối đa cho phép (10MB).";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -130,8 +149,7 @@ public class SubmissionService {
 		if (caller.role() != UserRole.STUDENT) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
-		AssignmentWindow window = assignmentWindowRepository.findWindowById(assignmentId)
-				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		AssignmentWindow window = findAssignmentWindowForStart(assignmentId);
 		if (window.deleted()) {
 			throw ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE);
 		}
@@ -154,9 +172,22 @@ public class SubmissionService {
 				submission.getId(),
 				modules.stream().map(ModuleInfo::moduleId).toList());
 		gradingRepository.bulkCreate(submissionModules.stream()
-				.map(submissionModule -> new GradingDraft(
-						submissionModule.getId(),
-						gradingMethodOf(moduleById.get(submissionModule.getModuleId()))))
+				.map(submissionModule -> {
+					ModuleInfo moduleInfo = moduleById.get(submissionModule.getModuleId());
+					BigDecimal maxScoreSnapshot = moduleInfo.maxScore() != null
+							&& moduleInfo.maxScore().compareTo(BigDecimal.ZERO) > 0
+							? moduleInfo.maxScore()
+							: null;
+					String aiInstructionSnapshot = moduleInfo.aiInstruction() != null
+							&& !moduleInfo.aiInstruction().isBlank()
+							? moduleInfo.aiInstruction().trim()
+							: null;
+					return new GradingDraft(
+							submissionModule.getId(),
+							gradingMethodOf(moduleInfo),
+							maxScoreSnapshot,
+							aiInstructionSnapshot);
+				})
 				.toList());
 
 		List<ModuleEntry> entries = submissionModules.stream()
@@ -189,7 +220,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public SubmissionListResult list(
-			Long assignmentId, Long studentId, String statusValue, int page, int limit) {
+			Long classId, Long assignmentId, Long studentId, String statusValue, int page, int limit) {
 		SubmissionPageRequest pageRequest = new SubmissionPageRequest(page, limit);
 		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest(INVALID_PARAM_MESSAGE);
@@ -208,17 +239,20 @@ public class SubmissionService {
 				scopedStudentId = caller.id();
 			}
 			case TEACHER -> {
-				if (assignmentId == null) {
+				if (classId == null && assignmentId == null) {
 					throw ApiException.badRequest(TEACHER_ASSIGNMENT_REQUIRED_MESSAGE);
 				}
-				if (!isTeacherOfAssignment(caller.id(), assignmentId)) {
+				boolean allowed = classId != null
+						? classTeachingRepository.isTeacherOfClass(caller.id(), classId)
+						: isTeacherOfAssignment(caller.id(), assignmentId);
+				if (!allowed) {
 					throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 				}
 			}
 			default -> throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		SubmissionPage result = submissionRepository.findPage(
-				new SubmissionFilter(assignmentId, scopedStudentId, status), pageRequest);
+				new SubmissionFilter(classId, assignmentId, scopedStudentId, status), pageRequest);
 		return composeList(result);
 	}
 
@@ -230,9 +264,6 @@ public class SubmissionService {
 		}
 		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
 				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
-		}
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
 		if (!submission.getStudentId().equals(caller.id())) {
@@ -240,6 +271,17 @@ public class SubmissionService {
 		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
+
+		AssignmentWindow window = assignmentWindowRepository
+				.findWindowById(submission.getAssignmentId())
+				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		if (window.status() == AssignmentStatus.CLOSED) {
+			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
+		}
+		OffsetDateTime now = OffsetDateTime.now();
+		if (now.isAfter(window.closeAt())) {
+			throw ApiException.conflict(SUBMISSION_DEADLINE_PASSED_MESSAGE);
 		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
@@ -302,6 +344,13 @@ public class SubmissionService {
 		String matchedKey = found == null
 				? null
 				: storageKey(submission.getId(), submissionModule.getId(), filename, found.extension());
+		if (found != null) {
+			Long actualSize = storageService.getObjectSize(matchedKey);
+			if (actualSize != null && actualSize > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+				storageService.deleteObject(matchedKey);
+				throw ApiException.badRequest(FILE_SIZE_EXCEEDED_MESSAGE);
+			}
+		}
 		UploadStatus uploadStatus = found == null ? UploadStatus.UPLOADING : UploadStatus.READY;
 
 		Answer persisted = answerRepository.bulkCreate(
@@ -347,7 +396,8 @@ public class SubmissionService {
 	private List<FileCandidate> documentCandidates() {
 		return List.of(
 				new FileCandidate("pdf", "application/pdf"),
-				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+				new FileCandidate("txt", "text/plain"));
 	}
 
 	private record FileCandidate(String extension, String mimeType) {
@@ -367,19 +417,86 @@ public class SubmissionService {
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
 		}
+		AssignmentWindow window = assignmentWindowRepository
+				.findWindowById(submission.getAssignmentId())
+				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		if (window.status() == AssignmentStatus.CLOSED) {
+			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
+		}
+		List<SubmissionModule> modulesToSubmit = findInProgressModules(submissionId);
+		Map<Long, ModuleInfo> moduleById = Map.of();
+		if (!modulesToSubmit.isEmpty()) {
+			moduleById = modulesOf(submission.getAssignmentId());
+		}
+
 		OffsetDateTime submittedAt = OffsetDateTime.now();
 		submission.setStatus(SubmissionStatus.SUBMITTED);
 		submission.setSubmittedAt(submittedAt);
 		submissionRepository.save(submission);
+		saveSubmittedModules(modulesToSubmit);
 
-		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
-		for (SubmissionModule submissionModule : submissionModules) {
+		Set<Long> autoGradingModuleIds = autoGradingModuleIds(submission, modulesToSubmit, moduleById);
+		publishModuleSubmittedEvents(autoGradingModuleIds);
+		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
+	}
+
+	private List<SubmissionModule> findInProgressModules(long submissionId) {
+		List<SubmissionModule> modulesToSubmit = new ArrayList<>();
+		for (SubmissionModule submissionModule : submissionModuleRepository.findBySubmissionId(submissionId)) {
 			if (submissionModule.getStatus() == SubmissionStatus.IN_PROGRESS) {
-				submissionModule.setStatus(SubmissionStatus.SUBMITTED);
-				submissionModuleRepository.save(submissionModule);
+				modulesToSubmit.add(submissionModule);
 			}
 		}
-		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
+		return modulesToSubmit;
+	}
+
+	private void saveSubmittedModules(List<SubmissionModule> modulesToSubmit) {
+		for (SubmissionModule submissionModule : modulesToSubmit) {
+			submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+			submissionModuleRepository.save(submissionModule);
+		}
+	}
+
+	private Set<Long> autoGradingModuleIds(
+			Submission submission, List<SubmissionModule> submittedModules, Map<Long, ModuleInfo> moduleById) {
+		Set<Long> submissionModuleIds = new LinkedHashSet<>();
+		for (SubmissionModule submissionModule : submittedModules) {
+			ModuleInfo moduleInfo = moduleById.get(submissionModule.getModuleId());
+			if (isEligibleForFinalAutoGrading(submission, submissionModule, moduleInfo)) {
+				submissionModuleIds.add(submissionModule.getId());
+			}
+		}
+		return submissionModuleIds;
+	}
+
+	private boolean isEligibleForFinalAutoGrading(
+			Submission submission, SubmissionModule submissionModule, ModuleInfo moduleInfo) {
+		if (moduleInfo == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "missing module metadata");
+			return false;
+		}
+		if (moduleInfo.skill() == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "null skill");
+			return false;
+		}
+		if (moduleInfo.taskType() == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "null taskType");
+			return false;
+		}
+		return gradingMethodOf(moduleInfo) == GradingMethod.AUTO;
+	}
+
+	private void warnSkippedAutoGrading(
+			Submission submission, SubmissionModule submissionModule, String reason) {
+		LOGGER.warn(
+				"Skipping final-submit auto-grading event: submissionId={}, assignmentId={}, submissionModuleId={}, moduleId={}, reason={}",
+				submission.getId(), submission.getAssignmentId(), submissionModule.getId(), submissionModule.getModuleId(), reason);
+	}
+
+	private void publishModuleSubmittedEvents(Set<Long> submissionModuleIds) {
+		for (Long submissionModuleId : submissionModuleIds) {
+			eventPublisher.publishEvent(new SubmissionModuleSubmittedEvent(submissionModuleId));
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -390,7 +507,7 @@ public class SubmissionService {
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
 		verifyReadAccess(submission, caller);
-		if (!isSubmittedOrGraded(submissionModule.getStatus()) || !isSubmittedOrGraded(submission.getStatus())) {
+		if (!isSubmittedOrGraded(submissionModule.getStatus())) {
 			throw ApiException.badRequest(NOT_SUBMITTED_YET_MESSAGE);
 		}
 
@@ -409,19 +526,24 @@ public class SubmissionService {
 						question.questionType(),
 						question.score(),
 						question.orderIndex(),
-						graded ? parseContent(question.correctAnswer()) : null))
+						graded ? QuestionCorrectAnswerMapper.toResponse(
+								question.questionType(), parseContent(question.correctAnswer())) : null))
 				.toList();
 		List<AnswerResult> answers = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
 				.map(answer -> new AnswerResult(
 						answer.getId(),
 						answer.getQuestionId(),
-						parseContent(answer.getContent()),
+						answer.getQuestionId() != null
+								? AnswerContentMapper.toResponse(parseContent(answer.getContent()))
+								: toTextContent(answer.getContent()),
 						answer.getDocStorageKey(),
 						answer.getDocMimeType(),
 						answer.getDocUploadStatus(),
 						answer.getAudioStorageKey(),
 						answer.getAudioMimeType(),
-						answer.getAudioUploadStatus()))
+						answer.getAudioUploadStatus(),
+						resolveSubmissionAudioDownloadUrl(answer),
+						resolveSubmissionDocDownloadUrl(answer, null)))
 				.toList();
 		return new SubmissionModuleDetailResult(
 				submissionModule.getId(),
@@ -435,37 +557,179 @@ public class SubmissionService {
 	}
 
 	@Transactional(readOnly = true)
+	public SubmissionFileDownloadResult generateSubmissionAudioDownloadUrl(long submissionModuleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		verifyReadAccess(submission, caller);
+
+		Answer answer = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.filter(a -> a.getAudioStorageKey() != null && !a.getAudioStorageKey().isBlank())
+				.findFirst()
+				.orElseThrow(() -> ApiException.notFound("Bài nộp chưa có file audio."));
+
+		StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+				answer.getAudioStorageKey(), SUBMISSION_DOWNLOAD_TTL, null);
+		if (download == null) {
+			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo liên kết tải audio.");
+		}
+
+		String fileName = answer.getAudioStorageKey().substring(answer.getAudioStorageKey().lastIndexOf('/') + 1);
+		return new SubmissionFileDownloadResult(
+				submissionModuleId,
+				download.downloadUrl(),
+				answer.getAudioStorageKey(),
+				fileName,
+				answer.getAudioMimeType(),
+				download.expiresAt());
+	}
+
+	@Transactional(readOnly = true)
+	public SubmissionFileDownloadResult generateSubmissionDocumentDownloadUrl(long submissionModuleId, String mode) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		verifyReadAccess(submission, caller);
+
+		Answer answer = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.filter(a -> a.getDocStorageKey() != null && !a.getDocStorageKey().isBlank())
+				.findFirst()
+				.orElseThrow(() -> ApiException.notFound("Bài nộp chưa có file tài liệu."));
+
+		String fileName = extractOriginalFileName(answer);
+		String disposition = "download".equalsIgnoreCase(mode)
+				? "attachment; filename=\"" + fileName + "\""
+				: "inline";
+
+		StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+				answer.getDocStorageKey(), SUBMISSION_DOWNLOAD_TTL, disposition);
+		if (download == null) {
+			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo liên kết tải tài liệu.");
+		}
+
+		return new SubmissionFileDownloadResult(
+				submissionModuleId,
+				download.downloadUrl(),
+				answer.getDocStorageKey(),
+				fileName,
+				answer.getDocMimeType(),
+				download.expiresAt());
+	}
+
+	private String resolveSubmissionAudioDownloadUrl(Answer answer) {
+		if (answer == null || answer.getAudioStorageKey() == null || answer.getAudioStorageKey().isBlank()) {
+			return null;
+		}
+		try {
+			StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+					answer.getAudioStorageKey(), SUBMISSION_DOWNLOAD_TTL, null);
+			return download != null ? download.downloadUrl() : null;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
+
+	private String resolveSubmissionDocDownloadUrl(Answer answer, String mode) {
+		if (answer == null || answer.getDocStorageKey() == null || answer.getDocStorageKey().isBlank()) {
+			return null;
+		}
+		try {
+			String disposition = "download".equalsIgnoreCase(mode)
+					? "attachment; filename=\"" + extractOriginalFileName(answer) + "\""
+					: "inline";
+			StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+					answer.getDocStorageKey(), SUBMISSION_DOWNLOAD_TTL, disposition);
+			return download != null ? download.downloadUrl() : null;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
+
+	private String extractOriginalFileName(Answer answer) {
+		if (answer.getContent() != null) {
+			try {
+				tools.jackson.databind.JsonNode node = parseContent(answer.getContent());
+				if (node != null && node.has("fileName") && !node.get("fileName").asText().isBlank()) {
+					return node.get("fileName").asText().trim();
+				}
+			} catch (Exception ignored) {
+				// Fall back to storage key
+			}
+		}
+		if (answer.getDocStorageKey() != null) {
+			int idx = answer.getDocStorageKey().lastIndexOf('/');
+			if (idx != -1 && idx < answer.getDocStorageKey().length() - 1) {
+				return answer.getDocStorageKey().substring(idx + 1);
+			}
+			return answer.getDocStorageKey();
+		}
+		return "bai-lam.pdf";
+	}
+
+	@Transactional(readOnly = true)
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
+		return getAudioUploadUrl(submissionModuleId, mimeType, null);
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType, Long fileSizeBytes) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
 		if (moduleInfo == null
 				|| (moduleInfo.taskType() != ModuleTaskType.RECORDING && moduleInfo.skill() != ModuleSkill.SPEAKING)) {
 			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
 		}
+		validateFileSizeBytes(fileSizeBytes);
 		String extension = audioExtensionOf(mimeType);
 		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "audio", extension);
+		if (fileSizeBytes != null) {
+			return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType, fileSizeBytes));
+		}
 		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
 	}
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
+		return getDocumentUploadUrl(submissionModuleId, mimeType, null);
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType, Long fileSizeBytes) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
-		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(context.submissionModule().getModuleId());
 		/* REWRITE answers questions like QUIZ does, so a document upload is essay-only. */
 		if (moduleInfo == null || moduleInfo.taskType() != ModuleTaskType.ESSAY) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
 		}
+		validateFileSizeBytes(fileSizeBytes);
 		String extension = documentExtensionOf(mimeType);
 		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "essay", extension);
+		if (fileSizeBytes != null) {
+			return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType, fileSizeBytes));
+		}
 		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
+	}
+
+	private void validateFileSizeBytes(Long fileSizeBytes) {
+		if (fileSizeBytes != null) {
+			if (fileSizeBytes <= 0) {
+				throw ApiException.badRequest(FILE_SIZE_NON_POSITIVE_MESSAGE);
+			}
+			if (fileSizeBytes > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+				throw ApiException.badRequest(FILE_SIZE_EXCEEDED_MESSAGE);
+			}
+		}
 	}
 
 	private OwnedModuleContext requireOwnModule(long submissionModuleId) {
@@ -515,6 +779,9 @@ public class SubmissionService {
 		if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)) {
 			return "docx";
 		}
+		if ("text/plain".equals(mimeType)) {
+			return "txt";
+		}
 		throw ApiException.badRequest(UNSUPPORTED_FILE_MESSAGE);
 	}
 
@@ -535,6 +802,10 @@ public class SubmissionService {
 				grading.getMaxScoreSnapshot(),
 				grading.getAiFeedback(),
 				grading.getFinalFeedback());
+	}
+
+	private JsonNode toTextContent(String raw) {
+		return raw == null ? null : objectMapper.valueToTree(raw);
 	}
 
 	private JsonNode parseContent(String raw) {
@@ -651,15 +922,19 @@ public class SubmissionService {
 				.findBySubmissionModuleIds(submissionModuleIds)
 				.stream()
 				.collect(Collectors.toMap(Grading::getSubmissionModuleId, Function.identity()));
-		Map<Long, Map<Long, ModuleInfo>> moduleInfoByAssignment = submissions.stream()
+		List<Long> assignmentIds = submissions.stream()
 				.map(Submission::getAssignmentId)
 				.distinct()
-				.collect(Collectors.toMap(Function.identity(), this::modulesOf));
+				.toList();
+		Map<Long, Map<Long, ModuleInfo>> moduleInfoByAssignment = assignmentModuleRepository
+				.findModulesByAssignmentIds(assignmentIds).stream()
+				.collect(Collectors.groupingBy(ModuleInfo::assignmentId,
+						Collectors.toMap(ModuleInfo::moduleId, Function.identity())));
 		List<SubmissionListItemResult> items = submissions.stream()
 				.map(submission -> toListItem(
 						submission,
 						modulesBySubmissionId.getOrDefault(submission.getId(), List.of()),
-						moduleInfoByAssignment.get(submission.getAssignmentId()),
+						moduleInfoByAssignment.getOrDefault(submission.getAssignmentId(), Map.of()),
 						gradingBySubmissionModuleId))
 				.toList();
 		return new SubmissionListResult(page.page(), page.limit(), page.total(), items);
@@ -700,6 +975,7 @@ public class SubmissionService {
 				.toList();
 		return new SubmissionListItemResult(
 				submission.getId(),
+				submission.getAssignmentId(),
 				submission.getStudentId(),
 				submission.getAttemptNumber(),
 				submission.getStatus(),
@@ -717,6 +993,15 @@ public class SubmissionService {
 				.map(byId -> byId.get(submissionModule.getModuleId()))
 				.map(ModuleInfo::orderIndex)
 				.orElse(Integer.MAX_VALUE));
+	}
+
+	private AssignmentWindow findAssignmentWindowForStart(long assignmentId) {
+		try {
+			return assignmentWindowRepository.findWindowByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private boolean isWithinWindow(AssignmentWindow window) {
@@ -804,6 +1089,7 @@ public class SubmissionService {
 
 	public record SubmissionListItemResult(
 			Long id,
+			Long assignmentId,
 			Long studentId,
 			int attemptNumber,
 			SubmissionStatus status,
@@ -842,7 +1128,42 @@ public class SubmissionService {
 			UploadStatus docUploadStatus,
 			String audioStorageKey,
 			String audioMimeType,
-			UploadStatus audioUploadStatus) {
+			UploadStatus audioUploadStatus,
+			String audioDownloadUrl,
+			String docDownloadUrl) {
+
+		public AnswerResult(
+				Long id,
+				Long questionId,
+				JsonNode content,
+				String docStorageKey,
+				String docMimeType,
+				UploadStatus docUploadStatus,
+				String audioStorageKey,
+				String audioMimeType,
+				UploadStatus audioUploadStatus) {
+			this(
+					id,
+					questionId,
+					content,
+					docStorageKey,
+					docMimeType,
+					docUploadStatus,
+					audioStorageKey,
+					audioMimeType,
+					audioUploadStatus,
+					null,
+					null);
+		}
+	}
+
+	public record SubmissionFileDownloadResult(
+			Long submissionModuleId,
+			String downloadUrl,
+			String storageKey,
+			String fileName,
+			String mimeType,
+			OffsetDateTime expiresAt) {
 	}
 
 	public record AnswerPayload(Long questionId, QuestionType questionType, Map<String, Object> content) {

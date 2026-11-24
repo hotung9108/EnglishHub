@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-10-11T11:19:45.366Z",
+  "mode": "LIVE FRONTEND",
+  "scope": "Login form and authenticated dashboard for requested roles; no full usability/maintainability acceptance verdict.",
+  "status": "PASSED",
+  "cases": [
+    {
+      "id": "QA28-SMOKE-001",
+      "title": "Frontend root renders login form with editable email, masked password and labeled submit",
+      "status": "PASSED",
+      "screenshot": "QA28-SMOKE-001.png"
+    },
+    {
+      "id": "QA28-LOGIN-TEACHER",
+      "title": "Login as teacher",
+      "status": "PASSED",
+      "screenshot": "QA28-LOGIN-TEACHER.png"
+    }
+  ],
+  "baseUrl": "https://staging.hotung9108.me",
+  "browser": "chrome",
+  "headless": false,
+  "browserVersion": "154.0.8037.98",
+  "endedAt": "2026-10-11T11:19:49.516Z"
+}

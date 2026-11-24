@@ -67,13 +67,15 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void teacherCanListAnyStudentWithOptionalClassFilterAndTeacherName() {
+	void teacherCanListTheirOwnClassStudentWithOptionalClassFilterAndTeacherName() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
 		when(classRepository.studentExists(STUDENT_ID)).thenReturn(true);
 		StudentEvaluation evaluation = evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Good work.");
 		StudentEvaluationFilter filter = new StudentEvaluationFilter(
 				STUDENT_ID,
 				CLASS_ID,
+				TEACHER_ID,
 				Instant.parse("2026-09-19T17:00:00Z"),
 				Instant.parse("2026-09-20T17:00:00Z"));
 		when(studentEvaluationRepository.findPage(filter, 2, 5))
@@ -91,6 +93,46 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
+	void teacherListWithoutClassFilterIsScopedToTheirOwnClasses() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(classRepository.studentExists(STUDENT_ID)).thenReturn(true);
+		StudentEvaluationFilter filter = new StudentEvaluationFilter(STUDENT_ID, null, TEACHER_ID, null, null);
+		when(studentEvaluationRepository.findPage(filter, 1, 20))
+				.thenReturn(new StudentEvaluationPage(List.of(), 1, 20, 0));
+
+		StudentEvaluationPage result = service.listForStudent(STUDENT_ID, null, null, null, 1, 20);
+
+		assertThat(result.getTotalElements()).isZero();
+		verify(studentEvaluationRepository).findPage(filter, 1, 20);
+	}
+
+	@Test
+	void teacherCannotListEvaluationsForAClassTheyDoNotTeach() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID + 1)));
+
+		ApiException exception = assertThrows(
+				ApiException.class,
+				() -> service.listForStudent(STUDENT_ID, CLASS_ID, null, null, 1, 20));
+
+		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+		verifyNoInteractions(studentEvaluationRepository);
+	}
+
+	@Test
+	void listingReturnsClassNotFoundWhenTeacherFiltersByMissingClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.empty());
+
+		ApiException exception = assertThrows(
+				ApiException.class,
+				() -> service.listForStudent(STUDENT_ID, CLASS_ID, null, null, 1, 20));
+
+		assertApiException(exception, HttpStatus.NOT_FOUND, "Không tìm thấy lớp học.");
+		verifyNoInteractions(studentEvaluationRepository);
+	}
+
+	@Test
 	void studentCanOnlyListTheirOwnEvaluations() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(STUDENT_ID, UserRole.STUDENT));
 
@@ -103,15 +145,17 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void adminCannotListStudentEvaluations() {
+	void adminCanListAnyStudentEvaluationsWithoutClassScoping() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
+		when(classRepository.studentExists(STUDENT_ID)).thenReturn(true);
+		StudentEvaluationFilter filter = new StudentEvaluationFilter(STUDENT_ID, null, null, null, null);
+		when(studentEvaluationRepository.findPage(filter, 1, 20))
+				.thenReturn(new StudentEvaluationPage(List.of(), 1, 20, 0));
 
-		ApiException exception = assertThrows(
-				ApiException.class,
-				() -> service.listForStudent(STUDENT_ID, null, null, null, 1, 20));
+		StudentEvaluationPage result = service.listForStudent(STUDENT_ID, null, null, null, 1, 20);
 
-		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
-		verifyNoInteractions(studentEvaluationRepository, classRepository);
+		assertThat(result.getTotalElements()).isZero();
+		verify(studentEvaluationRepository).findPage(filter, 1, 20);
 	}
 
 	@Test
@@ -241,10 +285,67 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void updateChangesContentWhenCurrentTeacherIsTheAuthor() {
+	void getByIdAllowsTeacherInChargeOfTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		StudentEvaluation evaluation = evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Owned class.");
+		when(studentEvaluationRepository.findById(EVALUATION_ID)).thenReturn(Optional.of(evaluation));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
+
+		assertThat(service.getById(EVALUATION_ID)).isEqualTo(evaluation);
+	}
+
+	@Test
+	void getByIdRejectsTeacherWhoDoesNotTeachTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(studentEvaluationRepository.findById(EVALUATION_ID))
+				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Text")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID + 1)));
+
+		ApiException exception = assertThrows(ApiException.class, () -> service.getById(EVALUATION_ID));
+
+		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void adminCanReadAnyEvaluationDetailWithoutClassScoping() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
+		StudentEvaluation evaluation = evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Admin can read.");
+		when(studentEvaluationRepository.findById(EVALUATION_ID)).thenReturn(Optional.of(evaluation));
+
+		assertThat(service.getById(EVALUATION_ID)).isEqualTo(evaluation);
+		verifyNoInteractions(classRepository);
+	}
+
+	@Test
+	void adminCannotCreateUpdateOrDeleteEvaluations() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
+
+		assertApiException(
+				assertThrows(
+						ApiException.class,
+						() -> service.createForStudent(
+								STUDENT_ID, new CreateStudentEvaluationCommand(CLASS_ID, "Text"))),
+				HttpStatus.FORBIDDEN,
+				"Bạn không có quyền thực hiện thao tác này.");
+		assertApiException(
+				assertThrows(
+						ApiException.class,
+						() -> service.update(EVALUATION_ID, new UpdateStudentEvaluationCommand("Text"))),
+				HttpStatus.FORBIDDEN,
+				"Bạn không có quyền thực hiện thao tác này.");
+		assertApiException(
+				assertThrows(ApiException.class, () -> service.delete(EVALUATION_ID)),
+				HttpStatus.FORBIDDEN,
+				"Bạn không có quyền thực hiện thao tác này.");
+		verifyNoInteractions(studentEvaluationRepository, classRepository);
+	}
+
+	@Test
+	void updateChangesContentWhenCurrentTeacherIsInChargeOfTheClass() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
 		when(studentEvaluationRepository.findById(EVALUATION_ID))
 				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Old text.")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
 
 		service.update(EVALUATION_ID, new UpdateStudentEvaluationCommand("New text."));
 
@@ -278,10 +379,11 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void updateRejectsTeacherOtherThanOriginalAuthor() {
+	void updateRejectsTeacherWhoDoesNotTeachTheClass() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID + 1, UserRole.TEACHER));
 		when(studentEvaluationRepository.findById(EVALUATION_ID))
 				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Old text.")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
 
 		ApiException exception = assertThrows(
 				ApiException.class,
@@ -292,10 +394,39 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void deleteRemovesEvaluationWhenCurrentTeacherIsTheAuthor() {
+	void updateRejectsOriginalAuthorWhoIsNoLongerTeachingTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
+		when(studentEvaluationRepository.findById(EVALUATION_ID))
+				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Old text.")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID + 1)));
+
+		ApiException exception = assertThrows(
+				ApiException.class,
+				() -> service.update(EVALUATION_ID, new UpdateStudentEvaluationCommand("New text.")));
+
+		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
+		verify(studentEvaluationRepository, never()).save(any());
+	}
+
+	@Test
+	void updateAllowsInChargeTeacherWhoIsNotTheOriginalAuthor() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID + 1, UserRole.TEACHER));
+		when(studentEvaluationRepository.findById(EVALUATION_ID))
+				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Old text.")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID + 1)));
+
+		service.update(EVALUATION_ID, new UpdateStudentEvaluationCommand("New text."));
+
+		verify(studentEvaluationRepository).save(evaluation(
+				EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "New text."));
+	}
+
+	@Test
+	void deleteRemovesEvaluationWhenCurrentTeacherIsInChargeOfTheClass() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
 		when(studentEvaluationRepository.findById(EVALUATION_ID))
 				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Text")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
 
 		service.delete(EVALUATION_ID);
 
@@ -303,15 +434,28 @@ class StudentEvaluationServiceTest {
 	}
 
 	@Test
-	void deleteRejectsTeacherOtherThanOriginalAuthor() {
+	void deleteRejectsTeacherWhoDoesNotTeachTheClass() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID + 1, UserRole.TEACHER));
 		when(studentEvaluationRepository.findById(EVALUATION_ID))
 				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Text")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID)));
 
 		ApiException exception = assertThrows(ApiException.class, () -> service.delete(EVALUATION_ID));
 
 		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
 		verify(studentEvaluationRepository, never()).deleteById(any());
+	}
+
+	@Test
+	void deleteAllowsInChargeTeacherWhoIsNotTheOriginalAuthor() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID + 1, UserRole.TEACHER));
+		when(studentEvaluationRepository.findById(EVALUATION_ID))
+				.thenReturn(Optional.of(evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Text")));
+		when(classRepository.findById(CLASS_ID)).thenReturn(Optional.of(englishClass(TEACHER_ID + 1)));
+
+		service.delete(EVALUATION_ID);
+
+		verify(studentEvaluationRepository).deleteById(EVALUATION_ID);
 	}
 
 	private User user(long id, UserRole role) {

@@ -1,0 +1,846 @@
+{
+  "layout": "function-group/UC/case",
+  "backup": "D:/ki7/prj1/backups/selenium-before-uc-layout-20261117/source-before.zip",
+  "cases": [
+    {
+      "id": "LOGIN_001",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_002",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_003",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_004",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_005",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_006",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_007",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_008",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_009",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_010",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_011",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_012",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_013",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_014",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_017",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_018",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_020",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_021",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_022",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_023",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_024",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_025",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_015",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_016",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGIN_019",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc001/auth.cases.js"
+    },
+    {
+      "id": "LOGOUT_001",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc002/auth.cases.js"
+    },
+    {
+      "id": "LOGOUT_002",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc002/auth.cases.js"
+    },
+    {
+      "id": "LOGOUT_003",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc002/auth.cases.js"
+    },
+    {
+      "id": "LOGOUT_004",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc002/auth.cases.js"
+    },
+    {
+      "id": "LOGOUT_005",
+      "from": "common/auth.cases.js",
+      "to": "cases/01-auth-profile/uc002/auth.cases.js"
+    },
+    {
+      "id": "PROF_001",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_002",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_003",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_004",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_005",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_006",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_007",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_008",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_009",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_010",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_011",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "PROF_012",
+      "from": "common/profile.cases.js",
+      "to": "cases/01-auth-profile/uc003/profile.cases.js"
+    },
+    {
+      "id": "USER_001",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_002",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_003",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_004",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_005",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_006",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_007",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_008",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_009",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_010",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_011",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_012",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "USER_013",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc004/admin-accounts.cases.js"
+    },
+    {
+      "id": "RBAC_001",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc005/admin-accounts.cases.js"
+    },
+    {
+      "id": "RBAC_002",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc005/admin-accounts.cases.js"
+    },
+    {
+      "id": "RBAC_003",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc005/admin-accounts.cases.js"
+    },
+    {
+      "id": "RBAC_004",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc005/admin-accounts.cases.js"
+    },
+    {
+      "id": "RBAC_006",
+      "from": "admin/accounts.cases.js",
+      "to": "cases/02-users-permissions/uc005/admin-accounts.cases.js"
+    },
+    {
+      "id": "DO_001",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc015/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_002",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc015/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_003",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc016/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_004",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc016/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_005",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc016/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_006",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc017/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_007",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc017/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_008",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc017/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_009",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc018/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_010",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc018/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_011",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc019/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_012",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc019/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_013",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc021/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_014",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc021/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_015",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc021/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_016",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc021/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_018",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc021/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_019",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc022/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_020",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc022/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_021",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc022/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_022",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc020/student-attempts.cases.js"
+    },
+    {
+      "id": "DO_023",
+      "from": "student/attempts.cases.js",
+      "to": "cases/05-attempts-submissions/uc023/student-attempts.cases.js"
+    },
+    {
+      "id": "RBAC_005",
+      "from": "student/attempts.cases.js",
+      "to": "cases/02-users-permissions/uc005/student-attempts.cases.js"
+    },
+    {
+      "id": "TCHR_001",
+      "from": "admin/teachers.cases.js",
+      "to": "cases/02-users-permissions/uc006/admin-teachers.cases.js"
+    },
+    {
+      "id": "TCHR_002",
+      "from": "admin/teachers.cases.js",
+      "to": "cases/02-users-permissions/uc006/admin-teachers.cases.js"
+    },
+    {
+      "id": "TCHR_003",
+      "from": "admin/teachers.cases.js",
+      "to": "cases/02-users-permissions/uc006/admin-teachers.cases.js"
+    },
+    {
+      "id": "TCHR_004",
+      "from": "admin/teachers.cases.js",
+      "to": "cases/02-users-permissions/uc006/admin-teachers.cases.js"
+    },
+    {
+      "id": "STDT_001",
+      "from": "admin/students.cases.js",
+      "to": "cases/02-users-permissions/uc007/admin-students.cases.js"
+    },
+    {
+      "id": "STDT_002",
+      "from": "admin/students.cases.js",
+      "to": "cases/02-users-permissions/uc007/admin-students.cases.js"
+    },
+    {
+      "id": "STDT_003",
+      "from": "admin/students.cases.js",
+      "to": "cases/02-users-permissions/uc007/admin-students.cases.js"
+    },
+    {
+      "id": "STDT_004",
+      "from": "admin/students.cases.js",
+      "to": "cases/02-users-permissions/uc007/admin-students.cases.js"
+    },
+    {
+      "id": "CLS_001",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_003",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_004",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_005",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_002",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_006",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_007",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "CLS_008",
+      "from": "admin/classes.cases.js",
+      "to": "cases/03-classes-members/uc008/admin-classes.cases.js"
+    },
+    {
+      "id": "MEM_001",
+      "from": "admin/members.cases.js",
+      "to": "cases/03-classes-members/uc009/admin-members.cases.js"
+    },
+    {
+      "id": "MEM_002",
+      "from": "admin/members.cases.js",
+      "to": "cases/03-classes-members/uc009/admin-members.cases.js"
+    },
+    {
+      "id": "MEM_003",
+      "from": "admin/members.cases.js",
+      "to": "cases/03-classes-members/uc009/admin-members.cases.js"
+    },
+    {
+      "id": "MEM_004",
+      "from": "admin/members.cases.js",
+      "to": "cases/03-classes-members/uc009/admin-members.cases.js"
+    },
+    {
+      "id": "MEM_005",
+      "from": "teacher/members.cases.js",
+      "to": "cases/03-classes-members/uc009/teacher-members.cases.js"
+    },
+    {
+      "id": "CLV_001",
+      "from": "student/classes.cases.js",
+      "to": "cases/03-classes-members/uc010/student-classes.cases.js"
+    },
+    {
+      "id": "CLV_003",
+      "from": "student/classes.cases.js",
+      "to": "cases/03-classes-members/uc010/student-classes.cases.js"
+    },
+    {
+      "id": "CLV_002",
+      "from": "teacher/classes.cases.js",
+      "to": "cases/03-classes-members/uc010/teacher-classes.cases.js"
+    },
+    {
+      "id": "ASG_001",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc011/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_002",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc011/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_003",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc011/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_022",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc011/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_004",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_005",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_006",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_007",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_008",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_009",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_010",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_011",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_014",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_015",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_016",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_012",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_013",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc012/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_017",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc013/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_018",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc013/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_021",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc013/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_019",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc014/teacher-assignments.cases.js"
+    },
+    {
+      "id": "ASG_020",
+      "from": "teacher/assignments.cases.js",
+      "to": "cases/04-assignments/uc014/teacher-assignments.cases.js"
+    },
+    {
+      "id": "GRD_001",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_006",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_007",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_002",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_003",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_004",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_005",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_008",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc025/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_009",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc025/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_010",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc025/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_011",
+      "from": "teacher/grading.cases.js",
+      "to": "cases/06-grading-scores/uc026/teacher-grading.cases.js"
+    },
+    {
+      "id": "GRD_013",
+      "from": "student/grading.cases.js",
+      "to": "cases/06-grading-scores/uc027/student-grading.cases.js"
+    },
+    {
+      "id": "GRD_015",
+      "from": "student/grading.cases.js",
+      "to": "cases/06-grading-scores/uc027/student-grading.cases.js"
+    },
+    {
+      "id": "GRD_014",
+      "from": "student/grading.cases.js",
+      "to": "cases/06-grading-scores/uc028/student-grading.cases.js"
+    },
+    {
+      "id": "GRD_016",
+      "from": "student/grading.cases.js",
+      "to": "cases/06-grading-scores/uc024/student-grading.cases.js"
+    },
+    {
+      "id": "SCR_001",
+      "from": "student/results.cases.js",
+      "to": "cases/06-grading-scores/uc029/student-results.cases.js"
+    },
+    {
+      "id": "SCR_003",
+      "from": "student/results.cases.js",
+      "to": "cases/06-grading-scores/uc029/student-results.cases.js"
+    },
+    {
+      "id": "RES_001",
+      "from": "student/results.cases.js",
+      "to": "cases/07-results-reports/uc031/student-results.cases.js"
+    },
+    {
+      "id": "RES_002",
+      "from": "student/results.cases.js",
+      "to": "cases/07-results-reports/uc031/student-results.cases.js"
+    },
+    {
+      "id": "RES_003",
+      "from": "student/results.cases.js",
+      "to": "cases/07-results-reports/uc032/student-results.cases.js"
+    },
+    {
+      "id": "RES_004",
+      "from": "student/results.cases.js",
+      "to": "cases/07-results-reports/uc032/student-results.cases.js"
+    },
+    {
+      "id": "SCR_002",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/06-grading-scores/uc029/teacher-progress.cases.js"
+    },
+    {
+      "id": "SCR_004",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/06-grading-scores/uc030/teacher-progress.cases.js"
+    },
+    {
+      "id": "SCR_005",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/06-grading-scores/uc030/teacher-progress.cases.js"
+    },
+    {
+      "id": "RES_005",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/07-results-reports/uc033/teacher-progress.cases.js"
+    },
+    {
+      "id": "RES_006",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/07-results-reports/uc033/teacher-progress.cases.js"
+    },
+    {
+      "id": "RES_007",
+      "from": "teacher/progress.cases.js",
+      "to": "cases/07-results-reports/uc034/teacher-progress.cases.js"
+    },
+    {
+      "id": "RES_008",
+      "from": "admin/reports.cases.js",
+      "to": "cases/07-results-reports/uc035/admin-reports.cases.js"
+    },
+    {
+      "id": "RES_009",
+      "from": "admin/reports.cases.js",
+      "to": "cases/07-results-reports/uc035/admin-reports.cases.js"
+    },
+    {
+      "id": "RES_010",
+      "from": "admin/reports.cases.js",
+      "to": "cases/07-results-reports/uc035/admin-reports.cases.js"
+    },
+    {
+      "id": "NFR_001",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_002",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_003",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_004",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_005",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_006",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_007",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_008",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    },
+    {
+      "id": "NFR_009",
+      "from": "common/nfr.cases.js",
+      "to": "cases/08-nfr/nfr.cases.js"
+    }
+  ]
+}

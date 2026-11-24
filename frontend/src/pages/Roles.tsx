@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { 
-  Shield, Check, RotateCcw, Save, 
-  HelpCircle, CheckCircle2, ShieldCheck, 
-  Layers
+  Shield, Check, HelpCircle, ShieldCheck, 
+  Layers, Lock
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -21,10 +20,9 @@ export const Roles: React.FC = () => {
   const isVi = language === 'vi';
 
   const [activeRole, setActiveRole] = useState<'admin' | 'teacher' | 'ta' | 'student'>('admin');
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Granular capability matrix
-  const [permissions, setPermissions] = useState<Record<string, RoleCapability[]>>({
+  // Authoritative system capability matrix enforced by Spring Security RBAC
+  const permissions: Record<string, RoleCapability[]> = {
     admin: [
       { id: 'mod-1', module: t('roles.mod1'), description: isVi ? 'Tạo mới, khóa, mở và phân bổ vai trò người dùng' : 'Create, suspend, and assign user identities', read: true, write: true, approve: true, export: true },
       { id: 'mod-2', module: t('roles.mod2'), description: isVi ? 'Quản lý danh sách lớp, sĩ số và giáo viên phụ trách' : 'Manage course cohorts, capacity, and teacher assignments', read: true, write: true, approve: true, export: true },
@@ -53,31 +51,6 @@ export const Roles: React.FC = () => {
       { id: 'mod-4', module: t('roles.mod4'), description: isVi ? 'Xem điểm số, nhận xét của AI và giáo viên' : 'Access graded feedback & error annotations', read: true, write: false, approve: false, export: false },
       { id: 'mod-5', module: t('roles.mod5'), description: isVi ? 'Xem bảng điểm và biểu đồ năng lực cá nhân' : 'Track personal competency radar', read: true, write: false, approve: false, export: false },
     ]
-  });
-
-  const handleToggle = (moduleId: string, field: 'read' | 'write' | 'approve' | 'export') => {
-    setPermissions(prev => ({
-      ...prev,
-      [activeRole]: prev[activeRole].map(mod => {
-        if (mod.id === moduleId) {
-          return { ...mod, [field]: !mod[field] };
-        }
-        return mod;
-      })
-    }));
-  };
-
-  const handleSave = () => {
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 2000);
-  };
-
-  const handleApplyPreset = (preset: string) => {
-    if (confirm(isVi ? `Áp dụng mẫu phân quyền "${preset}" cho vai trò này?` : `Apply preset "${preset}"?`)) {
-      alert(isVi ? 'Đã áp dụng mẫu phân quyền thành công.' : 'Preset applied.');
-    }
   };
 
   return (
@@ -85,57 +58,25 @@ export const Roles: React.FC = () => {
       {/* Header */}
       <div className="adm-header">
         <div className="adm-title-group">
-          <h1 className="adm-title">
-            <Shield size={28} color="var(--primary)" />
-            {t('roles.title')}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="adm-title">
+              {t('roles.title')}
+            </h1>
+            <span className="badge badge-primary px-2.5 py-1 text-xs font-semibold">
+              <Lock size={12} className="mr-1 inline" />
+              {isVi ? 'RBAC Cố định (Backend Security)' : 'Fixed System RBAC'}
+            </span>
+          </div>
           <p className="adm-subtitle">
             {isVi 
-              ? 'Ma trận phân quyền chi tiết (RBAC) kiểm soát quyền đọc, ghi, duyệt và kết xuất dữ liệu cho từng nhóm tài khoản.' 
-              : 'Role-Based Access Control matrix configuring granular Read, Write, Approve, and Export capabilities.'}
+              ? 'Ma trận đặc quyền và phạm vi truy cập hệ thống của từng vai trò được thực thi bảo mật tại Spring Security.' 
+              : 'System role capability matrix and access boundaries strictly enforced by Spring Security.'}
           </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            className="btn btn-secondary"
-            onClick={() => alert(isVi ? 'Đã khôi phục các thiết lập phân quyền mặc định của hệ thống.' : 'Default permissions restored.')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <RotateCcw size={15} />
-            <span>{t('roles.restoreDefault')}</span>
-          </button>
-          <button 
-            className="btn btn-primary"
-            onClick={handleSave}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Save size={15} />
-            <span>{t('roles.updatePerms')}</span>
-          </button>
         </div>
       </div>
 
-      {saveSuccess && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          color: '#15803d',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          <CheckCircle2 size={18} />
-          <span>{isVi ? 'Cập nhật phân quyền vai trò thành công! Quyền hạn đã có hiệu lực ngay lập tức.' : 'Role permissions updated successfully and propagated.'}</span>
-        </div>
-      )}
-
-      {/* Role Selector Tabs (Mobbin Segmented Bar) */}
-      <div className="adm-filter-bar" style={{ padding: '8px 12px', marginBottom: '24px' }}>
+      {/* Role Selector Tabs */}
+      <div className="adm-filter-bar mb-6">
         <div className="adm-pills">
           {(
             [
@@ -151,8 +92,7 @@ export const Roles: React.FC = () => {
               <button
                 key={r.key}
                 onClick={() => setActiveRole(r.key)}
-                className={`adm-pill ${isActive ? 'active' : ''}`}
-                style={{ padding: '8px 16px', fontSize: '13.5px' }}
+                className={`adm-pill py-2 px-4 text-[13.5px] ${isActive ? 'active' : ''}`}
               >
                 <Icon size={16} />
                 <span>{r.label}</span>
@@ -160,115 +100,94 @@ export const Roles: React.FC = () => {
             );
           })}
         </div>
-
-        {/* Preset Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-          <span className="text-on-surface-variant">{isVi ? 'Mẫu phân quyền:' : 'Preset:'}</span>
-          <select 
-            className="input"
-            onChange={(e) => handleApplyPreset(e.target.value)}
-            defaultValue=""
-            style={{ padding: '6px 12px', fontSize: '12.5px' }}
-          >
-            <option value="" disabled>{isVi ? '-- Chọn mẫu có sẵn --' : '-- Choose Preset --'}</option>
-            <option value="super-admin">Super Administrator (Full Privileges)</option>
-            <option value="lead-instructor">Lead Senior Instructor</option>
-            <option value="auditor">Internal Academic Auditor</option>
-            <option value="standard-student">Standard Student Participant</option>
-          </select>
-        </div>
       </div>
 
       {/* RBAC Capabilities Table */}
       <div className="adm-table-card">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-container-low)' }}>
+        <div className="adm-table-card-header">
           <div>
-            <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--on-surface-variant)' }}>
+            <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               {t('roles.permHeading')}
             </span>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--on-surface)', marginTop: '2px' }}>
-              {isVi ? `Đang cấu hình quyền hạn cho: ${activeRole.toUpperCase()}` : `Configuring capability rules for: ${activeRole.toUpperCase()}`}
+            <div className="text-sm font-semibold text-on-surface mt-0.5">
+              {isVi ? `Đặc quyền hệ thống cho vai trò: ${activeRole.toUpperCase()}` : `System access rules for: ${activeRole.toUpperCase()}`}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>
+          <div className="flex items-center gap-1.5 text-[12.5px] text-on-surface-variant">
             <HelpCircle size={15} />
-            <span>{isVi ? 'Bật công tắc để kích hoạt quyền' : 'Toggle switches to adjust access'}</span>
+            <span>{isVi ? 'Quy định cố định theo vai trò bảo mật' : 'Enforced strictly by role permissions'}</span>
           </div>
         </div>
 
         <table className="adm-table">
           <thead>
             <tr>
-              <th style={{ width: '38%' }}>{t('roles.colModule')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colRead')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colWrite')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colApprove')}</th>
-              <th style={{ textAlign: 'center', width: '17%' }}>{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
+              <th className="w-[38%]">{t('roles.colModule')}</th>
+              <th className="text-center w-[15%]">{t('roles.colRead')}</th>
+              <th className="text-center w-[15%]">{t('roles.colWrite')}</th>
+              <th className="text-center w-[15%]">{t('roles.colApprove')}</th>
+              <th className="text-center w-[17%]">{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
             </tr>
           </thead>
           <tbody>
             {permissions[activeRole].map((mod) => (
               <tr key={mod.id}>
                 <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span className="font-semibold" style={{ fontSize: '14px', color: 'var(--on-surface)' }}>{mod.module}</span>
-                    <span style={{ fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>{mod.description}</span>
+                  <div className="flex flex-col gap-[3px]">
+                    <span className="font-semibold text-sm text-on-surface">{mod.module}</span>
+                    <span className="text-[12.5px] text-on-surface-variant">{mod.description}</span>
                   </div>
                 </td>
 
-                {/* Read Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={mod.read} 
-                      onChange={() => handleToggle(mod.id, 'read')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                {/* Read Badge */}
+                <td className="text-center">
+                  {mod.read ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Write Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={mod.write} 
-                      onChange={() => handleToggle(mod.id, 'write')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                {/* Write Badge */}
+                <td className="text-center">
+                  {mod.write ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Approve Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={mod.approve} 
-                      onChange={() => handleToggle(mod.id, 'approve')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                {/* Approve Badge */}
+                <td className="text-center">
+                  {mod.approve ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Export Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={mod.export} 
-                      onChange={() => handleToggle(mod.id, 'export')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                {/* Export Badge */}
+                <td className="text-center">
+                  {mod.export ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>
+        <div className="adm-table-card-footer">
           {t('roles.note')}
         </div>
       </div>

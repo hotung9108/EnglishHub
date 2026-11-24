@@ -5,5 +5,5 @@ public record CriteriaScoresDto(
 		double lexicalResource,
 		double grammaticalRangeAndAccuracy,
 		double pronunciation,
-		double overallScore
+		Double overallScore
 ) {}

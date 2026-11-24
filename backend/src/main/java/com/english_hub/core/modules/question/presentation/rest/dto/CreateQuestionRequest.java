@@ -4,6 +4,7 @@ import com.english_hub.core.modules.question.domain.model.QuestionType;
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.CorrectAnswer;
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.CorrectAnswerDeserializer;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,4 +20,12 @@ public record CreateQuestionRequest(
 		@DecimalMin(value = "0.00", message = "score không được âm.") BigDecimal score,
 		@NotNull(message = "orderIndex là bắt buộc.")
 		@Positive(message = "orderIndex phải lớn hơn 0.") Integer orderIndex) {
+
+	@AssertTrue(message = CorrectAnswerDeserializer.INVALID_SHAPE_MESSAGE)
+	public boolean isCorrectAnswerValid() {
+		if (questionType == null || correctAnswer == null) {
+			return true;
+		}
+		return correctAnswer.questionType() == questionType;
+	}
 }

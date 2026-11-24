@@ -1,0 +1,5 @@
+{
+  "name": "plantuml-integration",
+  "description": "PlantUML MCP integration for generating, validating, and compiling UML diagrams",
+  "version": "1.0.0"
+}

@@ -1,4 +1,4 @@
-import { buildListParams } from '@/hooks/useUsers.utils';
+import { buildListParams } from '../../hooks/useUsers.utils';
 import { httpClient } from '../core/client';
 import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
@@ -36,6 +36,7 @@ export interface ChangePasswordPayload {
 type CreateUserBase = { fullName: string; email: string; password: string };
 
 export type CreateUserPayload =
+  | (CreateUserBase & { role: 'ADMIN' })
   | (CreateUserBase & { role: 'TEACHER'; specialization?: string })
   | (CreateUserBase & {
       role: 'STUDENT';
@@ -48,6 +49,7 @@ export type CreatableRole = CreateUserPayload['role'];
 export interface UpdateUserPayload {
   fullName?: string;
   phone?: string;
+  role?: UserRole;
   specialization?: string;
   studentCode?: string;
   dateOfBirth?: string;
@@ -63,6 +65,10 @@ export interface UserListResponse {
 }
 export interface CreateUserResponse extends MessageResponse {
   user: Pick<UserListItem, 'id' | 'email' | 'role'>;
+}
+export interface AdminResetPasswordResponse {
+  message: string;
+  newPassword: string;
 }
 
 const USERS_ENDPOINT = '/admin/users';
@@ -90,6 +96,46 @@ export class UserService {
     return this.http.patch<UserProfile>(`${USERS_ENDPOINT}/${id}/status`, { status });
   }
 
+  async getAdminUserDetail(id: UserId, options?: ApiRequestOptions): Promise<UserProfile> {
+    return this.http.get<UserProfile>(`${USERS_ENDPOINT}/${id}`, options);
+  }
+
+  async getUserById(
+    id: UserId,
+    hint?: { fullName?: string; email?: string },
+    options?: ApiRequestOptions
+  ): Promise<UserListItem | null> {
+    try {
+      const direct = await this.http.get<UserListItem>(`${USERS_ENDPOINT}/${id}`, options);
+      if (direct && direct.id === id) {
+        return direct;
+      }
+    } catch {
+      // Backend direct endpoint GET /{id} may not be available yet; fallback gracefully
+    }
+
+    const searchQuery = hint?.email?.trim() || hint?.fullName?.trim();
+    if (searchQuery) {
+      try {
+        const searchRes = await this.listUsers({ q: searchQuery, role: 'STUDENT', limit: 50 }, options);
+        const matched = (searchRes.data || []).find((u: UserListItem) => u.id === id);
+        if (matched) return matched;
+      } catch {
+        // Ignore and fallback to list scan
+      }
+    }
+
+    try {
+      const listRes = await this.listUsers({ role: 'STUDENT', limit: 100 }, options);
+      const matchedFromList = (listRes.data || []).find((u: UserListItem) => u.id === id);
+      if (matchedFromList) return matchedFromList;
+    } catch {
+      // Ignore
+    }
+
+    return null;
+  }
+
   async listUsers(params: UserListParams = {}, options?: ApiRequestOptions): Promise<UserListResponse> {
     const response = await this.http.get<UserListResponse>(USERS_ENDPOINT, {
       ...options,
@@ -108,6 +154,10 @@ export class UserService {
 
   async deleteUser(id: UserId): Promise<MessageResponse> {
     return this.http.delete<MessageResponse>(`${USERS_ENDPOINT}/${id}`);
+  }
+
+  async resetPassword(id: UserId): Promise<AdminResetPasswordResponse> {
+    return this.http.post<AdminResetPasswordResponse>(`${USERS_ENDPOINT}/${id}/reset-password`);
   }
 }
 

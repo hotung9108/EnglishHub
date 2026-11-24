@@ -67,6 +67,7 @@ export interface ClassMember {
   studentId: number;
   fullName: string;
   studentCode?: string;
+  email?: string;
 }
 
 export interface ClassMemberListResponse {
@@ -76,6 +77,25 @@ export interface ClassMemberListResponse {
 export interface AddedClassMemberResponse extends MessageResponse {
   memberId: number;
 }
+
+export interface CandidateStudent {
+  id: number;
+  fullName: string;
+  email: string;
+  studentCode?: string;
+  status: 'ACTIVE' | 'LOCKED' | 'INACTIVE';
+}
+
+export interface CandidateStudentListResponse {
+  data: CandidateStudent[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+}
+
+export type CandidateStudentListParams = { q?: string; page?: number; limit?: number };
 
 const CLASSES_ENDPOINT = '/classes';
 
@@ -121,6 +141,38 @@ export class ClassService {
 
   async removeMember(id: ClassId, memberId: number): Promise<MessageResponse> {
     return this.http.delete<MessageResponse>(`${CLASSES_ENDPOINT}/${id}/members/${memberId}`);
+  }
+
+  async listCandidatesPage(
+    id: ClassId,
+    params: CandidateStudentListParams = {},
+    options?: ApiRequestOptions
+  ): Promise<CandidateStudentListResponse> {
+    const queryParams: Record<string, string | number> = {};
+    if (params.q?.trim()) queryParams.q = params.q.trim();
+    if (typeof params.page === 'number') queryParams.page = params.page;
+    if (typeof params.limit === 'number') queryParams.limit = params.limit;
+
+    const response = await this.http.get<CandidateStudentListResponse>(
+      `${CLASSES_ENDPOINT}/${id}/candidates`,
+      {
+        ...options,
+        params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+      }
+    );
+    return {
+      data: response?.data ?? [],
+      pagination: response?.pagination,
+    };
+  }
+
+  async listCandidates(
+    id: ClassId,
+    params: CandidateStudentListParams = {},
+    options?: ApiRequestOptions
+  ): Promise<CandidateStudent[]> {
+    const res = await this.listCandidatesPage(id, params, options);
+    return res.data;
   }
 }
 

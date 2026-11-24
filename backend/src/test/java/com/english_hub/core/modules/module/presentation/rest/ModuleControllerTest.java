@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,21 +16,24 @@ import com.english_hub.core.modules.module.application.service.ModuleService;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.module.domain.model.ModuleTaskType;
+import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadConfirmRequest;
+import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadUrlRequest;
 import com.english_hub.core.modules.module.presentation.rest.dto.CreateModuleRequest;
 import com.english_hub.core.modules.module.presentation.rest.dto.UpdateModuleRequest;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class ModuleControllerTest {
@@ -105,32 +108,72 @@ class ModuleControllerTest {
 	}
 
 	@Test
-	void mapsAudioUploadResponse() {
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'});
-		when(moduleService.uploadAudio(9L, file))
-				.thenReturn(new ModuleService.AudioUploadResult("modules/9/audio/source.mp3", "READY"));
+	void mapsAudioUploadUrlResponse() {
+		when(moduleService.requestAudioUpload(9L, "audio/mpeg"))
+				.thenReturn(new ModuleService.AudioUploadUrlResult(
+						"https://storage.example/presigned-put",
+						"modules/9/audio/new.mp3",
+						OffsetDateTime.parse("2026-10-01T00:00:00Z"),
+						"UPLOADING"));
 
-		var response = moduleController.uploadAudio(9L, file);
+		var response = moduleController.requestAudioUpload(9L, new AudioUploadUrlRequest("audio/mpeg"));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getBody().sourceAudioStorageKey()).isEqualTo("modules/9/audio/source.mp3");
-		assertThat(response.getBody().sourceAudioUploadStatus()).isEqualTo("READY");
+		assertThat(response.getBody().message()).isEqualTo("Lấy link upload audio thành công.");
+		assertThat(response.getBody().uploadUrl()).isEqualTo("https://storage.example/presigned-put");
+		assertThat(response.getBody().storageKey()).isEqualTo("modules/9/audio/new.mp3");
+		assertThat(response.getBody().expiresAt()).isEqualTo(OffsetDateTime.parse("2026-10-01T00:00:00Z"));
+		assertThat(response.getBody().sourceAudioUploadStatus()).isEqualTo("UPLOADING");
 	}
 
 	@Test
-	void mapsAudioMetadataDatabaseFailureToServerErrorInsteadOfReadyResponse() throws Exception {
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'});
-		when(moduleService.uploadAudio(eq(9L), any(MultipartFile.class)))
+	void mapsAudioConfirmResponseForReadyAndFailedStatuses() {
+		when(moduleService.confirmAudioUpload(9L, "modules/9/audio/new.mp3"))
+				.thenReturn(new ModuleService.AudioUploadConfirmResult("modules/9/audio/new.mp3", "READY"));
+		when(moduleService.confirmAudioUpload(9L, "modules/9/audio/missing.mp3"))
+				.thenReturn(new ModuleService.AudioUploadConfirmResult("modules/9/audio/missing.mp3", "FAILED"));
+
+		var ready = moduleController.confirmAudioUpload(9L, new AudioUploadConfirmRequest("modules/9/audio/new.mp3"));
+		var failed = moduleController.confirmAudioUpload(9L, new AudioUploadConfirmRequest("modules/9/audio/missing.mp3"));
+
+		assertThat(ready.getBody().message()).isEqualTo("Xác nhận upload audio thành công.");
+		assertThat(ready.getBody().sourceAudioUploadStatus()).isEqualTo("READY");
+		assertThat(failed.getBody().message()).isEqualTo("File audio chưa được tải lên kho lưu trữ.");
+		assertThat(failed.getBody().sourceAudioUploadStatus()).isEqualTo("FAILED");
+	}
+
+	@Test
+	void mapsAudioUploadUrlDatabaseFailureToServerError() throws Exception {
+		when(moduleService.requestAudioUpload(eq(9L), any()))
 				.thenThrow(new DataAccessResourceFailureException("metadata save failed"));
 		MockMvc mockMvc = MockMvcBuilders.standaloneSetup(moduleController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.build();
 
-		mockMvc.perform(multipart("/api/v1/modules/{moduleId}/audio", 9L).file(file))
+		mockMvc.perform(post("/api/v1/modules/{moduleId}/audio", 9L)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/mpeg\"}"))
 				.andExpect(status().isInternalServerError())
 				.andExpect(jsonPath("$.error").value("Lỗi máy chủ."));
+	}
+
+	@Test
+	void mapsModuleAudioDownloadUrlResponse() {
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(moduleService.generateAudioDownloadUrl(9L))
+				.thenReturn(new ModuleService.AudioDownloadUrlResult(
+						9L, "https://storage.example.com/audio.mp3", "modules/9/audio.mp3", "audio/mpeg", 120, expiresAt));
+
+		var response = moduleController.getAudioDownloadUrl(9L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().message()).isEqualTo("Lấy link tải audio thành công.");
+		assertThat(response.getBody().downloadUrl()).isEqualTo("https://storage.example.com/audio.mp3");
+		assertThat(response.getBody().storageKey()).isEqualTo("modules/9/audio.mp3");
+		assertThat(response.getBody().mimeType()).isEqualTo("audio/mpeg");
+		assertThat(response.getBody().durationSeconds()).isEqualTo(120);
+		assertThat(response.getBody().expiresAt()).isEqualTo(expiresAt);
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

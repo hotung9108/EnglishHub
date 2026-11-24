@@ -13,7 +13,9 @@ public record AnswerDetailResponse(
 		String docUploadStatus,
 		String audioStorageKey,
 		String audioMimeType,
-		String audioUploadStatus) {
+		String audioUploadStatus,
+		String audioDownloadUrl,
+		String docDownloadUrl) {
 
 	public static AnswerDetailResponse from(AnswerResult result) {
 		return new AnswerDetailResponse(
@@ -25,6 +27,8 @@ public record AnswerDetailResponse(
 				result.docUploadStatus() == null ? null : result.docUploadStatus().name(),
 				result.audioStorageKey(),
 				result.audioMimeType(),
-				result.audioUploadStatus() == null ? null : result.audioUploadStatus().name());
+				result.audioUploadStatus() == null ? null : result.audioUploadStatus().name(),
+				result.audioDownloadUrl(),
+				result.docDownloadUrl());
 	}
 }

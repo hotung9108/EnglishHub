@@ -11,8 +11,79 @@
 *.dbdiagram
 .env.production
 
+# Dependencies
+node_modules/
+**/node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+/sharepoint_extractors
+
+/tester_doc
+
+/tester_plan_real
+
+/overleaf_reports
+
+# Local MCP configs containing secrets
+.agents/plugins/**/mcp_config.json
+!.agents/plugins/**/mcp_config.example.json
+
+# Private environment credentials
+*.private.json
+**/*.private.json
+
+# Test caches, reports, and execution artifacts
+test_reborn/.cache/
+test_reborn/reports/
+test/**/.cache/
+test/**/reports/
+test/api/history/
+test/reports/
+test/tools/
+.local/
+production_artifacts/test_reports/history/
+
+# Legacy fragmented API suites & bugs notes
+test/api/collections/
+test/api/environments/
+test/api/staging/
+test/api/suites/
+test/bugs/
+
+# Activity diagrams in reports and documentation
+**/activity/
+**/activity.rar
+**/Activity Diagram/
+**/Activity Diagram.rar
+**/Activity Diagram*/
+docs/diagrams/
+**/detailed_use_cases/
+*.puml
+*.rar
+
+# Activity diagram scripts and pipeline artifacts
+scripts/*activity_diagrams*.py
+final_2_ucs.json
+production_artifacts/final_2_pipeline/
+docs/reports/
+
+# Overleaf synchronization & report pulling helper scripts
+scripts/*overleaf*.py
+scripts/pull_latest_from_cloud.py
+
+# Report audits and discrepancy analysis artifacts
+docs/AUDIT_REPORT_*.md
+production_artifacts/audit/
+production_artifacts/**/PM_SPEC_FINAL_2_DISCREPANCY_FIXES.md
+
+# Private test history and local environments; source pointer remains public.
+/test/archive/test-reborn-20261117/
+/test/archive/selenium-batch1-reports-20261117/
+/test/api/review/**/environment*.json
+/test/archive/selenium-before-layout-20261116/**
+!/test/archive/selenium-before-layout-20261116/README.md

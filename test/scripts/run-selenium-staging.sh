@@ -1,3 +1,4 @@
 #!/bin/sh
 export TEST_ENV=staging
-node selenium/suites/staging/run-staging.js
+cd "$(dirname "$0")/../selenium" || exit 1
+npm test

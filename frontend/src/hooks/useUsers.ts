@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseApiError, type ApiClientError } from '@/api/core/errors';
+import { isRequestCanceled, parseApiError, type ApiClientError } from '@/api/core/errors';
 import { userService } from '@/api/services/user.service';
 import type {
   CreateUserPayload, CreateUserResponse, MessageResponse, UpdateUserPayload, UserId,
@@ -45,7 +45,7 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersResult {
     isLoading: enabled, isSuccess: false, isError: false, error: null,
   }));
   const requestId = useRef(0), controller = useRef<AbortController | null>(null);
-  const mounted = useRef(false), enabledRef = useRef(enabled);
+  const mounted = useRef(true), enabledRef = useRef(enabled);
   const query = useRef<UsersQuery>({ page, limit, q, role }), skipEffectFor = useRef<string | null>(null);
   enabledRef.current = enabled;
   query.current = params;
@@ -54,6 +54,14 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersResult {
     controller.current?.abort();
   }, []);
   const changeQuery = useCallback((next: UsersQuery) => {
+    if (
+      next.page === query.current.page &&
+      next.limit === query.current.limit &&
+      next.q === query.current.q &&
+      next.role === query.current.role
+    ) {
+      return;
+    }
     invalidate();
     query.current = next;
     setParams(next);
@@ -95,6 +103,9 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersResult {
         }));
         return result;
       } catch (cause) {
+        if (isRequestCanceled(cause)) {
+          return null;
+        }
         if (mounted.current && enabledRef.current && id === requestId.current) {
           setList(state => ({ ...state, isLoading: false, isSuccess: false, isError: true, error: parseApiError(cause) }));
         }

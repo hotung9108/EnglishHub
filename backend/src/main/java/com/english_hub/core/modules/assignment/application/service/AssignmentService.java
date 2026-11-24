@@ -11,14 +11,18 @@ import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSumm
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
-import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
-import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepository;
+import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,44 +40,75 @@ public class AssignmentService {
 			"Lớp học chưa được gán giáo viên phụ trách, không thể tạo bài tập.";
 	private static final String CLOSED_ASSIGNMENT_MESSAGE = "Không thể sửa bài tập đã đóng.";
 	private static final String INVALID_STATUS_TRANSITION_MESSAGE = "Không thể chuyển sang trạng thái này.";
+	private static final String CLOSE_AT_ONLY_FOR_REOPEN_MESSAGE = "Chỉ được cập nhật hạn nộp khi mở lại bài tập.";
+	private static final String REOPEN_CLOSE_AT_BEFORE_OPEN_MESSAGE = "Hạn nộp phải sau thời điểm mở bài.";
+	private static final String REOPEN_CLOSE_AT_NOT_FUTURE_MESSAGE = "Hạn nộp khi mở lại phải sau thời điểm hiện tại.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final int TITLE_MAX_LENGTH = 200;
 
 	private final AssignmentRepository assignmentRepository;
 	private final ClassRepository classRepository;
-	private final ClassMemberRepository classMemberRepository;
 	private final CurrentUserProvider currentUserProvider;
+	private final Clock clock;
 
+	@Autowired
 	public AssignmentService(
 			AssignmentRepository assignmentRepository,
 			ClassRepository classRepository,
-			ClassMemberRepository classMemberRepository,
 			CurrentUserProvider currentUserProvider) {
+		this(assignmentRepository, classRepository, currentUserProvider, Clock.systemUTC());
+	}
+
+	AssignmentService(
+			AssignmentRepository assignmentRepository,
+			ClassRepository classRepository,
+			CurrentUserProvider currentUserProvider,
+			Clock clock) {
 		this.assignmentRepository = assignmentRepository;
 		this.classRepository = classRepository;
-		this.classMemberRepository = classMemberRepository;
 		this.currentUserProvider = currentUserProvider;
+		this.clock = clock;
 	}
 
 	@Transactional(readOnly = true)
-	public AssignmentPage listAssignments(String statusValue, long classId, int page, int limit) {
+	public AssignmentListResult listAssignments(String statusValue, long classId, int page, int limit) {
 		User caller = currentUserProvider.requireActiveUser();
-		requireClassAccess(classId, caller);
+		if (caller.role() == UserRole.ADMIN) {
+			classAccessOrThrow(classId, caller);
+		} else {
+			requireClassAccess(classId, caller);
+		}
 		AssignmentStatus status = parseStatusFilter(statusValue);
 		AssignmentPageRequest pageRequest = new AssignmentPageRequest(page, limit);
 		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest(INVALID_DATA_MESSAGE);
 		}
-		return assignmentRepository.findPage(classId, status, pageRequest);
+		if (caller.role() == UserRole.STUDENT && status == AssignmentStatus.DRAFT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		AssignmentPage assignmentPage;
+		if (caller.role() == UserRole.STUDENT && status == null) {
+			assignmentPage = assignmentRepository.findPageExcludingDraft(classId, pageRequest);
+		} else {
+			assignmentPage = assignmentRepository.findPage(classId, status, pageRequest);
+		}
+		if (assignmentPage.assignments().isEmpty()) {
+			return new AssignmentListResult(assignmentPage, Map.of());
+		}
+		List<Long> assignmentIds = assignmentPage.assignments().stream().map(Assignment::id).toList();
+		Map<Long, List<ModuleSkill>> skillsByAssignmentId =
+				assignmentRepository.findSkillsByAssignmentIds(assignmentIds);
+		return new AssignmentListResult(assignmentPage, skillsByAssignmentId);
 	}
 
 	@Transactional
 	public long createAssignment(long classId, CreateAssignmentCommand command) {
 		User caller = requireTeacher();
-		EnglishClass englishClass = requireClass(classId);
-		if (englishClass.getTeacherId() == null) {
+		ClassAccess access = classAccessOrThrow(classId, caller);
+		if (access.teacherId() == null) {
 			throw ApiException.badRequest(CLASS_WITHOUT_TEACHER_MESSAGE);
 		}
-		if (!Objects.equals(englishClass.getTeacherId(), caller.id())) {
+		if (!Objects.equals(access.teacherId(), caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		validateCreateCommand(command);
@@ -93,15 +128,20 @@ public class AssignmentService {
 		User caller = currentUserProvider.requireActiveUser();
 		Assignment assignment = findAssignmentOrThrow(assignmentId);
 		requireClassAccess(assignment.classId(), caller);
+		if (caller.role() == UserRole.STUDENT && assignment.status() == AssignmentStatus.DRAFT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
 		return new AssignmentDetailResult(
 				assignment,
 				assignmentRepository.findModuleSummaries(assignment.id()));
 	}
 
 	@Transactional
-	public void updateAssignment(long assignmentId, UpdateAssignmentCommand command) {
+	public AssignmentUpdateResult updateAssignment(
+			long assignmentId,
+			UpdateAssignmentCommand command) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		if (assignment.status() == AssignmentStatus.CLOSED) {
 			throw ApiException.badRequest(CLOSED_ASSIGNMENT_MESSAGE);
@@ -123,13 +163,14 @@ public class AssignmentService {
 		validateTimeAndSubmissions(openAt, closeAt, maxSubmissions);
 
 		assignment.updateDetails(title, description, openAt, closeAt, maxSubmissions);
-		assignmentRepository.save(assignment);
+		Assignment savedAssignment = assignmentRepository.save(assignment);
+		return new AssignmentUpdateResult(savedAssignment.maxSubmissions());
 	}
 
 	@Transactional
 	public void deleteAssignment(long assignmentId) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		assignment.softDelete();
 		assignmentRepository.save(assignment);
@@ -138,15 +179,35 @@ public class AssignmentService {
 	@Transactional
 	public AssignmentStatus updateStatus(long assignmentId, UpdateAssignmentStatusCommand command) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		AssignmentStatus nextStatus = parseStatus(command == null ? null : command.status());
+		boolean reopening = assignment.status() == AssignmentStatus.CLOSED && nextStatus == AssignmentStatus.PUBLISHED;
+		OffsetDateTime requestedCloseAt = command.closeAt();
+		if (!reopening && requestedCloseAt != null) {
+			throw ApiException.badRequest(CLOSE_AT_ONLY_FOR_REOPEN_MESSAGE);
+		}
 		if (!assignment.canTransitionTo(nextStatus)) {
 			throw ApiException.badRequest(INVALID_STATUS_TRANSITION_MESSAGE);
 		}
-		assignment.changeStatus(nextStatus);
+		if (reopening) {
+			validateReopenDeadline(assignment, requestedCloseAt);
+			assignment.reopen(requestedCloseAt);
+		} else {
+			assignment.changeStatus(nextStatus);
+		}
 		assignmentRepository.save(assignment);
 		return nextStatus;
+	}
+
+	private void validateReopenDeadline(Assignment assignment, OffsetDateTime requestedCloseAt) {
+		OffsetDateTime effectiveCloseAt = requestedCloseAt == null ? assignment.closeAt() : requestedCloseAt;
+		if (!effectiveCloseAt.isAfter(assignment.openAt())) {
+			throw ApiException.badRequest(REOPEN_CLOSE_AT_BEFORE_OPEN_MESSAGE);
+		}
+		if (!effectiveCloseAt.isAfter(OffsetDateTime.now(clock))) {
+			throw ApiException.badRequest(REOPEN_CLOSE_AT_NOT_FUTURE_MESSAGE);
+		}
 	}
 
 	private User requireTeacher() {
@@ -157,37 +218,48 @@ public class AssignmentService {
 		return caller;
 	}
 
-	private EnglishClass requireClassAccess(long classId, User caller) {
-		EnglishClass englishClass = requireClass(classId);
+	private void requireClassAccess(long classId, User caller) {
+		ClassAccess access = classAccessOrThrow(classId, caller);
 		if (caller.role() == UserRole.ADMIN) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
-		if (caller.role() == UserRole.TEACHER
-				&& Objects.equals(englishClass.getTeacherId(), caller.id())) {
-			return englishClass;
+		if (caller.role() == UserRole.TEACHER && Objects.equals(access.teacherId(), caller.id())) {
+			return;
 		}
-		if (caller.role() == UserRole.STUDENT
-				&& classMemberRepository.existsByClassIdAndStudentId(classId, caller.id())) {
-			return englishClass;
+		if (caller.role() == UserRole.STUDENT && access.studentMember()) {
+			return;
 		}
 		throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 	}
 
 	private void requireTeacherOwnsClass(long classId, User caller) {
-		EnglishClass englishClass = requireClass(classId);
-		if (!Objects.equals(englishClass.getTeacherId(), caller.id())) {
+		ClassAccess access = classAccessOrThrow(classId, caller);
+		if (!Objects.equals(access.teacherId(), caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 	}
 
-	private EnglishClass requireClass(long classId) {
-		return classRepository.findById(classId)
+	/**
+	 * Resolves class existence, owner and caller membership in one query instead
+	 * of separate class + class_member SELECTs (~40ms each on staging).
+	 */
+	private ClassAccess classAccessOrThrow(long classId, User caller) {
+		return classRepository.findAccess(classId, caller.id())
 				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
 	}
 
 	private Assignment findAssignmentOrThrow(long assignmentId) {
 		return assignmentRepository.findById(assignmentId)
 				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+	}
+
+	private Assignment findAssignmentForUpdateOrThrow(long assignmentId) {
+		try {
+			return assignmentRepository.findByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private AssignmentStatus parseStatusFilter(String statusValue) {
@@ -263,8 +335,20 @@ public class AssignmentService {
 		return trimmed.isEmpty() ? null : trimmed;
 	}
 
+	public record AssignmentListResult(
+			AssignmentPage assignmentPage,
+			Map<Long, List<ModuleSkill>> skillsByAssignmentId) {
+
+		public List<ModuleSkill> skillsFor(Long assignmentId) {
+			return skillsByAssignmentId.getOrDefault(assignmentId, List.of());
+		}
+	}
+
 	public record AssignmentDetailResult(
 			Assignment assignment,
 			List<AssignmentModuleSummary> modules) {
+	}
+
+	public record AssignmentUpdateResult(Integer maxSubmissions) {
 	}
 }

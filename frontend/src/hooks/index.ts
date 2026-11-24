@@ -1,6 +1,7 @@
 export * from './core';
 export * from './useAuth';
 export * from './useCurrentUser';
+export * from './useDocumentTitle';
 export * from './useClasses';
 export type { UseClassesOptions, UseClassesResult } from '@/types/classes.types';
 export * from './useAssignments';
@@ -44,3 +45,11 @@ export type {
   TeacherSummary,
   UpdateClassPayload,
 } from '@/api/services/class.service';
+export { useAudioRecorder, getBackendMimeType } from './useAudioRecorder';
+export type {
+  UseAudioRecorderOptions,
+  UseAudioRecorderResult,
+} from './useAudioRecorder';
+export { useDebounce } from './useDebounce';
+export { useStudentAssignmentBadge, formatAssignmentBadge, invalidateStudentAssignmentBadgeCache } from './useStudentAssignmentBadge';
+export type { UseStudentAssignmentBadgeResult } from './useStudentAssignmentBadge';

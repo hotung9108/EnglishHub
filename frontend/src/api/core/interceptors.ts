@@ -74,6 +74,7 @@ export class TokenRefreshManager {
           if (newToken && originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
           }
+          originalRequest._retry = true;
           return client(originalRequest);
         })
         .catch(err => Promise.reject(parseApiError(err)));
@@ -109,12 +110,12 @@ export class TokenRefreshManager {
       return client(originalRequest);
     } catch (refreshErr) {
       this.storage.clearTokens();
+      this.notifySessionExpired();
       const rejectionError = new UnauthorizedError(
         'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
         refreshErr
       );
       this.processQueue(rejectionError);
-      this.notifySessionExpired();
       return Promise.reject(rejectionError);
     } finally {
       this.isRefreshing = false;

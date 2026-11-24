@@ -44,6 +44,7 @@ try:
         
         # CORS
         CORS_ALLOWED_ORIGINS: Union[str, List[str]] = ["*"]
+        INTERNAL_SECRET: str = os.getenv("INTERNAL_SECRET", "")
 
         @field_validator("CORS_ALLOWED_ORIGINS", mode="after")
         @classmethod
@@ -94,6 +95,7 @@ except ImportError:
         
         # CORS
         CORS_ALLOWED_ORIGINS: List[str] = ["*"]
+        INTERNAL_SECRET: str = os.getenv("INTERNAL_SECRET", "")
 
 
 settings = Settings()

@@ -8,16 +8,22 @@ import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.core.modules.user.application.page.UserPageRequest;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
+import com.english_hub.core.modules.user.application.port.PasswordGenerator;
+import com.english_hub.core.modules.user.domain.event.AdminUserPasswordResetEvent;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import com.english_hub.core.modules.user.domain.model.FullNameValidator;
+import com.english_hub.core.modules.user.domain.model.PhoneValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -31,14 +37,20 @@ public class AdminUserService {
 	private final UserRepository userRepository;
 	private final CurrentUserProvider currentUserProvider;
 	private final PasswordEncoder passwordEncoder;
+	private final ApplicationEventPublisher eventPublisher;
+	private final PasswordGenerator passwordGenerator;
 
 	public AdminUserService(
 			UserRepository userRepository,
 			CurrentUserProvider currentUserProvider,
-			PasswordEncoder passwordEncoder) {
+			PasswordEncoder passwordEncoder,
+			ApplicationEventPublisher eventPublisher,
+			PasswordGenerator passwordGenerator) {
 		this.userRepository = userRepository;
 		this.currentUserProvider = currentUserProvider;
 		this.passwordEncoder = passwordEncoder;
+		this.eventPublisher = eventPublisher;
+		this.passwordGenerator = passwordGenerator;
 	}
 
 	@Transactional(readOnly = true)
@@ -47,6 +59,34 @@ public class AdminUserService {
 		UserPageRequest pageRequest = new UserPageRequest(page, limit);
 		validatePagination(pageRequest);
 		return userRepository.findPage(query, parseRoleFilter(roleValue), pageRequest);
+	}
+
+	@Transactional(readOnly = true)
+	public User getUser(long userId) {
+		currentUserProvider.requireAdmin();
+		if (userId <= 0) {
+			throw ApiException.notFound(USER_NOT_FOUND_MESSAGE);
+		}
+		return findUserOrThrow(userId);
+	}
+
+	@Transactional
+	public ResetPasswordData resetPassword(long userId) {
+		User admin = currentUserProvider.requireAdmin();
+		if (userId <= 0) {
+			throw ApiException.notFound(USER_NOT_FOUND_MESSAGE);
+		}
+		User target = findUserOrThrow(userId);
+		if (userId == admin.id()) {
+			throw ApiException.badRequest("Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.");
+		}
+
+		String newPassword = passwordGenerator.generate();
+		String passwordHash = passwordEncoder.encode(newPassword);
+		target.changePassword(passwordHash);
+		userRepository.save(target);
+		eventPublisher.publishEvent(new AdminUserPasswordResetEvent(admin.id(), userId, Instant.now()));
+		return new ResetPasswordData(newPassword);
 	}
 
 	@Transactional
@@ -71,9 +111,6 @@ public class AdminUserService {
 		} catch (IllegalArgumentException exception) {
 			throw invalidCreateRequest();
 		}
-		if (role == UserRole.ADMIN) {
-			throw invalidCreateRequest();
-		}
 		if (userRepository.existsByEmail(email)) {
 			throw ApiException.conflict("Email đã được sử dụng.");
 		}
@@ -92,7 +129,7 @@ public class AdminUserService {
 					emptyToNull(request.specialization()),
 					emptyToNull(request.studentCode()),
 					request.dateOfBirth(),
-					emptyToNull(request.parentPhone()));
+					PhoneValidator.validateAndNormalize(request.parentPhone()));
 			user = userRepository.save(user);
 			if (user.id() == null) {
 				throw new IllegalStateException("User insert did not return an id");
@@ -127,6 +164,18 @@ public class AdminUserService {
 			target.updatePhone(emptyToNull(request.phone()));
 			changed = true;
 		}
+		if (request.role() != null && hasText(request.role())) {
+			UserRole newRole;
+			try {
+				newRole = UserRole.fromApiValue(request.role());
+			} catch (IllegalArgumentException e) {
+				throw ApiException.badRequest("Vai trò không hợp lệ: " + request.role());
+			}
+			if (newRole != target.role()) {
+				target.changeRole(newRole);
+				changed = true;
+			}
+		}
 
 		boolean hasProfileUpdate = target.role() == UserRole.TEACHER
 				? request.specialization() != null
@@ -154,6 +203,7 @@ public class AdminUserService {
 		currentUserProvider.requireAdmin();
 		findUserOrThrow(userId);
 		userRepository.deleteById(userId);
+		eventPublisher.publishEvent(new UserSoftDeletedEvent(userId));
 	}
 
 	@Transactional
@@ -210,5 +260,23 @@ public class AdminUserService {
 	}
 
 	public record CreatedUserData(long id, String email, String role) {
+	}
+
+	public static final class ResetPasswordData {
+
+		private final String newPassword;
+
+		private ResetPasswordData(String newPassword) {
+			this.newPassword = newPassword;
+		}
+
+		public String newPassword() {
+			return newPassword;
+		}
+
+		@Override
+		public String toString() {
+			return "ResetPasswordData[newPassword=<redacted>]";
+		}
 	}
 }

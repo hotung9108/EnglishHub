@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
@@ -23,32 +27,39 @@ import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepos
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
-import com.english_hub.core.modules.module.application.port.AudioStoragePort;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.module.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.module.domain.model.ModuleUploadStatus;
 import com.english_hub.core.modules.module.domain.repository.ModuleRepository;
+import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class ModuleServiceTest {
 
 	private static final OffsetDateTime OPEN_AT = OffsetDateTime.parse("2026-09-15T00:00:00Z");
 	private static final OffsetDateTime CLOSE_AT = OffsetDateTime.parse("2026-09-20T23:59:00Z");
+	private static final OffsetDateTime EXPIRES_AT = OffsetDateTime.parse("2026-10-01T00:00:00Z");
 
 	@Mock
 	private ModuleRepository moduleRepository;
@@ -66,7 +77,7 @@ class ModuleServiceTest {
 	private CurrentUserProvider currentUserProvider;
 
 	@Mock
-	private AudioStoragePort audioStoragePort;
+	private StorageService storageService;
 
 	private ModuleService moduleService;
 
@@ -78,7 +89,7 @@ class ModuleServiceTest {
 				classRepository,
 				classMemberRepository,
 				currentUserProvider,
-				audioStoragePort);
+				storageService);
 	}
 
 	@Test
@@ -92,10 +103,11 @@ class ModuleServiceTest {
 		assertThat(moduleService.listModules(5L)).containsExactly(first, second);
 	}
 
-	@Test
-	void studentMemberCanListModules() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanListModules(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
-		givenAssignmentAndClass(5L, 3L, 10L);
+		givenAssignmentAndClass(5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 		when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(List.of());
 
@@ -225,12 +237,13 @@ class ModuleServiceTest {
 		assertThat(moduleService.getModule(9L)).isEqualTo(module);
 	}
 
-	@Test
-	void studentMemberCanReadModuleDetail() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanReadModuleDetail(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
 		Module module = module(9L, 5L, ModuleSkill.READING, 1);
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
-		givenAssignmentAndClass(5L, 3L, 10L);
+		givenAssignmentAndClass(5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 
 		assertThat(moduleService.getModule(9L)).isEqualTo(module);
@@ -320,171 +333,481 @@ class ModuleServiceTest {
 	}
 
 	@Test
-	void teacherOwnerCanUploadListeningAudioAndMarkItReady() {
-		givenCaller(user(10L, UserRole.TEACHER));
-		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
-		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
-		givenAssignmentAndClass(5L, 3L, 10L);
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
-		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
-				"modules/9/audio/test.mp3", "audio/mpeg", null));
+	void teacherOwnerCanRequestAudioUploadUrlForListeningModule() {
+		givenListeningModule();
+		ArgumentCaptor<String> presignedKey = ArgumentCaptor.forClass(String.class);
+		when(storageService.generatePresignedPutUrl(presignedKey.capture(), eq("audio/mpeg")))
+				.thenReturn(presignedUpload("modules/9/audio/new.mp3"));
 
-		ModuleService.AudioUploadResult result = moduleService.uploadAudio(9L, file);
+		ModuleService.AudioUploadUrlResult result = moduleService.requestAudioUpload(9L, "audio/mpeg");
 
-		assertThat(result.storageKey()).isEqualTo("modules/9/audio/test.mp3");
-		assertThat(result.uploadStatus()).isEqualTo("READY");
-		verify(moduleRepository).save(any(Module.class));
+		assertThat(result.uploadUrl()).isEqualTo("https://storage.example/presigned-put");
+		assertThat(result.storageKey()).startsWith("modules/9/audio/").endsWith(".mp3");
+		assertThat(result.storageKey()).isEqualTo(presignedKey.getValue());
+		assertThat(result.expiresAt()).isEqualTo(EXPIRES_AT);
+		assertThat(result.uploadStatus()).isEqualTo("UPLOADING");
+		ArgumentCaptor<Module> saved = ArgumentCaptor.forClass(Module.class);
+		verify(moduleRepository).save(saved.capture());
+		assertThat(saved.getValue().sourceAudioStorageKey()).isEqualTo(result.storageKey());
+		assertThat(saved.getValue().sourceAudioMimeType()).isEqualTo("audio/mpeg");
+		assertThat(saved.getValue().sourceAudioUploadStatus()).isEqualTo(ModuleUploadStatus.UPLOADING);
 	}
 
 	@Test
-	void databaseMetadataFailureCleansUpFileAndBestEffortPersistsFailedStatus() {
+	void requestingNewUploadDeletesPreviousAudioObject() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/old.mp3");
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignmentAndClass(5L, 3L, 10L);
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
-		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
-				"modules/9/audio/failed.mp3", "audio/mpeg", null));
-		DataAccessResourceFailureException databaseException =
-				new DataAccessResourceFailureException("metadata save failed");
-		when(moduleRepository.save(any(Module.class)))
-				.thenThrow(databaseException)
-				.thenAnswer(invocation -> invocation.getArgument(0));
+		when(storageService.generatePresignedPutUrl(anyString(), eq("audio/mpeg")))
+				.thenReturn(presignedUpload("modules/9/audio/new.mp3"));
 
-		assertThatThrownBy(() -> moduleService.uploadAudio(9L, file))
-				.isSameAs(databaseException);
+		moduleService.requestAudioUpload(9L, "audio/mpeg");
 
-		ArgumentCaptor<Module> savedModules = ArgumentCaptor.forClass(Module.class);
-		verify(moduleRepository, org.mockito.Mockito.times(2)).save(savedModules.capture());
-		assertThat(savedModules.getAllValues().get(0).sourceAudioUploadStatus())
-				.isEqualTo(ModuleUploadStatus.READY);
-		assertThat(savedModules.getAllValues().get(1).sourceAudioUploadStatus())
-				.isEqualTo(ModuleUploadStatus.FAILED);
-		verify(audioStoragePort).delete("modules/9/audio/failed.mp3");
+		verify(storageService).deleteObject("modules/9/audio/old.mp3");
 	}
 
 	@Test
-	void cleanupFailureIsLoggedAndDoesNotReplaceDatabaseException() {
-		givenCaller(user(10L, UserRole.TEACHER));
-		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
-		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
-		givenAssignmentAndClass(5L, 3L, 10L);
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
-		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
-				"modules/9/audio/cleanup-failure.mp3", "audio/mpeg", null));
-		DataAccessResourceFailureException databaseException =
-				new DataAccessResourceFailureException("metadata save failed");
-		when(moduleRepository.save(any(Module.class))).thenThrow(databaseException);
-		RuntimeException cleanupException = new RuntimeException("cleanup failed");
-		doThrow(cleanupException).when(audioStoragePort).delete("modules/9/audio/cleanup-failure.mp3");
-
-		assertThatThrownBy(() -> moduleService.uploadAudio(9L, file))
-				.isSameAs(databaseException)
-				.satisfies(exception -> assertThat(exception.getSuppressed()).contains(cleanupException));
-		verify(audioStoragePort).delete("modules/9/audio/cleanup-failure.mp3");
-	}
-
-	@Test
-	void nonListeningModuleCannotReceiveAudio() {
+	void nonListeningModuleCannotRequestAudioUpload() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.READING, 1)));
 		givenAssignmentAndClass(5L, 3L, 10L);
 
 		assertApiException(
-				() -> moduleService.uploadAudio(9L, new MockMultipartFile(
-						"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'})),
+				() -> moduleService.requestAudioUpload(9L, "audio/mpeg"),
 				"Module này không hỗ trợ upload audio.");
+		verify(storageService, never()).generatePresignedPutUrl(anyString(), anyString());
 	}
 
 	@Test
-	void studentCannotUploadAudio() {
+	void studentCannotRequestAudioUpload() {
 		givenCaller(user(41L, UserRole.STUDENT));
 
 		assertApiException(
-				() -> moduleService.uploadAudio(9L, new MockMultipartFile(
-						"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'})),
+				() -> moduleService.requestAudioUpload(9L, "audio/mpeg"),
 				"Bạn không có quyền thực hiện thao tác này.");
 	}
 
 	@Test
-	void acceptsAudioAtExactTwentyFiveMiBBoundary() {
+	void unsupportedAudioMimeTypeIsRejected() {
 		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "boundary.mp3", "audio/mpeg", audioBytes(25 * 1024 * 1024, 'I', 'D', '3'));
-		givenStoredAudio(file);
 
-		ModuleService.AudioUploadResult result = moduleService.uploadAudio(9L, file);
+		assertApiException(
+				() -> moduleService.requestAudioUpload(9L, "audio/ogg"),
+				"Định dạng file audio không được hỗ trợ.");
+		verify(storageService, never()).generatePresignedPutUrl(anyString(), anyString());
+	}
 
+	@Test
+	void nullAudioMimeTypeIsRejected() {
+		givenListeningModule();
+
+		assertApiException(
+				() -> moduleService.requestAudioUpload(9L, null),
+				"Định dạng file audio không được hỗ trợ.");
+		verify(storageService, never()).generatePresignedPutUrl(anyString(), anyString());
+	}
+
+	@Test
+	void teacherOwnerCanConfirmUploadedAudioAsReady() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+
+		ModuleService.AudioUploadConfirmResult result =
+				moduleService.confirmAudioUpload(9L, "modules/9/audio/new.mp3");
+
+		assertThat(result.storageKey()).isEqualTo("modules/9/audio/new.mp3");
 		assertThat(result.uploadStatus()).isEqualTo("READY");
-		verify(audioStoragePort).store(9L, file);
+		ArgumentCaptor<Module> saved = ArgumentCaptor.forClass(Module.class);
+		verify(moduleRepository).save(saved.capture());
+		assertThat(saved.getValue().sourceAudioUploadStatus()).isEqualTo(ModuleUploadStatus.READY);
 	}
 
 	@Test
-	void rejectsAudioOneByteOverTwentyFiveMiBBoundary() {
-		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "too-large.mp3", "audio/mpeg", audioBytes(25 * 1024 * 1024 + 1, 'I', 'D', '3'));
+	void confirmWithoutUploadedObjectMarksFailedInsteadOfThrowing() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/missing.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(storageService.objectExists("modules/9/audio/missing.mp3")).thenReturn(false);
 
-		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
-		verify(audioStoragePort, never()).store(anyLong(), any());
+		ModuleService.AudioUploadConfirmResult result =
+				moduleService.confirmAudioUpload(9L, "modules/9/audio/missing.mp3");
+
+		assertThat(result.uploadStatus()).isEqualTo("FAILED");
+		ArgumentCaptor<Module> saved = ArgumentCaptor.forClass(Module.class);
+		verify(moduleRepository).save(saved.capture());
+		assertThat(saved.getValue().sourceAudioUploadStatus()).isEqualTo(ModuleUploadStatus.FAILED);
 	}
 
 	@Test
-	void rejectsAudioFilenameWithoutExtension() {
-		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "audio", "audio/mpeg", audioBytes(6, 'I', 'D', '3'));
+	void confirmWithMismatchedStorageKeyIsRejected() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
 
-		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
-		verify(audioStoragePort, never()).store(anyLong(), any());
+		assertApiException(
+				() -> moduleService.confirmAudioUpload(9L, "modules/9/audio/other.mp3"),
+				"storageKey không khớp với module.");
+		verify(moduleRepository, never()).save(any(Module.class));
 	}
 
 	@Test
-	void acceptsUppercaseAudioExtension() {
-		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "SOURCE.MP3", "audio/mpeg", audioBytes(6, 'I', 'D', '3'));
-		givenStoredAudio(file);
+	void studentCannotConfirmAudioUpload() {
+		givenCaller(user(41L, UserRole.STUDENT));
 
-		moduleService.uploadAudio(9L, file);
+		assertApiException(
+				() -> moduleService.confirmAudioUpload(9L, "modules/9/audio/new.mp3"),
+				"Bạn không có quyền thực hiện thao tác này.");
+	}
 
-		verify(audioStoragePort).store(9L, file);
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanStreamListeningAudio(AssignmentStatus status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", expiresAt));
+
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(9L);
+
+		assertThat(result.downloadUrl()).isEqualTo("https://storage.example.com/audio.mp3");
+		assertThat(result.mimeType()).isEqualTo("audio/mpeg");
+		assertThat(result.expiresAt()).isEqualTo(expiresAt);
 	}
 
 	@Test
-	void acceptsAudioWithNullMimeTypeWhenSignatureAndExtensionAreValid() {
-		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "source.mp3", null, audioBytes(6, 'I', 'D', '3'));
-		givenStoredAudio(file);
+	void downloadUrlFallsBackToMpegMimeTypeWhenModuleHasNone() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = new Module(
+				9L, 5L, ModuleSkill.LISTENING, ModuleTaskType.QUIZ, 2,
+				"Instructions", BigDecimal.TEN,
+				"modules/9/audio/new.mp3", null, null, ModuleUploadStatus.READY, null);
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", expiresAt));
 
-		moduleService.uploadAudio(9L, file);
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(9L);
 
-		verify(audioStoragePort).store(9L, file);
+		assertThat(result.mimeType()).isEqualTo("audio/mpeg");
 	}
 
 	@Test
-	void rejectsMp3MagicBytesWithWavExtension() {
-		givenListeningModule();
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "source.wav", "audio/wav", audioBytes(6, 'I', 'D', '3'));
+	void downloadUrlReturnsNotFoundWhenStoredObjectIsGone() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/gone.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(storageService.objectExists("modules/9/audio/gone.mp3")).thenReturn(false);
 
-		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
-		verify(audioStoragePort, never()).store(anyLong(), any());
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Module chưa có file audio.");
 	}
 
 	@Test
-	void rejectsWavMagicBytesWithMp3Extension() {
-		givenListeningModule();
-		byte[] wavHeader = new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
-		MockMultipartFile file = new MockMultipartFile(
-				"file", "source.mp3", "audio/mpeg", wavHeader);
+	void downloadUrlReturnsNotFoundWhenModuleHasNoAudio() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2)));
+		givenAssignmentAndClass(5L, 3L, 10L);
 
-		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
-		verify(audioStoragePort, never()).store(anyLong(), any());
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Module chưa có file audio.");
+	}
+
+	@Test
+	void adminCannotGetListeningAudioDownloadUrl() {
+		givenCaller(user(1L, UserRole.ADMIN));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignment(5L, 3L);
+
+		assertApiException(() -> moduleService.generateAudioDownloadUrl(9L), "Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void foreignStudentCannotGetListeningAudioDownloadUrl() {
+		givenCaller(user(42L, UserRole.STUDENT));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+
+		assertApiException(() -> moduleService.generateAudioDownloadUrl(9L), "Bạn không có quyền thực hiện thao tác này.");
+		verify(storageService, never()).generatePresignedDownload(anyString(), any(), any());
+	}
+
+	@Test
+	void deletingModuleWithAudioAlsoDeletesStoredObject() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(moduleRepository.existsSubmissionReference(9L)).thenReturn(false);
+
+		moduleService.deleteModule(9L);
+
+		verify(moduleRepository).deleteById(9L);
+		verify(storageService).deleteObject("modules/9/audio/new.mp3");
+	}
+
+	@Test
+	void deletingModuleWithoutAudioDoesNotTouchStorage() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.READING, 1)));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(moduleRepository.existsSubmissionReference(9L)).thenReturn(false);
+
+		moduleService.deleteModule(9L);
+
+		verify(storageService, never()).deleteObject(anyString());
+	}
+
+	@Test
+	void storedAudioDeletionFailureIsLoggedAndDoesNotFailTheDelete() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(moduleRepository.existsSubmissionReference(9L)).thenReturn(false);
+		doThrow(new RuntimeException("storage down")).when(storageService).deleteObject("modules/9/audio/new.mp3");
+
+		moduleService.deleteModule(9L);
+
+		verify(moduleRepository).deleteById(9L);
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {true, false})
+	void studentCannotListDraftModules(boolean emptyList) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		List<Module> modules = emptyList ? List.of() : List.of(module(9L, 5L, ModuleSkill.READING, 1));
+		lenient().when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(modules);
+
+		assertThatThrownBy(() -> moduleService.listModules(5L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(moduleRepository, storageService);
+	}
+
+	@Test
+	void studentCannotReadDraftModuleDetail() {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.READING, 1)));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> moduleService.getModule(9L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+	}
+
+	@ParameterizedTest
+	@NullSource
+	@EnumSource(value = ModuleUploadStatus.class, names = {"READY", "UPLOADING"})
+	void draftAudioIsForbiddenBeforeStorage(ModuleUploadStatus uploadStatus) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		String storageKey = uploadStatus == null ? null : "modules/9/audio/new.mp3";
+		Module module = new Module(
+				9L, 5L, ModuleSkill.LISTENING, ModuleTaskType.QUIZ, 2, "Instructions", BigDecimal.TEN,
+				storageKey, null, "audio/mpeg", uploadStatus, null);
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(storageService);
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleReadLookupCases")
+	void moduleReadLookupErrorsArePreserved(String resource, String scenario) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		boolean missingModule = scenario.startsWith("MODULE_");
+		if (!"LIST".equals(resource)) {
+			Optional<Module> module = missingModule
+					? Optional.empty()
+					: Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2));
+			when(moduleRepository.findById(9L)).thenReturn(module);
+		}
+		if (!missingModule) {
+			// The assignment port hides both missing and soft-deleted assignments.
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.empty());
+		}
+		String message = missingModule ? "Không tìm thấy module." : "Không tìm thấy bài tập.";
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(exception).hasMessage(message);
+				});
+
+		verifyNoInteractions(classRepository, classMemberRepository, storageService);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		if (missingModule) {
+			verifyNoInteractions(assignmentRepository);
+		}
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleResourceStatusCases")
+	void studentOutsideClassCannotReadModuleResources(String resource, AssignmentStatus status) {
+		givenCaller(user(42L, UserRole.STUDENT));
+		if (!"LIST".equals(resource)) {
+			when(moduleRepository.findById(9L)).thenReturn(Optional.of(moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3")));
+		}
+		givenAssignmentAndClass(5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 42L)).thenReturn(false);
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verify(classMemberRepository).existsByClassIdAndStudentId(3L, 42L);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		verifyNoInteractions(storageService);
+	}
+
+	@ParameterizedTest
+	@MethodSource("nonStudentModuleReadCases")
+	void nonStudentModuleReadAccessIsPreserved(String resource, AssignmentStatus status, UserRole role) {
+		givenCaller(user(11L, role));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		if (!"LIST".equals(resource)) {
+			when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		}
+		if (role == UserRole.ADMIN) {
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment(5L, 3L, status)));
+		} else {
+			givenAssignmentAndClass(5L, 3L, 10L, status);
+		}
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(storageService, classMemberRepository);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		if (role == UserRole.ADMIN) {
+			verifyNoInteractions(classRepository);
+		}
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleResourceStatusCases")
+	void owningTeacherModuleReadAccessIsPreserved(String resource, AssignmentStatus status) {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenAssignmentAndClass(5L, 3L, 10L, status);
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		if ("LIST".equals(resource)) {
+			when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(List.of(module));
+			assertThat(moduleService.listModules(5L)).containsExactly(module);
+			verifyNoInteractions(classMemberRepository, storageService);
+			return;
+		}
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		if ("DETAIL".equals(resource)) {
+			assertThat(moduleService.getModule(9L)).isEqualTo(module);
+		} else {
+			when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+			when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+					.thenReturn(new StorageService.PresignedDownload(
+							"https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", EXPIRES_AT));
+			assertThat(moduleService.generateAudioDownloadUrl(9L).downloadUrl())
+					.isEqualTo("https://storage.example.com/audio.mp3");
+			verify(storageService).objectExists("modules/9/audio/new.mp3");
+			verify(storageService).generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull());
+		}
+		verifyNoInteractions(classMemberRepository);
+	}
+
+	private static Stream<Arguments> moduleReadLookupCases() {
+		return Stream.of(
+				Arguments.of("LIST", "ASSIGNMENT_MISSING"),
+				Arguments.of("LIST", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "ASSIGNMENT_MISSING"),
+				Arguments.of("DETAIL", "ASSIGNMENT_DELETED"),
+				Arguments.of("AUDIO", "ASSIGNMENT_MISSING"),
+				Arguments.of("AUDIO", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "MODULE_MISSING"),
+				Arguments.of("DETAIL", "MODULE_DELETED"),
+				Arguments.of("AUDIO", "MODULE_MISSING"),
+				Arguments.of("AUDIO", "MODULE_DELETED"));
+	}
+
+	private static Stream<Arguments> moduleResourceStatusCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL", "AUDIO")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status));
+			}
+		}
+		return cases.build();
+	}
+
+	private static Stream<Arguments> nonStudentModuleReadCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL", "AUDIO")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status, UserRole.TEACHER));
+				cases.add(Arguments.of(resource, status, UserRole.ADMIN));
+			}
+		}
+		return cases.build();
+	}
+
+	private void readModuleResource(String resource) {
+		if ("LIST".equals(resource)) {
+			moduleService.listModules(5L);
+		} else if ("DETAIL".equals(resource)) {
+			moduleService.getModule(9L);
+		} else {
+			moduleService.generateAudioDownloadUrl(9L);
+		}
+	}
+
+	private void givenAssignmentAndClass(Long assignmentId, Long classId, Long teacherId, AssignmentStatus status) {
+		when(assignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment(assignmentId, classId, status)));
+		when(classRepository.findById(classId)).thenReturn(Optional.of(englishClass(classId, teacherId)));
+	}
+
+	private Assignment assignment(Long assignmentId, Long classId, AssignmentStatus status) {
+		Assignment value = assignment(assignmentId, classId);
+		if (status != AssignmentStatus.DRAFT) {
+			value.changeStatus(AssignmentStatus.PUBLISHED);
+		}
+		if (status == AssignmentStatus.CLOSED) {
+			value.changeStatus(AssignmentStatus.CLOSED);
+		}
+		return value;
 	}
 
 	private void givenListeningModule() {
@@ -493,17 +816,24 @@ class ModuleServiceTest {
 		givenAssignmentAndClass(5L, 3L, 10L);
 	}
 
-	private void givenStoredAudio(MockMultipartFile file) {
-		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
-				"modules/9/audio/test.mp3", "audio/mpeg", null));
+	private Module moduleWithAudio(Long id, Long assignmentId, String storageKey) {
+		return new Module(
+				id,
+				assignmentId,
+				ModuleSkill.LISTENING,
+				ModuleTaskType.QUIZ,
+				2,
+				"Instructions",
+				BigDecimal.TEN,
+				storageKey,
+				null,
+				"audio/mpeg",
+				ModuleUploadStatus.READY,
+				null);
 	}
 
-	private byte[] audioBytes(int size, char... header) {
-		byte[] bytes = new byte[size];
-		for (int index = 0; index < header.length; index++) {
-			bytes[index] = (byte) header[index];
-		}
-		return bytes;
+	private StorageService.PresignedUpload presignedUpload(String storageKey) {
+		return new StorageService.PresignedUpload("https://storage.example/presigned-put", storageKey, EXPIRES_AT);
 	}
 
 	private void givenAssignment(Long assignmentId, Long classId) {

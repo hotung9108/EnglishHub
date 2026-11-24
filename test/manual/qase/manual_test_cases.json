@@ -1,0 +1,81 @@
+{
+  "project": "EAM",
+  "suite_id": 230,
+  "suite_name": "8.3. Khả năng Sử dụng (Usability - USA)",
+  "source_of_truth": ["docs/core/01.SRS.md", "docs/core/03.TP.md"],
+  "total_cases": 9,
+  "cases": [
+    {
+      "id": 4697,
+      "code": "TC-UX-AUTH-01",
+      "title": "[TC-UX-AUTH-01] Đóng vai Khách: Thẩm định màn hình Đăng nhập, Quên mật khẩu & Responsive Mobile",
+      "srs_references": ["UC01", "UC02", "USA-01", "USA-02", "USA-03", "USA-04", "USA-05"],
+      "expected_correct": "Form đăng nhập căn giữa trang, typography rõ ràng, có nút ẩn/hiện mật khẩu, validation email/mật khẩu báo lỗi inline thân thiện tiếng Việt, từ chối khoảng trắng đầu/cuối chuỗi email. Trên mobile 375px co giãn 100% bề rộng không tràn lề.",
+      "defect_incorrect": "Thông báo lỗi 500 hoặc crash trắng trang; chữ mờ nhạt không đạt độ tương phản; submit form trắng không báo lỗi; tràn viền ngang trên mobile."
+    },
+    {
+      "id": 4698,
+      "code": "TC-UX-STU-01",
+      "title": "[TC-UX-STU-01] Đóng vai Học viên: Trải nghiệm Dashboard tổng quan & Quản lý lớp học",
+      "srs_references": ["UC10", "USA-01", "USA-06"],
+      "expected_correct": "Dashboard hiển thị thẻ bài tập sắp hết hạn, tiến độ hoàn thành các khóa học; tìm kiếm lớp học lọc tức thì; danh sách lớp hiển thị tên giáo viên phụ trách; có breadcrumb quay lại trang trước.",
+      "defect_incorrect": "Dashboard trắng trơn khi chưa có dữ liệu mà không có hướng dẫn (missing empty state); thanh tìm kiếm giật lag hoặc không lọc được; không có nút quay lại dashboard khi vào chi tiết lớp."
+    },
+    {
+      "id": 4699,
+      "code": "TC-UX-STU-02",
+      "title": "[TC-UX-STU-02] Đóng vai Học viên: Trải nghiệm Không gian làm bài 4 kỹ năng Nghe/Nói/Đọc/Viết",
+      "srs_references": ["UC15", "UC16", "UC17", "UC18", "UC19", "UC20", "UC21", "USA-01", "USA-03", "USA-04"],
+      "expected_correct": "Trình soạn thảo Writing có đếm số từ, tự động lưu nháp; bài Reading/Listening có bộ câu hỏi trắc nghiệm rõ ràng, audio player phát mượt; bài Speaking có kiểm tra mic và cho nghe lại bản ghi âm trước khi nộp; có modal cảnh báo trước khi nộp bài.",
+      "defect_incorrect": "Không có bộ đếm từ bài Writing; tải file audio bị treo; nộp bài trắng không có cảnh báo; mất nội dung khi nhỡ tay bấm reload."
+    },
+    {
+      "id": 4700,
+      "code": "TC-UX-STU-03",
+      "title": "[TC-UX-STU-03] Đóng vai Học viên: Tra cứu Bảng điểm, Chi tiết nhận xét giáo viên & Phản hồi AI",
+      "srs_references": ["UC28", "UC29", "UC30", "UC33", "USA-02", "USA-06"],
+      "expected_correct": "Bảng điểm phân loại rõ ràng 4 kỹ năng, thang điểm 10 chuẩn; bấm vào từng bài mở chi tiết bài chữa hiển thị rõ lỗi ngữ pháp/từ vựng được highlight; có tab nhận xét của giáo viên và đánh giá AI; dễ dàng quay lại bảng điểm.",
+      "defect_incorrect": "Bảng điểm hiển thị thô sơ thiếu phân loại kỹ năng; lỗi không mở được chi tiết bài chữa; điểm số hiển thị sai định dạng thập phân."
+    },
+    {
+      "id": 4701,
+      "code": "TC-UX-TEA-01",
+      "title": "[TC-UX-TEA-01] Đóng vai Giáo viên: Trải nghiệm Tạo bài tập đa kỹ năng & Cấu hình hạn nộp",
+      "srs_references": ["UC11", "UC12", "UC13", "UC14", "USA-01", "USA-04"],
+      "expected_correct": "Giao diện tạo bài trực quan theo từng bước (Wizard); cho phép cấu hình từng kỹ năng; hạn nộp phải sau thời gian mở; có tính năng lưu nháp hoặc hủy bỏ an toàn; tự động tính tổng điểm.",
+      "defect_incorrect": "Cho phép lưu bài tập khi hạn đóng trước hạn mở (Bug #210); mất trắng nội dung vừa soạn nếu chuyển tab; thiếu hướng dẫn định dạng file đính kèm."
+    },
+    {
+      "id": 4702,
+      "code": "TC-UX-TEA-02",
+      "title": "[TC-UX-TEA-02] Đóng vai Giáo viên: Sử dụng Studio Chấm bài, Gợi ý AI & Quản lý điểm số",
+      "srs_references": ["UC24", "UC25", "UC26", "UC27", "UC31", "USA-01", "USA-03"],
+      "expected_correct": "Giao diện chấm bài chia 2 cột (bài làm bên trái, khung nhập điểm/nhận xét bên phải); nút gọi AI phân tích phản hồi nhanh; gợi ý của AI có thể duyệt hoặc sửa đổi; chặn nhập điểm ngoài thang 0-10.",
+      "defect_incorrect": "Khung chấm điểm che mất bài làm; cho phép nhập điểm âm hoặc điểm >10; gọi AI bị treo vô tận không có thanh loading; không lưu lại lịch sử sửa điểm."
+    },
+    {
+      "id": 4703,
+      "code": "TC-UX-ADM-01",
+      "title": "[TC-UX-ADM-01] Đóng vai Quản trị viên: Trải nghiệm Dashboard số liệu, Quản lý tài khoản & Phân quyền",
+      "srs_references": ["UC04", "UC05", "UC06", "UC07", "USA-01", "USA-02"],
+      "expected_correct": "Dashboard thống kê tổng quan (Học viên, Giáo viên, Lớp học, Bài tập) tải nhanh và chính xác; bảng tài khoản có bộ lọc role rõ ràng; tìm kiếm tài khoản real-time; thao tác Khóa/Mở tài khoản có dialog xác nhận an toàn.",
+      "defect_incorrect": "Thống kê bị số âm hoặc NaN; bảng tài khoản không có phân trang gây lag; khóa tài khoản không có cảnh báo xác nhận; console báo lỗi JavaScript unhandled."
+    },
+    {
+      "id": 4704,
+      "code": "TC-UX-ADM-02",
+      "title": "[TC-UX-ADM-02] Đóng vai Quản trị viên: Quản lý Lớp học, Lưu trữ hoàn thành, Nhật ký Audit & Cài đặt hệ thống",
+      "srs_references": ["UC08", "UC09", "UC31", "UC36", "USA-06"],
+      "expected_correct": "Quản lý lớp học hiển thị sĩ số, giáo viên phụ trách; chuyển lớp hoàn thành vào kho lưu trữ (Archive); xem chi tiết nhật ký Audit ai đã chấm/sửa điểm bài nào; trang Cài đặt hệ thống lưu trữ bền vững sau khi reload.",
+      "defect_incorrect": "Xóa lớp bị mất vĩnh viễn dữ liệu điểm mà không có cảnh báo; audit log hiển thị thiếu thông tin người thực hiện; cài đặt hệ thống bị reset về mặc định khi tải lại trang."
+    },
+    {
+      "id": 4705,
+      "code": "TC-UX-NFR-RESP",
+      "title": "[TC-UX-NFR-RESP] Kiểm định toàn diện Tính co giãn Responsive trên thiết bị di động (Mobile 375x812 vs Desktop 1920x1080)",
+      "srs_references": ["USA-05"],
+      "expected_correct": "Trên màn hình Mobile 375px, menu sidebar tự động thu gọn thành nút hamburger / drawer; các bảng dữ liệu có thể cuộn ngang hoặc chuyển thành card view; form nhập liệu và nút bấm không bị cắt xén hay đè chữ.",
+      "defect_incorrect": "Xuất hiện thanh cuộn ngang toàn trang (Horizontal scroll); nút bấm bị lọt ra ngoài màn hình; menu sidebar chiếm trọn màn hình không tắt được; chữ đè lên ảnh."
+    }
+  ]
+}

@@ -1,10 +1,13 @@
 package com.english_hub.core.modules.classroom.application.service;
 
 import com.english_hub.core.common.ApiException;
+import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
@@ -18,6 +21,7 @@ import com.english_hub.core.modules.user.domain.model.User;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +43,8 @@ public class ClassService {
 	private static final String MISSING_STUDENT_ID_MESSAGE = "Thiếu mã học viên.";
 	private static final String CLASS_OR_STUDENT_NOT_FOUND_MESSAGE = "Không tìm thấy lớp học hoặc học viên.";
 	private static final String DUPLICATE_STUDENT_MESSAGE = "Học viên đã có trong lớp.";
+	private static final String DUPLICATE_CLASS_NAME_MESSAGE = "Tên lớp đã tồn tại.";
+	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String MEMBER_NOT_FOUND_MESSAGE = "Không tìm thấy thành viên trong lớp.";
 	private static final int NAME_MAX_LENGTH = 150;
 	private static final int LEVEL_MAX_LENGTH = 50;
@@ -72,8 +78,11 @@ public class ClassService {
 
 	@Transactional(readOnly = true)
 	public ClassDetailResult getClassDetail(long classId) {
+		User caller = currentUserProvider.requireActiveUser();
 		EnglishClass englishClass = classRepository.findById(classId)
 				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		requireTeacherOwnership(caller, englishClass);
+		requireStudentMembership(caller, classId);
 		TeacherInfo teacher = englishClass.getTeacherId() == null
 				? null
 				: classRepository.findTeacher(englishClass.getTeacherId()).orElse(null);
@@ -106,6 +115,9 @@ public class ClassService {
 		}
 		validateDateRange(command.startDate(), command.endDate());
 		validateTeacherExists(command.teacherId());
+		if (classRepository.existsByNameIgnoreCase(name)) {
+			throw ApiException.badRequest(DUPLICATE_CLASS_NAME_MESSAGE);
+		}
 		EnglishClass englishClass = new EnglishClass(
 				name,
 				trimToNull(command.level()),
@@ -168,12 +180,31 @@ public class ClassService {
 
 	@Transactional(readOnly = true)
 	public List<ClassMemberDetail> listClassMembers(long classId) {
-		requireClassExists(classId);
+		User caller = currentUserProvider.requireActiveUser();
+		EnglishClass englishClass = classRepository.findById(classId)
+				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		requireTeacherOwnership(caller, englishClass);
+		requireStudentMembership(caller, classId);
 		return classMemberRepository.findMembersWithStudentInfo(classId);
+	}
+
+	@Transactional(readOnly = true)
+	public ClassCandidatePage listCandidateStudents(long classId, String query, int page, int limit) {
+		if (!classRepository.existsById(classId)) {
+			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
+		}
+		requireMemberWriteAccess(classId);
+		return classMemberRepository.findCandidateStudents(classId, query, page, limit);
+	}
+
+	@Transactional(readOnly = true)
+	public List<ClassCandidateStudent> listCandidateStudents(long classId, String query, int limit) {
+		return listCandidateStudents(classId, query, 1, limit).candidates();
 	}
 
 	@Transactional
 	public long addClassMember(long classId, AddClassMemberCommand command) {
+		requireMemberWriteAccess(classId);
 		if (command == null || command.studentId() == null) {
 			throw ApiException.badRequest(MISSING_STUDENT_ID_MESSAGE);
 		}
@@ -188,14 +219,45 @@ public class ClassService {
 
 	@Transactional
 	public void removeClassMember(long classId, long memberId) {
+		requireMemberWriteAccess(classId);
 		ClassMember member = classMemberRepository.findByClassIdAndId(classId, memberId)
 				.orElseThrow(() -> ApiException.notFound(MEMBER_NOT_FOUND_MESSAGE));
 		classMemberRepository.deleteById(member.getId());
 	}
 
-	private void requireClassExists(long classId) {
-		if (!classRepository.existsById(classId)) {
-			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
+	private void requireMemberWriteAccess(long classId) {
+		CurrentUserProvider.AuthenticatedIdentity identity = currentUserProvider.requireAuthenticatedIdentity();
+		if (identity.role() == UserRole.ADMIN) {
+			return;
+		}
+		if (identity.role() == UserRole.TEACHER) {
+			User teacher = currentUserProvider.requireActiveUser();
+			if (teacher.role() != UserRole.TEACHER || teacher.id() == null) {
+				throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+			}
+			EnglishClass englishClass = classRepository.findById(classId)
+					.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+			if (!Objects.equals(englishClass.getTeacherId(), teacher.id())) {
+				throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+			}
+			return;
+		}
+		throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+	}
+
+	private void requireTeacherOwnership(User caller, EnglishClass englishClass) {
+		if (caller.role() != UserRole.TEACHER) {
+			return;
+		}
+		if (englishClass.getTeacherId() == null || !Objects.equals(englishClass.getTeacherId(), caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+	}
+
+	private void requireStudentMembership(User caller, long classId) {
+		if (caller.role() == UserRole.STUDENT
+				&& !classMemberRepository.existsByClassIdAndStudentId(classId, caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 	}
 

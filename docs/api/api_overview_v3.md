@@ -2,7 +2,7 @@
 
 *Bản V3 = áp dụng schema V6 (V4 → V5 → V6) lên api_overview_v2. Chi tiết các thay đổi xem Changelog bên dưới. Vẫn chỉ ở mức sương sương: method + endpoint + mục đích, chưa thiết kế request/response chi tiết.*
 
-**Tổng: 62 endpoint** (giảm từ 63 của V2, do bỏ endpoint PATCH class_members không còn nghiệp vụ sau khi xoá member_type).
+**Tổng: 64 endpoint** (V3 ban đầu có 62 sau khi bỏ PATCH class_members; bổ sung GET /admin/users/{id} cho FE-71 và POST /admin/users/{id}/reset-password cho BE-78).
 
 ---
 
@@ -45,7 +45,7 @@
 
 ---
 
-## CỤM 2 — User (8 endpoint)
+## CỤM 2 — User (10 endpoint)
 
 | # | Method + Endpoint | Mục đích |
 |---|---|---|
@@ -53,10 +53,12 @@
 | 5 | PUT /users/me | Sửa thông tin cá nhân (tên, phone, avatar...) |
 | 6 | PATCH /users/me/password | Đổi mật khẩu riêng (tách khỏi sửa thông tin) |
 | 7 | GET /admin/users | Admin xem danh sách + search user |
-| 8 | POST /admin/users | Admin tạo tài khoản giáo viên/học viên |
+| 8 | POST /admin/users | Admin tạo tài khoản với role ADMIN, TEACHER, STUDENT |
 | 9 | PUT /admin/users/{id} | Admin sửa thông tin 1 user |
 | 10 | DELETE /admin/users/{id} | Admin xoá (hoặc soft-delete) user |
 | 11 | PATCH /admin/users/{id}/status | Admin khoá/mở khoá tài khoản |
+| 11a | GET /admin/users/{id} | Admin xem chi tiết user theo ID (FE-71) |
+| 11b | POST /admin/users/{id}/reset-password | Admin đặt lại mật khẩu bằng mật khẩu ngẫu nhiên do server sinh (BE-78) |
 
 ---
 
@@ -74,6 +76,8 @@
 | 17 | GET /classes/{id}/members | Danh sách học viên trong lớp |
 | 18 | POST /classes/{id}/members | Thêm học viên vào lớp (body chỉ cần `student_id`, không còn `member_type`) |
 | 19 | DELETE /classes/{id}/members/{memberId} | Học viên rời lớp — xoá cứng |
+
+**Lưu ý cho POST/PUT `/classes`:** Nếu `teacherId` thuộc giáo viên bị khóa (`LOCKED`), API trả `400`; nếu giáo viên không tồn tại hoặc đã bị xóa mềm, API trả `404`.
 
 ---
 
@@ -95,11 +99,62 @@
 | 29 | PUT /modules/{id} | Sửa module (đổi `ai_instruction`, `max_score`...) |
 | 30 | DELETE /modules/{id} | Xoá module (cascade luôn questions) |
 | 31 | POST /modules/{id}/audio | Upload file audio đề bài (Listening) lên R2 |
-| 32 | GET /modules/{id}/questions | Danh sách câu hỏi trong module (kèm `correct_answer` nếu là trắc nghiệm) |
+| 32 | GET /modules/{id}/questions | Danh sách câu hỏi trong module; MCQ có `options` riêng, `correctAnswer` chỉ dành cho giáo viên phụ trách lớp |
 | 33 | POST /modules/{id}/questions | Tạo câu hỏi mới — gửi `content` (plain text) + `correctAnswer` (đối tượng đã định kiểu, xem bên dưới) |
-| 34 | GET /questions/{id} | Xem chi tiết câu hỏi (kèm `correctAnswer`) |
+| 34 | GET /questions/{id} | Xem chi tiết câu hỏi; cùng hợp đồng `options` và phân quyền `correctAnswer` như #32 |
 | 35 | PUT /questions/{id} | Sửa câu hỏi — sửa/thêm/xoá option = gửi lại toàn bộ `correctAnswer` |
 | 36 | DELETE /questions/{id} | Xoá câu hỏi |
+
+### Quyền truy cập bài tập nháp (BE-77)
+
+Với học viên (`STUDENT`) thuộc lớp, quyền đọc dữ liệu của bài tập `DRAFT` được áp dụng
+cho 7 endpoint sau (cùng tiền tố `/api/v1`):
+
+| Method + Endpoint | Chính sách với học viên |
+|---|---|
+| GET /classes/{id}/assignments | Không truyền `status` (kể cả chuỗi rỗng hoặc chỉ có khoảng trắng): chỉ trả `PUBLISHED`/`CLOSED`, `pagination.total` không tính `DRAFT`. Lọc `status=DRAFT` (kể cả `draft`, ` Draft `) trả **403**. |
+| GET /assignments/{id} | Trả **403** nếu bài tập là `DRAFT`. |
+| GET /assignments/{id}/modules | Trả **403** nếu bài tập là `DRAFT`, kể cả danh sách module rỗng. |
+| GET /modules/{id} | Trả **403** nếu bài tập cha là `DRAFT`. |
+| GET /modules/{id}/audio-download-url | Trả **403** nếu bài tập cha là `DRAFT`, trước khi kiểm tra audio hoặc tạo URL tải. |
+| GET /modules/{id}/questions | Trả **403** nếu bài tập cha là `DRAFT`, kể cả module không có câu hỏi. |
+| GET /questions/{id} | Trả **403** nếu bài tập cha là `DRAFT`. |
+
+Các phản hồi **403** trên có body:
+
+```json
+{"error":"Bạn không có quyền thực hiện thao tác này."}
+```
+
+Quyền hiện có của giáo viên phụ trách lớp và Admin được giữ nguyên. Học viên vẫn đọc
+được dữ liệu `PUBLISHED`/`CLOSED` theo quyền hiện có; các route câu hỏi vẫn ẩn `correctAnswer`.
+
+### Hợp đồng response câu hỏi (GET #32, #34 — module question)
+
+GET `/modules/{id}/questions` trả `{ "data": [QuestionResponse, ...] }`; GET
+`/questions/{id}` trả trực tiếp `QuestionResponse`. Cả hai endpoint có cùng quy tắc:
+
+- Câu `MULTIPLE_CHOICE` có dữ liệu options hợp lệ trả thêm trường `options` ở cấp câu hỏi,
+  gồm đúng 4 phần tử `{ "id": number, "content": string }`, cho cả giáo viên phụ trách
+  lớp và học sinh thành viên lớp. Mỗi phần tử **chỉ có `id` và `content`**, không có
+  `isCorrect`, `is_correct` hoặc trường đáp án bổ sung. Giữ nguyên ID, nội dung và thứ tự nguồn.
+- Học sinh không nhận trường `correctAnswer` và không nhận cờ đúng/sai của phương án.
+- Giáo viên phụ trách lớp vẫn nhận đầy đủ `correctAnswer` như trước, bao gồm
+  `correctAnswer.options` và các cờ `isCorrect`; trường `options` riêng không thay thế
+  dữ liệu này, để giữ tương thích màn hình tạo/sửa/xem đáp án.
+- Câu `SHORT_ANSWER` không có trường `options`.
+- Nếu options trong dữ liệu lưu trữ không hợp lệ sau khi đã đọc được thành map, chỉ bỏ
+  **toàn bộ trường `options` của câu đó**, không trả danh sách một phần và không tự bù
+  ID/nội dung. Việc chiếu options không ném lỗi hay trả 400; các câu khác vẫn trả bình
+  thường. `correctAnswer` của giáo viên vẫn giữ nguyên và server ghi WARN chỉ gồm
+  question ID, loại lỗi. Quy tắc này không thay đổi lỗi đọc JSON/root ở persistence mapper.
+
+Options không hợp lệ khi: không phải danh sách; số phần tử khác 4; phần tử không phải
+map; thiếu ID hoặc ID không phải số; ID trùng nhau; content không phải chuỗi, rỗng hoặc
+chỉ có khoảng trắng. Trường bị bỏ khỏi JSON, không trả `options: null` hay `options: []`.
+
+Thay đổi response này không đổi request tạo/sửa, cấu trúc lưu trữ `correct_answer`,
+hoặc DTO câu hỏi trong module submission (luồng xem bài nộp đã chấm).
 
 ### Hợp đồng `correctAnswer` (endpoint #33, #35)
 

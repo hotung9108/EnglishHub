@@ -1,0 +1,448 @@
+
+# EnglishHub API contract — User & Admin
+
+Cập nhật ngày **29/10/2026**, đối chiếu source tại commit `81d40f0`.
+Khôi phục từ `docs/api-contract.md` trong stash ngày 22/09/2026
+(`6539ba6:docs/api-contract.md`), sau đó cập nhật theo implementation hiện tại.
+
+Tài liệu này là điểm đối chiếu BE–FE cho **User và Admin User**. Các mô tả bên
+dưới phản ánh source của checkout này; chưa xác nhận bản đang deploy có cùng
+commit. Các ví dụ là dữ liệu minh hoạ, không phải response thu được từ server.
+
+## Phạm vi và tài liệu liên quan
+
+| Phân hệ | Tài liệu |
+| --- | --- |
+| User / Admin User | Contract chi tiết trong file này |
+| Answer annotations (FE-48) | [Contract annotation bên dưới](#fe-48-answer-annotations) |
+| Auth, Class, Assignment, Module, Question, Grading, Evaluation, Reports | [EnglishHub_API_docs_eng.md](EnglishHub_API_docs_eng.md) — tài liệu tham khảo, chưa được rà soát toàn bộ trong lần cập nhật này |
+| Submission / Answer | [api_v4_design_chapter_6_submissions_answers.md](api_v4_design_chapter_6_submissions_answers.md) |
+| Upload audio / document | [file-upload-guide-module-audio-and-submission-files.md](file-upload-guide-module-audio-and-submission-files.md) |
+| Danh mục API | [api_overview_v3.md](api_overview_v3.md) |
+| Điểm lệch FE đã tìm thấy | [Bàn giao đối chiếu User/Admin](../../production_artifacts/be_to_tester/user-admin-contract-alignment.md) |
+
+## Quy ước chung
+
+- API prefix: `/api/v1`. FE cấu hình base URL có prefix này rồi gọi `/users/me`,
+  `/admin/users`, ... để tránh lặp `/api/v1`.
+- Gửi `Authorization: Bearer <accessToken>` và `Content-Type: application/json`
+  với request có JSON body.
+- `/users/me` và đổi mật khẩu của chính mình: caller đang hoạt động, role
+  `ADMIN`, `TEACHER` hoặc `STUDENT`. `/admin/users` và các route con: chỉ `ADMIN`.
+- Caller thiếu token/token không hợp lệ hoặc tài khoản caller bị khoá/xoá:
+  `401`. Caller không đủ quyền: `403`.
+- Response thành công **không dùng một envelope chung**: GET detail trả object
+  trực tiếp; GET list trả `{ data, pagination }`; mutation trả `{ message }`,
+  riêng create trả `{ message, user }` và Admin reset mật khẩu trả
+  `{ message, newPassword }`.
+- Lỗi dùng `{ "error": "Thông báo lỗi" }`. FE đọc `error`, không đọc
+  `message` như response thành công.
+- Role: `ADMIN | TEACHER | STUDENT`. Status: `ACTIVE | LOCKED`.
+  `INACTIVE` không thuộc enum User của BE hiện tại.
+- ID user là số JSON. `dateOfBirth` là chuỗi ngày `YYYY-MM-DD`.
+- Các field profile có giá trị null được **bỏ khỏi response**. FE dùng field
+  optional; không suy ra dữ liệu trống trong list có nghĩa là profile trống.
+
+## Bảng endpoint
+
+Các path dưới đây đã bao gồm prefix `/api/v1`.
+
+| Method | Path | Thành công | Response |
+| --- | --- | --- | --- |
+| GET | `/api/v1/users/me` | 200 | `UserProfile` trực tiếp |
+| PUT | `/api/v1/users/me` | 200 | `{ message }` |
+| PATCH | `/api/v1/users/me/password` | 200 | `{ message }` |
+| GET | `/api/v1/admin/users` | 200 | `{ data: UserSummary[], pagination }` |
+| GET | `/api/v1/admin/users/{id}` | 200 | `UserProfile` trực tiếp |
+| POST | `/api/v1/admin/users` | 201 | `{ message, user: { id, email, role } }` |
+| PUT | `/api/v1/admin/users/{id}` | 200 | `{ message }` |
+| POST | `/api/v1/admin/users/{id}/reset-password` | 200 | `{ message, newPassword }` |
+| DELETE | `/api/v1/admin/users/{id}` | 200 | `{ message }` |
+| PATCH | `/api/v1/admin/users/{id}/status` | 200 | `{ message }` |
+
+## Kiểu dữ liệu phía FE
+
+Các kiểu dưới đây mô tả BE hiện tại; các khác biệt với type FE đang có được
+ghi trong tài liệu bàn giao.
+
+```ts
+type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
+type UserStatus = 'ACTIVE' | 'LOCKED';
+type MessageResponse = { message: string };
+type AdminResetPasswordResponse = { message: string; newPassword: string };
+type UserSummary = {
+  id: number;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+};
+type UserProfile = UserSummary & {
+  phone?: string;
+  avatarUrl?: string;
+  specialization?: string; // TEACHER
+  studentCode?: string;    // STUDENT
+  dateOfBirth?: string;    // STUDENT, YYYY-MM-DD
+  parentPhone?: string;    // STUDENT
+};
+```
+
+GET list chỉ trả 5 field của `UserSummary`. GET detail dùng cùng shape với
+`GET /users/me`, có thể trả profile của student/teacher khi có dữ liệu.
+ADMIN không có các field profile riêng của student/teacher.
+
+```json
+{
+  "id": 12,
+  "fullName": "Nguyễn Minh Anh",
+  "email": "student@example.com",
+  "role": "STUDENT",
+  "status": "ACTIVE",
+  "studentCode": "HV0012",
+  "dateOfBirth": "2005-03-10",
+  "parentPhone": "0912345678"
+}
+```
+
+ADMIN có thể đọc target đang `LOCKED`. Target không tồn tại, đã soft-delete
+hoặc ID số không dương: GET detail trả `404`. ID không parse được thành số
+trả `400`. Quyền caller được kiểm tra trước khi service tìm target.
+
+## Danh sách, tìm kiếm và phân trang
+
+`GET /api/v1/admin/users?q=&role=&page=1&limit=20`
+
+| Query | Quy tắc |
+| --- | --- |
+| `q` | Optional, tìm theo fullName/email |
+| `role` | Optional, `ADMIN`, `TEACHER`, `STUDENT`; không truyền hoặc rỗng để lấy tất cả role |
+| `page` | Số nguyên từ 1, mặc định 1 |
+| `limit` | Số nguyên 1–100, mặc định 20; ngoài khoảng trả 400 |
+
+Không có query lọc `status` trong controller hiện tại. `total` là tổng số user
+khớp bộ lọc, không phải số phần tử của trang đang lấy. User đã soft-delete
+không có trong kết quả.
+
+```json
+{
+  "data": [
+    {
+      "id": 12,
+      "fullName": "Nguyễn Minh Anh",
+      "email": "student@example.com",
+      "role": "STUDENT",
+      "status": "ACTIVE"
+    }
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 45 }
+}
+```
+
+FE cần truyền `q`, `role`, `page`, `limit` xuống API để tìm trong toàn bộ dữ
+liệu. Lọc hoặc chia trang client trên 100 user đầu không thể hiện toàn bộ
+dataset. Mã hiển thị tự ghép từ ID như `HV-0012` không phải `studentCode`
+được lưu trong profile và không phải bộ lọc được endpoint list hỗ trợ.
+
+## Tạo tài khoản
+
+`POST /api/v1/admin/users`
+
+- Bắt buộc: `fullName`, `email`, `password`, `role`.
+- Role hỗ trợ cả **ADMIN, TEACHER, STUDENT**. Quy tắc cũ cấm tạo ADMIN đã lỗi thời.
+- `fullName`: trim/gộp khoảng trắng, 2–50 ký tự; chữ Unicode, khoảng trắng,
+  dấu gạch nối hoặc nháy đơn giữa các phần tên; không có chữ số.
+- `email`: đúng định dạng, được trim và chuyển chữ thường; trùng trả `409`.
+- `password`: ít nhất 8 ký tự, có chữ hoa và chữ số.
+- Optional: `specialization` cho teacher; `studentCode`, `dateOfBirth`,
+  `parentPhone` cho student. Chuỗi optional rỗng được chuẩn hoá thành null.
+- `phone` và `avatarUrl` không thuộc DTO create; cập nhật qua các API phù hợp.
+
+```json
+{
+  "fullName": "Nguyễn Minh Anh",
+  "email": "student@example.com",
+  "password": "ExamplePass123",
+  "role": "STUDENT",
+  "studentCode": "HV0012",
+  "dateOfBirth": "2005-03-10",
+  "parentPhone": "0912345678"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "message": "Tạo tài khoản thành công.",
+  "user": { "id": 12, "email": "student@example.com", "role": "STUDENT" }
+}
+```
+
+## Cập nhật hồ sơ
+
+| Endpoint | Các field được xử lý |
+| --- | --- |
+| `PUT /api/v1/users/me` | `fullName`, `phone`, `avatarUrl` |
+| `PUT /api/v1/admin/users/{id}` | `fullName`, `phone`; `specialization` nếu target là TEACHER; `studentCode`, `dateOfBirth`, `parentPhone` nếu target là STUDENT |
+
+Các field đều optional nhưng phải có ít nhất một field cập nhật được hỗ trợ
+cho target. `{}` hoặc chỉ các field không được hỗ trợ trả `400`.
+Field không gửi hoặc gửi null giữ nguyên giá trị. Với các chuỗi optional
+được hỗ trợ, gửi `""` sẽ xoá giá trị (lưu null); `fullName` rỗng bị từ chối.
+`dateOfBirth: null` giữ nguyên ngày, không dùng để xoá ngày sinh.
+
+`email`, `role`, `password` không được thay đổi qua hai endpoint này.
+Lưu thành công trả `{ message }`; FE refetch detail nếu cần profile mới.
+
+```json
+{
+  "fullName": "Nguyễn Minh Anh",
+  "phone": "0987654321"
+}
+```
+
+## Mật khẩu
+
+`PATCH /api/v1/users/me/password` nhận cả hai field bắt buộc:
+
+```json
+{
+  "currentPassword": "OldExample123",
+  "newPassword": "NewExample456"
+}
+```
+
+Mật khẩu mới áp dụng cùng policy với create. Sai mật khẩu hiện tại trả `401`;
+thiếu field hoặc mật khẩu mới không hợp lệ trả `400`. Thành công trả
+`{ "message": "Đổi mật khẩu thành công." }`.
+
+### Admin đặt lại mật khẩu người dùng
+
+`POST /api/v1/admin/users/{id}/reset-password` đặt lại mật khẩu target. Route
+được giới hạn cho `ROLE_ADMIN` ở `ApiRoutePolicy`; service tiếp tục gọi
+`requireAdmin()` để xác nhận caller còn hoạt động. Không có request body và
+client không gửi mật khẩu mới. Body thừa bị bỏ qua, không ảnh hưởng kết quả.
+
+Backend tự sinh mật khẩu ngẫu nhiên dài 16 ký tự: có chữ hoa, chữ thường và số;
+không dùng `I`, `O`, `i`, `l`, `o`, `0`, `1`. Mật khẩu rõ chỉ được trả trong
+response reset lần đó; trường `newPassword` chỉ xuất hiện một lần, không có API
+đọc lại và không gửi email.
+
+```json
+{
+  "message": "Đặt lại mật khẩu thành công.",
+  "newPassword": "<16 ký tự>"
+}
+```
+
+Response `200` có đúng hai field: `message` và `newPassword`.
+
+Response `200` có các header `Cache-Control: no-store`, `Pragma: no-cache` và
+`Expires: 0`. BE hash mật khẩu bằng BCrypt trước khi lưu. Sau khi reset, mọi
+refresh token chưa bị revoke của target bị thu hồi trong cùng transaction;
+dùng refresh token cũ trả `401`. Với target `ACTIVE`, mật khẩu mới đăng nhập
+được ngay và mật khẩu cũ bị từ chối. Có thể reset cho Teacher, Student, Admin
+khác và tài khoản `LOCKED`; reset không mở khoá tài khoản. Target `LOCKED` vẫn
+bị từ chối đăng nhập với `403`.
+
+Sự kiện audit chỉ được ghi vào application log sau khi transaction commit:
+
+```text
+event=ADMIN_PASSWORD_RESET adminId=<id> targetUserId=<id> occurredAt=<time> revokedRefreshTokens=<count>
+```
+
+Log không chứa mật khẩu. Endpoint không ghi bản ghi vào bảng Audit Trail trong
+database; đây là log ứng dụng, không phải audit record bền vững trong DB.
+
+| HTTP | Trường hợp | Lỗi |
+| --- | --- | --- |
+| 400 | Admin tự reset; dùng `PATCH /api/v1/users/me/password` để đổi mật khẩu của chính mình | `{"error":"Vui lòng sử dụng chức năng đổi mật khẩu của chính mình."}` |
+| 400 | ID không parse được thành `long` (chữ, số thập phân hoặc vượt giới hạn `Long`) | `{"error":"Dữ liệu không hợp lệ."}` |
+| 401 | Thiếu/sai/hết hạn token; caller Admin bị khoá hoặc đã bị xoá | `{"error":"..."}` |
+| 403 | Caller không có role Admin | `{"error":"..."}` |
+| 404 | ID không dương, target không tồn tại hoặc đã soft-delete | `{"error":"Không tìm thấy người dùng."}` |
+
+### Giới hạn đã biết
+
+1. Access token còn hạn của target không bị blacklist trong lúc reset và vẫn có
+   thể dùng đến khi hết hạn.
+2. Login đang chạy khi reset bắt đầu có thể vẫn hoàn tất và tạo phiên mới;
+   refresh đang chạy có thể vẫn hoàn tất và cấp access token. Các trường hợp
+   đồng thời này chưa được kiểm thử riêng.
+3. Lỗi xảy ra ở mức JDBC commit chưa được kiểm thử riêng.
+4. Endpoint không idempotent. Retry sau khi mất response tạo một lần reset mới;
+   mật khẩu trong response trước không còn dùng được.
+5. Hai Admin reset cùng target đồng thời: lần commit sau quyết định mật khẩu
+   cuối cùng; code không khóa dòng target.
+6. Trong MockMvc, ID chỉ gồm khoảng trắng (`%20`) bị Spring Security
+   `StrictHttpFirewall` từ chối trước MVC với `400` và body rỗng, không có JSON lỗi.
+7. Trong MockMvc, caller Admin bị khoá kèm ID sai kiểu đã được quan sát nhận
+   `400` trước `401` vì MVC bind ID trước khi gọi service.
+8. Các method GET/PUT/PATCH/DELETE/HEAD trên path này được quan sát trả `403`
+   theo allowlist, không phải `405`.
+
+**Tích hợp FE-92:** thay lời gọi update rỗng
+`PUT /api/v1/admin/users/{id}` bằng POST endpoint này và hiển thị
+`newPassword` backend trả về. Form nhập mật khẩu không còn ý nghĩa vì backend
+tự sinh mật khẩu.
+
+Luồng tự khôi phục bằng OTP thuộc Auth; xem tài liệu Auth và yêu cầu token/OTP
+của luồng đó. Không dùng luồng OTP thay cho quyền Admin reset mật khẩu.
+
+## Khoá, mở khoá và xoá
+
+`PATCH /api/v1/admin/users/{id}/status`:
+
+```json
+{ "status": "LOCKED" }
+```
+
+Chấp nhận `ACTIVE` hoặc `LOCKED`. Khoá cũng revoke refresh token đang hoạt động
+của target. Response chỉ có message, **không phải UserProfile**:
+
+```json
+{ "message": "Đã khoá tài khoản." }
+```
+
+Mở khoá trả `{ "message": "Đã mở khoá tài khoản." }`.
+
+`DELETE /api/v1/admin/users/{id}` thực hiện soft-delete, giữ row để bảo toàn
+tham chiếu khoá ngoại. Response `200 { "message": "Đã xoá người dùng." }`.
+Sau đó user không xuất hiện trong list và detail trả `404`.
+
+## Mã lỗi để FE xử lý
+
+| HTTP | Trường hợp |
+| --- | --- |
+| 400 | Body/ID/query sai kiểu; thiếu field; password/name/role/status/pagination không hợp lệ; update rỗng |
+| 401 | Chưa đăng nhập, token không hợp lệ/hết hạn, caller bị khoá/xoá; sai mật khẩu hiện tại |
+| 403 | Caller không có quyền gọi route |
+| 404 | Target không tồn tại hoặc đã soft-delete |
+| 409 | Email hoặc dữ liệu unique bị trùng |
+| 415 | Content-Type không được hỗ trợ |
+| 500 | Lỗi hệ thống/database chưa được xử lý cụ thể |
+
+Ví dụ `400` khi update rỗng:
+
+```json
+{ "error": "Không có dữ liệu để cập nhật." }
+```
+
+## Nguồn đối chiếu và cách duy trì
+
+- BE routes, body và response: [UserController](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/UserController.java),
+  [AdminUserController](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/AdminUserController.java),
+  [ApiRoutePolicy](../../backend/src/main/java/com/english_hub/core/infrastructure/security/ApiRoutePolicy.java),
+  [DTOs](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/dto/).
+- Validation, password reset và audit log: [UserProfileService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/UserProfileService.java),
+  [AdminUserService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/AdminUserService.java),
+  [SecureRandomPasswordGenerator](../../backend/src/main/java/com/english_hub/core/modules/user/infrastructure/security/SecureRandomPasswordGenerator.java),
+  [AdminUserPasswordResetListener](../../backend/src/main/java/com/english_hub/core/modules/auth/application/event/AdminUserPasswordResetListener.java),
+  [AuthService](../../backend/src/main/java/com/english_hub/core/modules/auth/application/service/AuthService.java).
+- FE hiện tại: [user.service.ts](../../frontend/src/api/services/user.service.ts),
+  [useStudentDetails.ts](../../frontend/src/hooks/useStudentDetails.ts),
+  [Accounts.tsx](../../frontend/src/pages/Accounts.tsx).
+
+Khi đổi API User/Admin, cùng PR cần cập nhật contract, DTO/type/service FE bị
+ảnh hưởng và hướng dẫn kiểm thử. So sánh response thực tế với shape trong file
+này; TypeScript generic trong `http.get<T>()` không validate JSON lúc runtime.
+Những phân hệ ngoài phạm vi cần được đối chiếu riêng trước khi coi là đồng bộ.
+
+
+## FE-48: Answer annotations
+
+Đối chiếu ngày **06/11/2026** với working tree nhánh
+`fix/FE-48-ai-annotation-review-flow`, baseline `d86cd955`, có thay đổi L1–L3
+chưa commit. Phần này chỉ bổ sung annotation; các phần User/Admin phía trên giữ
+nguyên phạm vi riêng, không áp dụng envelope của User cho annotation.
+
+### Endpoint và quyền
+
+Tất cả path dưới đây có prefix `/api/v1`. Caller phải đăng nhập, đang hoạt động.
+
+| Method | Path | Quyền theo route và service | Thành công |
+| --- | --- | --- | --- |
+| GET | `/answers/{answerId}/annotations` | Student sở hữu bài; Teacher sở hữu lớp của bài | 200 `{data: AnswerAnnotation[]}` |
+| POST | `/answers/{answerId}/annotations` | Chỉ Teacher sở hữu lớp | 201 `{message, id}` |
+| PATCH | `/annotations/{id}/review` | Chỉ Teacher sở hữu lớp; annotation source AI | 200 `{message}` |
+| DELETE | `/annotations/{id}` | Chỉ Teacher sở hữu lớp; AI hoặc TEACHER | 200 `{message}` |
+
+**Admin không được cấp quyền annotation**: route policy trả 403, kể cả khi
+service dùng chung có nhánh đọc Admin cho nghiệp vụ khác. Student không được
+POST/PATCH/DELETE annotation.
+
+GET tìm answer trước, kiểm ownership sau, rồi mới tải/lọc danh sách:
+Student chỉ nhận `reviewStatus = ACCEPTED` của **cả AI và TEACHER**; Teacher chủ
+lớp vẫn nhận đủ `PENDING`, `ACCEPTED`, `REJECTED`. ID annotation tăng dần; không
+thêm pagination. Không có annotation được phép xem là **200 `{data: []}`**,
+không phải 403/404. Đổi trạng thái duyệt có hiệu lực ở lần GET tiếp theo.
+
+### Response annotation
+
+```ts
+type AnswerAnnotation = {
+  id: number;
+  source: 'AI' | 'TEACHER';
+  startOffset: number;
+  endOffset: number;
+  errorType: string | null;
+  comment: string | null;
+  suggestedFix: string | null;
+  reviewStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+};
+type AnswerAnnotationListResponse = { data: AnswerAnnotation[] };
+```
+
+Đúng tám field trên; không có `answerId` trong từng item, không dùng `MANUAL`
+làm source. FE lấy answerId từ module detail để gọi endpoint.
+
+### Tạo và duyệt
+
+POST nhận `startOffset`, `endOffset` bắt buộc, kiểu integer; start >= 0,
+end >= start, không vượt độ dài content khi BE có độ dài. `errorType`, `comment`,
+`suggestedFix` optional/nullable. `errorType` tối đa **50 ký tự theo @Size của Java**;
+null, thiếu field, chuỗi rỗng và whitespace vẫn hợp lệ; không tự trim.
+
+Vượt giới hạn errorType trả **400 trước persistence**:
+
+```json
+{"error":"errorType không được vượt quá 50 ký tự."}
+```
+
+Tạo thành công trả 201 `{message, id}`; source mặc định TEACHER, reviewStatus
+mặc định ACCEPTED. PATCH nhận `{reviewStatus: "ACCEPTED"}` hoặc `"REJECTED"`,
+chỉ đổi trạng thái một annotation AI. Không sửa nội dung, không bulk Accept/Reject,
+không bắt duyệt hết annotation mới được chốt điểm.
+
+| HTTP | Ý nghĩa trong annotation API |
+| --- | --- |
+| 200 | GET thành công, kể cả danh sách rỗng; PATCH/DELETE thành công |
+| 201 | POST tạo thành công |
+| 400 | ID sai kiểu, body/range/reviewStatus không hợp lệ, review source TEACHER, hoặc errorType > 50 |
+| 401 | Chưa đăng nhập/token không hợp lệ, caller không hoạt động |
+| 403 | Vai trò bị route chặn hoặc không sở hữu bài/lớp |
+| 404 | Answer/annotation không tồn tại sau khi qua quyền route |
+| 500 | Lỗi hệ thống; không phải kết quả đúng của errorType quá dài |
+
+Lỗi dùng `{error: string}`. `PENDING` không phải trạng thái hợp lệ cho request
+review. Range hoặc trạng thái sai không được diễn giải thành danh sách rỗng.
+
+### Tích hợp FE và ranh giới phạm vi
+
+- Quyền GET annotation không cấp quyền
+  `GET /submission-modules/{id}/grading/ai-suggestion`: route này chỉ cho Teacher;
+  Student và Admin bị 403. Student Result không gọi nó.
+- Student lấy điểm/feedback qua `getStudentGradingResult`, có gate COMPLETED và
+  allowlist bảy field **ở FE**. FE-48 không bổ sung gate COMPLETED tại BE.
+- Fallback annotation của Teacher giữa các GET hiện có là logic FE, không phải
+  endpoint, nguồn lưu annotation hoặc contract BE mới. GET annotations lỗi mà
+  fallback có dữ liệu phải có cảnh báo nguồn dự phòng; không có dữ liệu dự phòng
+  thì hiển thị loại lỗi, không coi là rỗng.
+- Offset giữ nguyên hành vi hiện có; FE-48 không chuẩn hóa hệ tọa độ offset.
+
+Nguồn: [GradingController](../../backend/src/main/java/com/english_hub/core/modules/grading/presentation/rest/GradingController.java),
+[GradingService](../../backend/src/main/java/com/english_hub/core/modules/grading/application/service/GradingService.java),
+[DTO annotation](../../backend/src/main/java/com/english_hub/core/modules/grading/presentation/rest/dto/CreateAnswerAnnotationRequest.java),
+[ApiRoutePolicy](../../backend/src/main/java/com/english_hub/core/infrastructure/security/ApiRoutePolicy.java),
+[AnswerAnnotationJpaAdapter](../../backend/src/main/java/com/english_hub/core/modules/grading/infrastructure/adapter/AnswerAnnotationJpaAdapter.java),
+[grading service FE](../../frontend/src/api/services/grading.service.ts).

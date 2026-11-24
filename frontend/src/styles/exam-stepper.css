@@ -1,0 +1,227 @@
+/* ==========================================================================
+   EnglishHub - Exam Stepper Component Styles
+   Theme: Royal Academic (Warm Ivory & Sovereign Green)
+   Prefix: .eh-stepper-*
+   ========================================================================== */
+
+/* === Overview Variant (Cards & Timeline) === */
+.eh-stepper-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.eh-stepper-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.eh-stepper-step-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background-color: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e6dfd5);
+  border-radius: var(--radius-md, 12px);
+  transition: all 0.2s ease;
+  min-height: 124px;
+}
+
+.eh-stepper-step-card:hover {
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: 0 4px 12px rgba(27, 77, 62, 0.05);
+}
+
+.eh-stepper-step-card.active {
+  border-color: var(--primary, #1b4d3e);
+  background-color: var(--surface, #ffffff);
+  box-shadow: 0 0 0 2px rgba(27, 77, 62, 0.12);
+}
+
+.eh-stepper-step-card.completed {
+  border-color: var(--color-success-border, #b7dec8);
+  background-color: #ffffff;
+}
+
+.eh-stepper-step-card.locked {
+  background-color: var(--surface-dim, #f4efe6);
+  border-color: var(--border-subtle, #f0ebe2);
+  opacity: 0.85;
+}
+
+.eh-stepper-step-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.eh-stepper-step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+}
+
+.eh-stepper-step-badge.completed {
+  background-color: var(--color-success-light, #e7f3ec);
+  color: var(--color-success, #17523f);
+  border: 1px solid var(--color-success-border, #b7dec8);
+}
+
+.eh-stepper-step-badge.active {
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  border: 1px solid rgba(27, 77, 62, 0.2);
+}
+
+.eh-stepper-step-badge.available {
+  background-color: var(--surface-dim, #f4efe6);
+  color: var(--text-secondary, #736b63);
+  border: 1px solid var(--border-color, #e6dfd5);
+}
+
+.eh-stepper-step-badge.locked {
+  background-color: var(--surface-container, #eae3d7);
+  color: var(--text-muted, #736b63);
+  border: 1px solid var(--border-color, #e6dfd5);
+}
+
+.eh-stepper-step-number {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #736b63);
+}
+
+.eh-stepper-step-main {
+  margin-bottom: 16px;
+}
+
+.eh-stepper-step-title {
+  font-family: var(--font-heading, serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #262320);
+  margin: 0 0 4px 0;
+}
+
+.eh-stepper-step-skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary, #736b63);
+}
+
+.eh-stepper-step-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+/* === Compact Variant (Exam Header Bar) === */
+.eh-stepper-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background-color: var(--surface-dim, #f4efe6);
+  border: 1px solid var(--border-color, #e6dfd5);
+  border-radius: var(--radius-full, 9999px);
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.eh-stepper-compact-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted, #736b63);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: none;
+  border: none;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.eh-stepper-compact-step.interactive {
+  cursor: pointer;
+}
+
+.eh-stepper-compact-step.interactive:hover {
+  background-color: var(--surface-hover, #f7f4ee);
+  color: var(--text-primary, #262320);
+}
+
+.eh-stepper-compact-step.active {
+  color: var(--primary, #1b4d3e);
+  font-weight: 600;
+  background-color: var(--surface, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.eh-stepper-compact-step.completed {
+  color: var(--color-success, #17523f);
+  font-weight: 500;
+}
+
+.eh-stepper-compact-step.locked {
+  color: var(--text-muted, #736b63);
+  opacity: 0.7;
+}
+
+.eh-stepper-compact-separator {
+  color: var(--border-strong, #d1c4b2);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* === Transition Modal/Banner for moving to next module === */
+.eh-module-transition-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-radius: var(--radius-md, 10px);
+  background-color: var(--color-success-light, #e7f3ec);
+  border: 1px solid var(--color-success-border, #b7dec8);
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.eh-module-transition-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-success, #17523f);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.eh-module-transition-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.writing-stepper-wrapper,
+.speaking-stepper-wrapper {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}

@@ -1,41 +1,76 @@
-import React, { useState } from 'react';
-import { 
-  Headphones, Play, Pause, Plus, Trash2, Volume2, 
-  Clock, FileText, AlertTriangle, Layers, Tag
-} from 'lucide-react';
+import React from 'react';
+import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle, UploadCloud } from 'lucide-react';
 import type { 
-  ListeningConfig, ListeningQuestionItem, ListeningSectionType 
+  ListeningConfig, ListeningQuestionItem 
 } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useToast } from '../../common/ToastContext';
 
 interface SkillListeningEditorProps {
   config: ListeningConfig;
   onChange: (updated: ListeningConfig) => void;
+  moduleMaxScore?: number;
 }
 
-export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ config, onChange }) => {
+export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ config, onChange, moduleMaxScore }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const { error: toastError } = useToast();
+
+  const currentTotalScore = moduleMaxScore !== undefined && moduleMaxScore > 0 ? moduleMaxScore : 10;
+  const calculatedScorePerQ = config.questions.length > 0 ? (currentTotalScore / config.questions.length) : 1;
+  const pointsDisplay = Number.isInteger(calculatedScorePerQ) ? calculatedScorePerQ : calculatedScorePerQ.toFixed(2);
 
   const updateField = <K extends keyof ListeningConfig>(key: K, value: ListeningConfig[K]) => {
     onChange({ ...config, [key]: value });
   };
 
-  const handleAddQuestion = () => {
+  const handleAddQuestion = (type: 'multiple_choice' | 'short_answer') => {
     const newOrder = config.questions.length + 1;
+    const initialOptions = type === 'multiple_choice'
+      ? ['', '', '', '']
+      : undefined;
+    const defaultAns = type === 'multiple_choice' ? 'A' : '';
+
     const newQ: ListeningQuestionItem = {
       id: `lq-${Date.now()}`,
       order: newOrder,
-      section: config.activeSection,
-      type: 'form_completion',
-      prompt: isVi ? `Câu hỏi #${newOrder}: Tên địa điểm: [ _____ ]` : `Question #${newOrder}: Location name: [ _____ ]`,
-      correctAnswer: 'Central Park',
-      acceptableAnswers: ['central park', 'The Central Park'],
-      timestampClue: '01:25',
+      type,
+      prompt: '',
+      options: initialOptions,
+      correctAnswer: defaultAns,
       points: 1
     };
+
     updateField('questions', [...config.questions, newQ]);
+  };
+
+  const handleInsertQuestionAfter = (targetIndex: number, type: 'multiple_choice' | 'short_answer') => {
+    const newQ: ListeningQuestionItem = {
+      id: `lq-${Date.now()}`,
+      order: targetIndex + 2,
+      type,
+      prompt: '',
+      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
+      correctAnswer: type === 'multiple_choice' ? 'A' : '',
+      points: 1
+    };
+
+    const nextQuestions = [...config.questions];
+    nextQuestions.splice(targetIndex + 1, 0, newQ);
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
+  };
+
+  const handleMoveQuestion = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= config.questions.length) return;
+    const nextQuestions = [...config.questions];
+    const temp = nextQuestions[index];
+    nextQuestions[index] = nextQuestions[targetIndex];
+    nextQuestions[targetIndex] = temp;
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
   };
 
   const handleUpdateQuestion = <K extends keyof ListeningQuestionItem>(
@@ -48,368 +83,423 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
     updateField('questions', updated);
   };
 
+  const handleUpdateQuestionMultiple = (
+    index: number,
+    updates: Partial<ListeningQuestionItem>
+  ) => {
+    const updated = [...config.questions];
+    updated[index] = { ...updated[index], ...updates };
+    updateField('questions', updated);
+  };
+
   const handleRemoveQuestion = (index: number) => {
     const updated = config.questions.filter((_, i) => i !== index);
     const reordered = updated.map((q, i) => ({ ...q, order: i + 1 }));
     updateField('questions', reordered);
   };
 
-  const sectionQuestions = config.questions.filter(q => q.section === config.activeSection);
+  const handleAddOption = (qIdx: number) => {
+    const q = config.questions[qIdx];
+    const currentOpts = q.options && q.options.length > 0 ? q.options : ['', ''];
+    const newOpts = [...currentOpts, ''];
+    handleUpdateQuestion(qIdx, 'options', newOpts);
+  };
+
+  const handleRemoveOption = (qIdx: number, oIdx: number) => {
+    const q = config.questions[qIdx];
+    const currentOpts = q.options && q.options.length > 0 ? q.options : ['', ''];
+    if (currentOpts.length <= 2) return;
+
+    const removingOpt = currentOpts[oIdx];
+    const removingLetter = String.fromCharCode(65 + oIdx);
+    const wasCorrect = q.correctAnswer === removingLetter || (removingOpt.trim() !== '' && q.correctAnswer === removingOpt);
+
+    const newOpts = currentOpts.filter((_, idx) => idx !== oIdx);
+    const updated = [...config.questions];
+    let nextCorrectAnswer = q.correctAnswer;
+    if (wasCorrect) {
+      nextCorrectAnswer = newOpts[0].trim() || 'A';
+    }
+    updated[qIdx] = {
+      ...updated[qIdx],
+      options: newOpts,
+      correctAnswer: nextCorrectAnswer,
+    };
+    updateField('questions', updated);
+  };
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const handleSelectedAudioFile = (file: File) => {
+    const validAudioExtensions = ['.mp3', '.wav', '.m4a'];
+    const hasValidExt = validAudioExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    const isAudioType = file.type.startsWith('audio/') || hasValidExt;
+
+    if (!isAudioType) {
+      toastError(isVi ? 'Vui lòng chọn tệp âm thanh hợp lệ (.mp3, .wav, .m4a).' : 'Please select a valid audio file (.mp3, .wav, .m4a).');
+      return;
+    }
+
+    if (config.audioPreviewUrl) {
+      URL.revokeObjectURL(config.audioPreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    onChange({
+      ...config,
+      audioFile: file,
+      audioPreviewUrl: previewUrl,
+      audioUrl: file.name,
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleSelectedAudioFile(file);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* SECTION 1: Audio Track Management */}
+    <div className="flex flex-col gap-5">
+      {/* SECTION 1: Audio Resource */}
       <section className="edit-card">
         <div className="edit-card-header">
-          <div className="edit-card-header-left">
-            <div className="edit-card-icon" style={{ backgroundColor: '#f0fdfa', color: '#0d9488' }}>
-              <Headphones size={20} />
-            </div>
-            <div>
-              <h2 className="edit-card-title">
-                {isVi ? 'Quản Lý File Bài Nghe (Audio Track & Playback)' : 'Audio Track Management'}
-              </h2>
-              <p className="edit-card-desc">
-                {isVi ? 'Tải lên file MP3 bài thi nghe, thiết lập số lần phát và thời lượng.' : 'Upload MP3 audio file, configure play limits and audio duration.'}
-              </p>
-            </div>
-          </div>
-          <span style={{ 
-            fontSize: '12px', 
-            fontWeight: 700, 
-            padding: '4px 10px', 
-            borderRadius: '6px', 
-            backgroundColor: '#f0fdfa', 
-            color: '#0d9488' 
-          }}>
-            IELTS Academic Listening
-          </span>
-        </div>
-
-        {/* Audio Player Box */}
-        <div className="audio-player-mock">
-          <div className="audio-player-row">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button 
-                type="button" 
-                className="audio-play-btn"
-                style={{ backgroundColor: '#0d9488' }}
-                onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-              >
-                {isPlayingAudio ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: 2 }} />}
-              </button>
-              <div>
-                <span style={{ fontSize: '14px', fontWeight: 700, display: 'block' }}>
-                  {config.audioTitle || 'Cambridge_15_Test1_Listening.mp3'}
-                </span>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                  {isPlayingAudio ? 'Playing track • 04:12 / 30:00' : 'Audio file ready • 30:00 duration (320kbps MP3)'}
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Volume2 size={16} color="#94a3b8" />
-              <div style={{ width: '60px', height: '4px', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '2px' }}>
-                <div style={{ width: '85%', height: '100%', backgroundColor: '#2dd4bf', borderRadius: '2px' }}></div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '11px', color: '#94a3b8', width: '32px' }}>04:12</span>
-            <div className="audio-waveform-bar">
-              <div className="audio-waveform-fill" style={{ width: isPlayingAudio ? '52%' : '14%', background: 'linear-gradient(90deg, #2dd4bf 0%, #0d9488 100%)' }}></div>
-            </div>
-            <span style={{ fontSize: '11px', color: '#94a3b8', width: '32px' }}>30:00</span>
+          <div>
+            <h2 className="edit-card-title">{isVi ? 'Tệp Âm Thanh Đề Bài' : 'Audio Track'}</h2>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-          <div>
-            <label className="edit-form-label">{isVi ? 'Tên tệp Audio (Audio Title)' : 'Audio Title'}</label>
-            <input 
-              type="text" 
-              className="edit-form-input" 
-              value={config.audioTitle}
-              onChange={(e) => updateField('audioTitle', e.target.value)}
-              placeholder="Cambridge IELTS 15 - Test 1 Listening Audio"
-            />
-          </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/mp3,audio/wav,audio/m4a,audio/*,.mp3,.wav,.m4a"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              handleSelectedAudioFile(file);
+            }
+          }}
+        />
 
-          <div>
-            <label className="edit-form-label">{isVi ? 'Đường dẫn file Audio / Storage Key' : 'Audio File URL or Key'}</label>
-            <input 
-              type="text" 
-              className="edit-form-input" 
-              value={config.audioUrl}
-              onChange={(e) => updateField('audioUrl', e.target.value)}
-              placeholder="https://cdn.englishhub.edu.vn/audio/listening/cam15-test1.mp3"
-            />
-          </div>
+        {config.audioPreviewUrl || config.audioUrl ? (() => {
+          const getAudioDisplayName = (): string => {
+            if (config.audioFile?.name) {
+              return config.audioFile.name;
+            }
+            if (config.audioTitle) {
+              return config.audioTitle;
+            }
+            if (config.audioUrl) {
+              try {
+                if (config.audioUrl.startsWith('http://') || config.audioUrl.startsWith('https://')) {
+                  const parsed = new URL(config.audioUrl);
+                  const segment = parsed.pathname.substring(parsed.pathname.lastIndexOf('/') + 1);
+                  if (segment) {
+                    return decodeURIComponent(segment);
+                  }
+                }
+              } catch {
+                // Fallback to url
+              }
+              return config.audioUrl;
+            }
+            return isVi ? 'Tệp bài nghe' : 'Audio track';
+          };
 
-          <div>
-            <label className="edit-form-label">{isVi ? 'Giới hạn số lần nghe' : 'Playback Limit'}</label>
-            <select 
-              className="edit-form-select"
-              value={config.playbackLimit}
-              onChange={(e) => updateField('playbackLimit', e.target.value as ListeningConfig['playbackLimit'])}
-            >
-              <option value="single">{isVi ? '1 lần duy nhất (Chuẩn phòng thi IELTS)' : 'Single Play (Real Exam)'}</option>
-              <option value="double">{isVi ? '2 lần (Chế độ luyện tập có gợi ý)' : '2 Plays (Practice Mode)'}</option>
-              <option value="unlimited">{isVi ? 'Không giới hạn (Tự do tua)' : 'Unlimited Playback'}</option>
-            </select>
+          const rawAudioDisplayName = getAudioDisplayName();
+          const truncatedAudioName =
+            rawAudioDisplayName.length > 40
+              ? `${rawAudioDisplayName.slice(0, 37)}...`
+              : rawAudioDisplayName;
+
+          return (
+            <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <span
+                  className="font-semibold text-sm block truncate min-w-0 flex-1 text-main"
+                  title={config.audioFile?.name || config.audioTitle || config.audioUrl || (isVi ? 'Tệp bài nghe' : 'Audio track')}
+                >
+                  {truncatedAudioName}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary bg-white btn-sm shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isVi ? 'Thay đổi file' : 'Change File'}
+                </button>
+              </div>
+              {(config.audioPreviewUrl || config.audioUrl) && (
+                <audio controls className="w-full h-10 mt-1" src={config.audioPreviewUrl || config.audioUrl}>
+                  {isVi ? 'Trình duyệt không hỗ trợ thẻ phát âm thanh.' : 'Your browser does not support audio element.'}
+                </audio>
+              )}
+            </div>
+          );
+        })() : (
+          <div
+            className={`tae-audio-dropzone ${isDragging ? 'dragging' : ''}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <div className="tae-audio-icon-wrap">
+              <UploadCloud size={24} />
+            </div>
+            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 mb-1">
+              {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag & drop audio here or click to browse'}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {isVi ? 'Hỗ trợ .mp3, .wav, .m4a (tối đa 50MB)' : 'Supports .mp3, .wav, .m4a (up to 50MB)'}
+            </p>
           </div>
+        )}
+
+        {/* Transcript / Instructions */}
+        <div className="edit-form-group mb-0 mt-4">
+          <label className="edit-form-label">
+            {isVi ? 'Lời thoại / Hướng dẫn bài nghe' : 'Transcript / Instructions'}
+          </label>
+          <textarea 
+            className="edit-form-textarea resize-y" 
+            rows={6}
+            value={config.transcript || ''}
+            onChange={(e) => updateField('transcript', e.target.value)}
+            placeholder={isVi 
+              ? 'Nhập nội dung lời thoại của bài nghe hoặc hướng dẫn làm bài cho học viên...' 
+              : 'Enter audio transcript or instructions for students...'}
+          />
         </div>
       </section>
 
-      {/* SECTION 2: Transcript with Timestamps */}
+      {/* SECTION 2: Questions Builder */}
       <section className="edit-card">
         <div className="edit-card-header">
-          <div className="edit-card-header-left">
-            <div className="edit-card-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
-              <FileText size={20} />
-            </div>
-            <div>
-              <h2 className="edit-card-title">
-                {isVi ? 'Nội Dung Transcript Kèm Mốc Thời Gian (Audio Transcript)' : 'Audio Transcript & Timestamp Clues'}
-              </h2>
-              <p className="edit-card-desc">
-                {isVi ? 'Bản ghi lời thoại với các mốc thời gian [01:25] để hỗ trợ AI đối chiếu và học sinh tra cứu sau khi nộp.' : 'Spoken script with timestamp markers for automated verification.'}
-              </p>
-            </div>
+          <div>
+            <h2 className="edit-card-title">
+              {isVi ? 'Danh Sách Câu Hỏi & Đáp Án' : 'Listening Questions & Answer Keys'}
+            </h2>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <input 
-              type="checkbox" 
-              checked={config.hideTranscriptUntilGraded}
-              onChange={(e) => updateField('hideTranscriptUntilGraded', e.target.checked)}
-              style={{ width: '16px', height: '16px', accentColor: '#0d9488' }}
-            />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
-              {isVi ? 'Ẩn Transcript trong lúc làm bài' : 'Hide Script Until Graded'}
-            </span>
-          </label>
-        </div>
-
-        <div className="edit-form-group" style={{ marginBottom: 0 }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+          <div className="flex items-center gap-2">
             <button 
               type="button" 
               className="btn btn-secondary bg-white btn-sm"
-              onClick={() => {
-                const nowStamp = `\n[02:30] Speaker: `;
-                updateField('transcript', config.transcript + nowStamp);
-              }}
-              style={{ fontSize: '12px' }}
+              onClick={() => handleAddQuestion('multiple_choice')}
             >
-              <Tag size={12} /> {isVi ? '+ Chèn mốc thời gian [02:30]' : '+ Insert Timestamp Marker'}
+              <Plus size={13} /> {isVi ? 'Trắc nghiệm' : 'Multiple Choice'}
             </button>
-          </div>
-          <textarea 
-            className="edit-form-textarea" 
-            rows={5}
-            value={config.transcript}
-            onChange={(e) => updateField('transcript', e.target.value)}
-            placeholder={isVi ? 'Nhập lời thoại nghe kèm tag mốc thời gian [00:45]... [01:30]...' : 'Paste transcript text with [mm:ss] tags...'}
-          />
-        </div>
-      </section>
-
-      {/* SECTION 3: Section Tabs & Listening Questions */}
-      <section className="edit-card">
-        <div className="edit-card-header">
-          <div className="edit-card-header-left">
-            <div className="edit-card-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-              <Layers size={20} />
-            </div>
-            <div>
-              <h2 className="edit-card-title">
-                {isVi ? 'Bộ Câu Hỏi Theo Section (Section Questions Builder)' : 'Section Questions Builder'}
-              </h2>
-              <p className="edit-card-desc">
-                {isVi ? 'Phân loại câu hỏi theo 4 Section chuẩn IELTS và gán mốc thời gian gợi ý.' : 'Organize questions across 4 IELTS listening sections.'}
-              </p>
-            </div>
-          </div>
-
-          <button 
-            type="button" 
-            className="btn btn-secondary bg-white btn-sm"
-            onClick={handleAddQuestion}
-          >
-            <Plus size={14} /> {isVi ? 'Thêm câu hỏi mới' : 'Add Question'}
-          </button>
-        </div>
-
-        {/* Section Tabs */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {[
-            { id: 'section1', label: isVi ? 'Section 1: Đời sống xã hội' : 'Section 1: Social Context' },
-            { id: 'section2', label: isVi ? 'Section 2: Độc thoại đời sống' : 'Section 2: Monologue' },
-            { id: 'section3', label: isVi ? 'Section 3: Thảo luận học tập' : 'Section 3: Educational Context' },
-            { id: 'section4', label: isVi ? 'Section 4: Bài giảng học thuật' : 'Section 4: Academic Lecture' },
-          ].map((sec) => (
             <button 
-              key={sec.id}
-              type="button"
-              className={`teacher-pill ${config.activeSection === sec.id ? 'active' : ''}`}
-              style={{
-                backgroundColor: config.activeSection === sec.id ? '#0d9488' : undefined,
-                borderColor: config.activeSection === sec.id ? '#0d9488' : undefined,
-                color: config.activeSection === sec.id ? '#ffffff' : undefined
-              }}
-              onClick={() => updateField('activeSection', sec.id as ListeningSectionType)}
+              type="button" 
+              className="btn btn-secondary bg-white btn-sm"
+              onClick={() => handleAddQuestion('short_answer')}
             >
-              {sec.label}
-              <span className="teacher-pill-badge" style={{ color: config.activeSection === sec.id ? '#ffffff' : undefined }}>
-                {config.questions.filter(q => q.section === sec.id).length}
-              </span>
+              <Plus size={13} /> {isVi ? 'Điền từ / Ngắn' : 'Short Answer'}
             </button>
-          ))}
+          </div>
         </div>
 
-        {/* Questions list for active section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {sectionQuestions.map((q) => {
-            const globalIndex = config.questions.findIndex(item => item.id === q.id);
-            return (
-              <div key={q.id} className="question-builder-item">
-                <div className="question-header-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span className="question-index-pill" style={{ backgroundColor: '#0d9488' }}>
-                      {q.order}
-                    </span>
-                    <select 
-                      className="edit-form-select"
-                      style={{ padding: '3px 8px', fontSize: '12px', width: 'auto' }}
-                      value={q.type}
-                      onChange={(e) => handleUpdateQuestion(globalIndex, 'type', e.target.value as ListeningQuestionItem['type'])}
-                    >
-                      <option value="form_completion">Form / Note Completion</option>
-                      <option value="multiple_choice">Multiple Choice</option>
-                      <option value="map_labeling">Map / Plan Labeling</option>
-                      <option value="short_answer">Short Answer</option>
-                    </select>
+        {/* Score Summary Badge */}
+        <div className="flex items-center gap-2 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-lg px-3 py-2 text-xs mb-3">
+          <CheckCircle size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-slate-700 dark:text-slate-200 font-medium">
+            {isVi 
+              ? `Tổng: ${currentTotalScore} điểm • ${config.questions.length} câu hỏi (${pointsDisplay} điểm/câu)` 
+              : `Total: ${currentTotalScore} pts • ${config.questions.length} questions (${pointsDisplay} pts/question)`}
+          </span>
+        </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-                      <Clock size={13} color="#0d9488" />
-                      <span>{isVi ? 'Mốc audio:' : 'Audio clue:'}</span>
-                      <input 
-                        type="text" 
-                        value={q.timestampClue || ''}
-                        onChange={(e) => handleUpdateQuestion(globalIndex, 'timestampClue', e.target.value)}
-                        placeholder="01:45"
-                        style={{ width: '56px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px' }}
-                      />
+        {/* Questions list */}
+        {config.questions.length === 0 ? (
+          <div className="question-empty-state">
+            {isVi ? 'Chưa có câu hỏi nào. Vui lòng nhấn nút phía trên để thêm câu hỏi trắc nghiệm hoặc điền từ.' : 'No questions yet. Click the buttons above to add questions.'}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {config.questions.map((q, qIdx) => {
+              const isMcq = q.type === 'multiple_choice';
+
+              return (
+                <div key={q.id} className="question-builder-item">
+                  <div className="question-header-row">
+                    <div className="flex items-center gap-2">
+                      <span className="question-index-pill">{q.order}</span>
+                      <span className={isMcq ? 'question-type-badge-mcq' : 'question-type-badge-short'}>
+                        {isMcq ? (isVi ? 'TRẮC NGHIỆM' : 'MULTIPLE CHOICE') : (isVi ? 'ĐIỀN TỪ / NGẮN' : 'SHORT ANSWER')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Move Up / Move Down buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === 0}
+                          onClick={() => handleMoveQuestion(qIdx, 'up')}
+                          title={isVi ? 'Di chuyển câu hỏi lên trên' : 'Move up'}
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === config.questions.length - 1}
+                          onClick={() => handleMoveQuestion(qIdx, 'down')}
+                          title={isVi ? 'Di chuyển câu hỏi xuống dưới' : 'Move down'}
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+
+                      {/* Score Pill */}
+                      <span className="question-score-pill">
+                        {pointsDisplay} {isVi ? 'điểm' : 'pts'}
+                      </span>
+
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary bg-white btn-sm text-danger"
+                        onClick={() => handleRemoveQuestion(qIdx)}
+                        title={isVi ? 'Xóa câu hỏi này' : 'Remove question'}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
 
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary bg-white btn-sm"
-                    style={{ color: '#dc2626', padding: '4px 8px' }}
-                    onClick={() => handleRemoveQuestion(globalIndex)}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-
-                <div className="edit-form-group">
-                  <input 
-                    type="text" 
-                    className="edit-form-input"
-                    value={q.prompt}
-                    onChange={(e) => handleUpdateQuestion(globalIndex, 'prompt', e.target.value)}
-                    placeholder="Enter question text or sentence with blank [ _____ ]..."
-                    style={{ fontWeight: 600 }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label className="edit-form-label" style={{ fontSize: '11px' }}>
-                      {isVi ? 'Đáp án đúng chính xác (Correct Answer)' : 'Target Correct Answer'}
+                  {/* Question Statement */}
+                  <div className="edit-form-group">
+                    <label className="edit-form-label text-xs">
+                      {isVi ? 'Nội dung câu hỏi' : 'Question Statement'} <span className="text-danger">*</span>
                     </label>
                     <input 
                       type="text" 
-                      className="edit-form-input"
-                      value={q.correctAnswer}
-                      onChange={(e) => handleUpdateQuestion(globalIndex, 'correctAnswer', e.target.value)}
+                      className="edit-form-input font-semibold"
+                      value={q.prompt}
+                      onChange={(e) => handleUpdateQuestion(qIdx, 'prompt', e.target.value)}
+                      placeholder={isVi ? 'Nhập nội dung câu hỏi hoặc câu có chỗ trống [ _____ ]...' : 'Enter question text or sentence with blank [ _____ ]...'}
                     />
                   </div>
 
-                  <div>
-                    <label className="edit-form-label" style={{ fontSize: '11px' }}>
-                      {isVi ? 'Từ đồng nghĩa/cách viết chấp nhận (Phân tách bằng dấu phẩy)' : 'Acceptable Variants (comma-separated)'}
-                    </label>
-                    <input 
-                      type="text" 
-                      className="edit-form-input"
-                      value={q.acceptableAnswers?.join(', ') || ''}
-                      onChange={(e) => handleUpdateQuestion(globalIndex, 'acceptableAnswers', e.target.value.split(',').map(s => s.trim()))}
-                      placeholder="e.g. central park, The Central Park"
-                    />
+                  {/* Multiple Choice Options */}
+                  {isMcq ? (
+                    <div className="edit-form-group mb-0">
+                      <label className="edit-form-label text-xs text-muted">
+                        {isVi ? 'Các lựa chọn (Tích chọn radio vào đáp án đúng):' : 'Options (Select correct radio):'}
+                      </label>
+                      <div className="question-options-list">
+                        {(q.options && q.options.length > 0 ? q.options : ['', '', '', '']).map((opt, oIdx, arr) => {
+                          const letter = String.fromCharCode(65 + oIdx);
+                          const isCorrect = q.correctAnswer === letter || (opt.trim() !== '' && q.correctAnswer === opt);
+                          return (
+                            <div key={oIdx} className={`question-option-row ${isCorrect ? 'correct' : ''}`}>
+                              <input 
+                                type="radio" 
+                                name={`correct-${q.id}`} 
+                                checked={isCorrect}
+                                onChange={() => handleUpdateQuestion(qIdx, 'correctAnswer', opt.trim() || letter)}
+                              />
+                              <span className="question-option-letter">{letter}.</span>
+                              <input 
+                                type="text" 
+                                className="edit-form-input bg-white py-1 px-3 flex-1"
+                                value={opt}
+                                placeholder={isVi ? `Lựa chọn ${letter} (nhập đáp án...)` : `Option ${letter} (enter text...)`}
+                                onChange={(e) => {
+                                  const newOpts = [...arr];
+                                  newOpts[oIdx] = e.target.value;
+                                  if (isCorrect) {
+                                    handleUpdateQuestionMultiple(qIdx, {
+                                      options: newOpts,
+                                      correctAnswer: e.target.value.trim() || letter,
+                                    });
+                                  } else {
+                                    handleUpdateQuestion(qIdx, 'options', newOpts);
+                                  }
+                                }}
+                              />
+                              {arr.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOption(qIdx, oIdx)}
+                                  className="text-slate-400 hover:text-danger p-1 rounded transition-colors cursor-pointer"
+                                  title={isVi ? 'Xóa lựa chọn này' : 'Remove option'}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center mt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddOption(qIdx)}
+                            className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 rounded-md border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary transition-all cursor-pointer"
+                          >
+                            <Plus size={13} />
+                            <span>{isVi ? 'Thêm lựa chọn' : 'Add option'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Short Answer / Blank */
+                    <div className="edit-form-group mb-0">
+                      <label className="edit-form-label text-xs">
+                        {isVi ? 'Đáp án chính xác' : 'Exact Target Answer'} <span className="text-danger">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        className="edit-form-input bg-white"
+                        value={q.correctAnswer}
+                        onChange={(e) => handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value)}
+                        placeholder={isVi ? 'Ví dụ: Central Park' : 'e.g. Central Park'}
+                      />
+                    </div>
+                  )}
+
+                  {/* Quick Insert Below Action Bar */}
+                  <div className="flex items-center justify-end pt-2 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
+                      >
+                        <Plus size={11} /> {isVi ? 'Trắc nghiệm' : 'MCQ'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
+                      >
+                        <Plus size={11} /> {isVi ? 'Điền từ' : 'Blank'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-
-          {sectionQuestions.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px 16px', border: '1px dashed #cbd5e1', borderRadius: '8px', color: '#64748b' }}>
-              <p style={{ margin: '0 0 10px 0', fontSize: '13px' }}>
-                {isVi ? `Chưa có câu hỏi nào trong ${config.activeSection.toUpperCase()}.` : `No questions in this section yet.`}
-              </p>
-              <button 
-                type="button" 
-                className="btn btn-secondary bg-white btn-sm"
-                onClick={handleAddQuestion}
-              >
-                <Plus size={14} /> {isVi ? 'Tạo câu hỏi đầu tiên' : 'Add First Question'}
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* SECTION 4: AI Trap & Distractor Check */}
-      <section className="edit-card">
-        <div className="edit-card-header">
-          <div className="edit-card-header-left">
-            <div className="edit-card-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
-              <AlertTriangle size={20} />
-            </div>
-            <div>
-              <h2 className="edit-card-title">
-                {isVi ? 'Phát Hiện Bẫy Nghe & Từ Dễ Nhầm Lẫn (AI Distractor Engine)' : 'AI Distractor & Trap Engine'}
-              </h2>
-              <p className="edit-card-desc">
-                {isVi ? 'Tự động kiểm tra các bẫy nghe phổ biến (VD: "fifteen" vs "fifty", sửa đổi ý định của speaker).' : 'Flag phonetic traps, numbers, and speaker self-correction.'}
-              </p>
-            </div>
-          </div>
-          <input 
-            type="checkbox" 
-            checked={config.enableAiDistractorCheck}
-            onChange={(e) => updateField('enableAiDistractorCheck', e.target.checked)}
-            style={{ width: '18px', height: '18px', accentColor: '#0d9488' }}
-          />
-        </div>
-
-        {config.enableAiDistractorCheck && (
-          <div className="edit-form-group" style={{ marginBottom: 0 }}>
-            <label className="edit-form-label">
-              {isVi ? 'Chỉ thị lưu ý bẫy nghe cho AI' : 'Distractor Rules for AI Checker'}
-            </label>
-            <textarea 
-              className="edit-form-textarea"
-              rows={2}
-              value={config.aiInstruction}
-              onChange={(e) => updateField('aiInstruction', e.target.value)}
-              placeholder={isVi ? 'Ví dụ: Cảnh báo học viên khi người nói tự đính chính thông tin (self-correction: "Actually, it is not 14, but 40")...' : 'Custom trap detection rule...'}
-            />
+              );
+            })}
           </div>
         )}
       </section>

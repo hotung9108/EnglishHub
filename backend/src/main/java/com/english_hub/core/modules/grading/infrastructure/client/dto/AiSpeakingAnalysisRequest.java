@@ -17,6 +17,19 @@ public record AiSpeakingAnalysisRequest(
 	public AiSpeakingAnalysisRequest(
 			long submissionModuleId,
 			String audioUrl,
+			String audioStorageKey,
+			String moduleInstructions,
+			String aiInstructionSnapshot,
+			double maxScore,
+			String model,
+			String aiProvider
+	) {
+		this(submissionModuleId, audioUrl, null, audioStorageKey, moduleInstructions, aiInstructionSnapshot, maxScore, model, aiProvider);
+	}
+
+	public AiSpeakingAnalysisRequest(
+			long submissionModuleId,
+			String audioUrl,
 			String audioBase64,
 			String audioStorageKey,
 			String moduleInstructions,

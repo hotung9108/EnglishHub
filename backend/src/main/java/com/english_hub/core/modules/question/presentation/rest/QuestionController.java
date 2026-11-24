@@ -72,7 +72,8 @@ public class QuestionController {
 						request.content(),
 						request.correctAnswer() == null ? null : request.correctAnswer().toMap(),
 						request.score(),
-						request.orderIndex()));
+						request.orderIndex(),
+						request.questionType()));
 		return ResponseEntity.ok(new QuestionMessageResponse("Cập nhật câu hỏi thành công."));
 	}
 

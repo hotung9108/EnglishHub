@@ -154,6 +154,7 @@ class SubmissionControllerTest {
 				1,
 				List.of(new SubmissionListItemResult(
 						88L,
+						5L,
 						41L,
 						1,
 						SubmissionStatus.GRADED,
@@ -165,9 +166,9 @@ class SubmissionControllerTest {
 								ModuleTaskType.QUIZ,
 								SubmissionStatus.GRADED,
 								new GradingSummaryResult(BigDecimal.valueOf(8), BigDecimal.TEN, GradingStatus.COMPLETED))))));
-		when(submissionService.list(5L, 41L, "GRADED", 2, 10)).thenReturn(result);
+		when(submissionService.list(3L, 5L, 41L, "GRADED", 2, 10)).thenReturn(result);
 
-		ResponseEntity<SubmissionListResponse> response = submissionController.listSubmissions(5L, 41L, "GRADED", 2, 10);
+		ResponseEntity<SubmissionListResponse> response = submissionController.listSubmissions(3L, 5L, 41L, "GRADED", 2, 10);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		SubmissionListResponse body = response.getBody();
@@ -175,6 +176,7 @@ class SubmissionControllerTest {
 		assertThat(body.pagination().limit()).isEqualTo(20);
 		assertThat(body.pagination().total()).isEqualTo(1);
 		assertThat(body.data()).hasSize(1);
+		assertThat(body.data().getFirst().assignmentId()).isEqualTo(5L);
 		assertThat(body.data().getFirst().studentId()).isEqualTo(41L);
 		assertThat(body.data().getFirst().status()).isEqualTo("GRADED");
 		assertThat(body.data().getFirst().modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");
@@ -255,7 +257,7 @@ class SubmissionControllerTest {
 	@Test
 	void mapsTheModuleDetailResultToAnOkResponse() {
 		JsonNode correctAnswer = new JsonMapper().readTree(
-				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"is_correct\":true}]}");
+				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"isCorrect\":true}]}");
 		JsonNode answerContent = new JsonMapper().readTree("{\"selectedOptionIds\":[1]}");
 		SubmissionModuleDetailResult result = new SubmissionModuleDetailResult(
 				150L,
@@ -286,6 +288,8 @@ class SubmissionControllerTest {
 		assertThat(body.questions().getFirst().id()).isEqualTo(21L);
 		assertThat(body.questions().getFirst().questionType()).isEqualTo("MULTIPLE_CHOICE");
 		assertThat(body.questions().getFirst().correctAnswer().get("options").get(0).get("id").asInt()).isEqualTo(1);
+		assertThat(body.questions().getFirst().correctAnswer().get("options").get(0).get("isCorrect").asBoolean())
+				.isTrue();
 		assertThat(body.answers()).hasSize(1);
 		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
 		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
@@ -310,6 +314,22 @@ class SubmissionControllerTest {
 	}
 
 	@Test
+	void mapsTheAudioUploadUrlResultWithFileSizeToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/audio.webm",
+				"submissions/88/module-150/audio.webm",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getAudioUploadUrl(150L, "audio/webm", 5000L)).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getAudioUploadUrl(150L, new UploadUrlRequest("audio/webm", 5000L));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/audio.webm");
+	}
+
+	@Test
 	void mapsTheDocumentUploadUrlResultToAnOkResponse() {
 		UploadUrlResult result = new UploadUrlResult(
 				"https://bucket/essay.pdf",
@@ -325,5 +345,67 @@ class SubmissionControllerTest {
 		assertThat(body.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
 		assertThat(body.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
 		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+	}
+
+	@Test
+	void mapsTheDocumentUploadUrlResultWithFileSizeToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/essay.pdf",
+				"submissions/88/module-151/essay.pdf",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getDocumentUploadUrl(151L, "application/pdf", 10000L)).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getDocumentUploadUrl(151L, new UploadUrlRequest("application/pdf", 10000L));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
+	}
+
+	@Test
+	void mapsTheAudioDownloadUrlResultToAnOkResponse() {
+		SubmissionService.SubmissionFileDownloadResult result = new SubmissionService.SubmissionFileDownloadResult(
+				150L,
+				"https://bucket/audio.webm?X-Amz-Signature=xyz",
+				"submissions/88/module-150/audio.webm",
+				"audio.webm",
+				"audio/webm",
+				OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+		when(submissionService.generateSubmissionAudioDownloadUrl(150L)).thenReturn(result);
+
+		var response = submissionController.getSubmissionAudioDownloadUrl(150L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		var body = response.getBody();
+		assertThat(body).isNotNull();
+		assertThat(body.submissionModuleId()).isEqualTo(150L);
+		assertThat(body.downloadUrl()).isEqualTo("https://bucket/audio.webm?X-Amz-Signature=xyz");
+		assertThat(body.fileName()).isEqualTo("audio.webm");
+		assertThat(body.mimeType()).isEqualTo("audio/webm");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+	}
+
+	@Test
+	void mapsTheDocumentDownloadUrlResultToAnOkResponse() {
+		SubmissionService.SubmissionFileDownloadResult result = new SubmissionService.SubmissionFileDownloadResult(
+				151L,
+				"https://bucket/essay.pdf?X-Amz-Signature=xyz",
+				"submissions/88/module-151/essay.pdf",
+				"my_essay.pdf",
+				"application/pdf",
+				OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+		when(submissionService.generateSubmissionDocumentDownloadUrl(151L, "download")).thenReturn(result);
+
+		var response = submissionController.getSubmissionDocumentDownloadUrl(151L, "download");
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		var body = response.getBody();
+		assertThat(body).isNotNull();
+		assertThat(body.submissionModuleId()).isEqualTo(151L);
+		assertThat(body.downloadUrl()).isEqualTo("https://bucket/essay.pdf?X-Amz-Signature=xyz");
+		assertThat(body.fileName()).isEqualTo("my_essay.pdf");
+		assertThat(body.mimeType()).isEqualTo("application/pdf");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:30:00Z"));
 	}
 }

@@ -1,4 +1,5 @@
 import { httpClient } from '../core/client';
+import { RequestCanceledError, TimeoutError } from '../core/errors';
 import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 
@@ -13,6 +14,9 @@ export interface AssignmentSummary {
   title: string;
   status: AssignmentStatus;
   closeAt: string;
+  skills: AssignmentSkill[];
+  openAt?: string | null;
+  maxSubmissions?: number | null;
 }
 
 export interface AssignmentModuleSummary {
@@ -24,6 +28,10 @@ export interface AssignmentDetail {
   id: AssignmentId;
   title: string;
   status: AssignmentStatus;
+  description?: string | null;
+  openAt?: string | null;
+  closeAt?: string | null;
+  maxSubmissions?: number | null;
   modules: AssignmentModuleSummary[];
 }
 
@@ -140,12 +148,46 @@ export class AssignmentService {
   async updateAssignmentStatus(
     assignmentId: AssignmentId,
     status: AssignmentStatus,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions & { reopen?: { closeAt?: string } }
   ): Promise<MessageResponse> {
-    return this.http.patch<MessageResponse>(
-      `/assignments/${assignmentId}/status`,
-      { status },
-      options
+    const { reopen, ...httpOptions } = options ?? {};
+    const closeAt = reopen?.closeAt;
+
+    if (closeAt !== undefined && status !== 'PUBLISHED') {
+      throw new TypeError('A new deadline requires a PUBLISHED status.');
+    }
+
+    try {
+      return await this.http.patch<MessageResponse>(
+        `/assignments/${assignmentId}/status`,
+        closeAt === undefined ? { status } : { status, closeAt },
+        options === undefined ? undefined : httpOptions
+      );
+    } catch (error) {
+      const cause = error instanceof RequestCanceledError ? error.rawError : null;
+      if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ECONNABORTED'
+        && (!('response' in cause) || cause.response == null)) {
+        throw new TimeoutError(undefined, cause);
+      }
+      throw error;
+    }
+  }
+
+  async exportSubmissionsExcel(
+    assignmentId: AssignmentId,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    return this.http.get<Blob>(
+      `/assignments/${assignmentId}/submissions/export`,
+      {
+        responseType: 'blob',
+        timeout: 15000,
+        headers: {
+          Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv',
+          ...(options?.headers || {})
+        },
+        ...options,
+      }
     );
   }
 }

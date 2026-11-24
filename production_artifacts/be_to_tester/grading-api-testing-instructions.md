@@ -25,8 +25,8 @@ The pending Writing/Speaking grading uses `GradingMethod.AUTO` and has no AI fee
 
 ### #48 and #51 — read grading
 
-- Teacher responsible for the class and the submission's student can read the grading.
-- A teacher from another class and unrelated users receive `403`.
+- Teacher responsible for the class, the submission's student, and Admin (for grading audit / history inspection per FE-23) can read the grading.
+- A teacher from another class, unauthorized students, and unauthenticated/unrelated users receive `403` or `401`.
 - Error responses use the existing `{ "error": "..." }` envelope.
 
 ### #49 — request AI analysis

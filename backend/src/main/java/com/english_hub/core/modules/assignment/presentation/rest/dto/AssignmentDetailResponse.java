@@ -7,6 +7,7 @@ public record AssignmentDetailResponse(
 		Long id,
 		String title,
 		String status,
+		Integer maxSubmissions,
 		List<AssignmentModuleSummaryResponse> modules) {
 
 	public static AssignmentDetailResponse from(AssignmentDetailResult result) {
@@ -14,6 +15,7 @@ public record AssignmentDetailResponse(
 				result.assignment().id(),
 				result.assignment().title(),
 				result.assignment().status().name(),
+				result.assignment().maxSubmissions(),
 				result.modules().stream().map(AssignmentModuleSummaryResponse::from).toList());
 	}
 }

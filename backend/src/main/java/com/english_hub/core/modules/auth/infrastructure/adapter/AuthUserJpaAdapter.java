@@ -24,12 +24,12 @@ public class AuthUserJpaAdapter implements AuthUserRepository {
 
 	@Override
 	public Optional<AuthUser> findByEmail(String email) {
-		return jpaRepository.findByEmail(email).map(mapper::toDomain);
+		return jpaRepository.findByEmailAndDeletedFalse(email).map(mapper::toDomain);
 	}
 
 	@Override
 	public Optional<AuthUser> findById(Long id) {
-		return jpaRepository.findById(id).map(mapper::toDomain);
+		return jpaRepository.findByIdAndDeletedFalse(id).map(mapper::toDomain);
 	}
 
 	@Override

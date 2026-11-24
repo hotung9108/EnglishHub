@@ -20,7 +20,9 @@ public final class ApiRoutePolicy {
 
 			// User administration
 			new RouteRule(HttpMethod.GET, "/api/v1/admin/users", List.of("ADMIN")),
+			new RouteRule(HttpMethod.GET, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.POST, "/api/v1/admin/users", List.of("ADMIN")),
+			new RouteRule(HttpMethod.POST, "/api/v1/admin/users/{id}/reset-password", List.of("ADMIN")),
 			new RouteRule(HttpMethod.PUT, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.PATCH, "/api/v1/admin/users/{id}/status", List.of("ADMIN")),
@@ -37,25 +39,36 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.POST, "/api/v1/classes", List.of("ADMIN")),
 			// TẠM — test hiện có cho STUDENT xem danh sách lớp của mình; cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.GET, "/api/v1/classes", List.of("ADMIN", "TEACHER", "STUDENT")),
-			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}", List.of("ADMIN", "TEACHER")),
-			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}/members", List.of("ADMIN", "TEACHER")),
+			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}", List.of("ADMIN", "TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/classes/{id}/members",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/classes/{id}/candidates",
+					List.of("ADMIN", "TEACHER")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.PUT, "/api/v1/classes/{id}", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
-			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN")),
+			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN", "TEACHER")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
-			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN")),
+			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN", "TEACHER")),
 
 			// Reports
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/reports/students/{id}/progress",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.GET, "/api/v1/reports/**", List.of("ADMIN", "TEACHER")),
 
 			// Assignment
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/classes/{classId}/assignments",
-					List.of("TEACHER", "STUDENT")),
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/classes/{classId}/assignments",
@@ -115,6 +128,14 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.PUT, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.POST, "/api/v1/modules/{moduleId}/audio", List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.POST,
+					"/api/v1/modules/{moduleId}/audio/confirm",
+					List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/modules/{moduleId}/audio-download-url",
+					List.of("TEACHER", "STUDENT")),
 
 			// Submission
 			new RouteRule(
@@ -140,18 +161,30 @@ public final class ApiRoutePolicy {
 					HttpMethod.POST,
 					"/api/v1/submission-modules/{id}/document-upload-url",
 					List.of("STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/submission-modules/{id}/audio-download-url",
+					List.of("TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/submission-modules/{id}/document-download-url",
+					List.of("TEACHER", "STUDENT")),
 
 			// Grading
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/submission-modules/{id}/grading",
 					List.of("TEACHER", "STUDENT")),
+				new RouteRule(
+						HttpMethod.GET,
+						"/api/v1/submission-modules/{id}/grading/ai-suggestion",
+						List.of("TEACHER")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/submission-modules/{id}/grading/ai-analyze",
 					List.of("TEACHER")),
 			new RouteRule(HttpMethod.PUT, "/api/v1/gradings/{id}", List.of("TEACHER")),
-			new RouteRule(HttpMethod.GET, "/api/v1/gradings/{id}", List.of("TEACHER", "STUDENT")),
+			new RouteRule(HttpMethod.GET, "/api/v1/gradings/{id}", List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.GET, "/api/v1/gradings", List.of("ADMIN", "TEACHER")),
 			new RouteRule(
 					HttpMethod.GET,
@@ -172,12 +205,19 @@ public final class ApiRoutePolicy {
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/students/{id}/evaluations",
-					List.of("TEACHER", "STUDENT")),
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/students/{id}/evaluations",
 					List.of("TEACHER")),
-			new RouteRule(HttpMethod.GET, "/api/v1/evaluations/{id}", List.of("TEACHER", "STUDENT")),
+				new RouteRule(
+						HttpMethod.GET,
+						"/api/v1/evaluations/students/{id}/overall",
+						List.of("ADMIN", "TEACHER")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/evaluations/{id}",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.PUT, "/api/v1/evaluations/{id}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/evaluations/{id}", List.of("TEACHER")));
 

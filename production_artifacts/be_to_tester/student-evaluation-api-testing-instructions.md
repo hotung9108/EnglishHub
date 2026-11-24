@@ -273,4 +273,66 @@ Phạm vi vòng này: đọc service/controller/adapter/entity, migration liên 
 3. **Page/limit #58 giữ đúng cùng logic #52 của Grading.** Hai bên default page=1, limit=20; page tối thiểu 1, limit 1–100; giá trị invalid trả 400 cùng message validation. Không thêm max page vì Grading cũng không đặt max cho page dương. Reference: `backend/src/main/java/com/english_hub/core/modules/grading/presentation/rest/GradingController.java:68-78`; `backend/src/main/java/com/english_hub/core/modules/grading/application/service/GradingService.java:298-305`; `backend/src/main/java/com/english_hub/core/modules/student_evaluation/presentation/rest/StudentEvaluationController.java:34-46`; `backend/src/main/java/com/english_hub/core/modules/student_evaluation/application/service/StudentEvaluationService.java:30,164-168`.
 4. **teacherName giữ live lookup; không thêm snapshot column/migration.** Response đọc tên hiện tại từ User.fullName qua ClassRepository; schema student_evaluations không có teacher_name và mapper không persist teacherName. Reference: `backend/src/main/java/com/english_hub/core/modules/student_evaluation/application/service/StudentEvaluationService.java:130-135`; `backend/src/main/java/com/english_hub/core/modules/classroom/infrastructure/adapter/ClassJpaAdapter.java:112-117`; `backend/src/main/java/com/english_hub/core/modules/student_evaluation/infrastructure/mapper/StudentEvaluationPersistenceMapper.java:28-35`; `backend/src/main/resources/db/migration/V1__init_schema.sql:522-540`.
 
-**Kết quả chạy mới nhất:** module student_evaluation 33/33 pass; `./gradlew build` toàn backend thành công với 469 test, 0 failure, 0 error, 0 skipped. Reference: các XML test reports ở mục 4, dòng 177; `backend/build/reports/tests/test/index.html:1`.
+**Kết quả chạy mới nhất (sau AMENDMENT 2 bên dưới):** module student_evaluation **49/49 pass** (service 28, API integration 11, controller MockMvc 8, persistence integration 2); `./gradlew build` toàn backend thành công với **746 test, 0 failure, 0 error, 0 skipped**. Reference: `backend/build/test-results/test/TEST-*.xml`; `backend/build/reports/tests/test/index.html:1`. (Số liệu 33/469 và 44/741 phía trên là của các vòng rà soát gốc/AMENDMENT 1, trước AMENDMENT 2.)
+
+---
+
+## AMENDMENT — Teacher read scope narrowed to owned classes (criterion enforcement)
+
+> **Thay đổi hành vi có chủ đích.** Quyết định cũ ("TEACHER được lọc đánh giá của mọi học viên, không kiểm tra lớp họ phụ trách" — mục c và B5 ở trên) đã bị **đảo ngược** theo yêu cầu xác minh bảo mật mới:
+>
+> - **#58 GET /students/{id}/evaluations** — TEACHER chỉ đọc được đánh giá thuộc các lớp mình phụ trách. Khi truyền `classId`, giáo viên không phụ trách lớp đó nhận **403** (`Bạn không có quyền thực hiện thao tác này.`); `classId` không tồn tại nhận **404** (`Không tìm thấy lớp học.`). Khi bỏ trống `classId`, kết quả tự động được giới hạn theo các lớp giáo viên phụ trách (không có lớp nào → danh sách rỗng 200).
+> - **#60 GET /evaluations/{id}** — TEACHER chỉ đọc được chi tiết nếu là **giáo viên hiện tại phụ trách lớp** của đánh giá; ngược lại **403**.
+> - **#58/#60 cho STUDENT không đổi** — chỉ đọc dữ liệu của chính mình. ADMIN vẫn **403**.
+> - Điều kiện tác giả gốc (`evaluation.teacherId`) vẫn chỉ áp dụng cho **#61 PUT** và **#62 DELETE**, không dùng cho quyền đọc.
+
+**Cơ chế triển khai:**
+
+- `StudentEvaluationFilter` thêm component `Long teacherId` (phạm vi giáo viên; `null` với STUDENT).
+- `StudentEvaluationJpaAdapter.buildSpecification` thêm subquery `ClassEntity.id = student_evaluations.class_id AND ClassEntity.teacherId = filter.teacherId` khi `teacherId != null` (cùng mẫu với `GradingJpaAdapter:164-168`).
+- `StudentEvaluationService.listForStudent` kiểm tra quyền sở hữu lớp khi có `classId` và luôn truyền `teacherId` cho TEACHER; `StudentEvaluationService.getById` kiểm tra quyền sở hữu lớp cho TEACHER qua helper `requireClassOwnedBy`.
+- Constant mới: `CLASS_NOT_FOUND_MESSAGE = "Không tìm thấy lớp học."`.
+
+**Test đã cập nhật/bổ sung (module student_evaluation: 44 test, 0 failure/error/skipped):**
+
+- Service (23): đổi `teacherCanListTheirOwnClassStudentWithOptionalClassFilterAndTeacherName`; thêm `teacherListWithoutClassFilterIsScopedToTheirOwnClasses`, `teacherCannotListEvaluationsForAClassTheyDoNotTeach`, `listingReturnsClassNotFoundWhenTeacherFiltersByMissingClass`, `getByIdAllowsTeacherInChargeOfTheClass`, `getByIdRejectsTeacherWhoDoesNotTeachTheClass`.
+- API integration (11): sửa fixture list dùng `teacherOneId`; thêm 403 khi giáo viên không phụ trách lọc theo `classId`, danh sách rỗng khi giáo viên không phụ trách lớp nào, và `onlyTeacherInChargeOfTheClassCanReadEvaluationDetail`.
+- Persistence integration (2): cập nhật call site filter (thêm `teacherId`) và thêm assert scoping theo `teacherId` (khớp 3, giáo viên lạ 0).
+- Controller MockMvc (8): không đổi.
+
+**Tác động cần Tester xác nhận lại:** các case cũ ở mục c và B5 trong báo cáo gốc (giáo viên khác đọc được #58/#60) nay **phải trả 403**, không còn 200.
+
+---
+
+## AMENDMENT 2 — ADMIN read-only + teacher-in-charge mutation (criterion enforcement)
+
+> **Thay đổi hành vi có chủ đích.** Hai quyết định cũ đã bị **đảo ngược** theo yêu cầu xác minh bảo mật mới:
+>
+> - **ADMIN đọc (mục a cũ: "role khác, gồm ADMIN, nhận 403")** → nay **ADMIN được đọc toàn bộ** đánh giá của mọi học viên, không giới hạn lớp/giáo viên. ADMIN **không** được tạo/sửa/xoá (vẫn 403 qua `requireTeacher()` và route policy).
+> - **#61 PUT / #62 DELETE theo "tác giả gốc" (mục h cũ: "quyền theo người viết gốc")** → nay theo **giáo viên hiện tại phụ trách lớp** của đánh giá. Tác giả gốc không còn quyền nếu lớp đã đổi giáo viên; giáo viên mới phụ trách có toàn quyền dù không phải người viết.
+
+**Chi tiết hành vi mới:**
+
+| API | ADMIN | TEACHER | STUDENT |
+|---|---|---|---|
+| `GET /students/{id}/evaluations` (#58) | 200, tất cả, không scope lớp/giáo viên | 200, chỉ lớp mình phụ trách | 200, chỉ của mình |
+| `GET /evaluations/{id}` (#60) | 200, mọi đánh giá | 200 nếu là giáo viên phụ trách lớp hiện tại | 200 nếu là chủ sở hữu |
+| `POST /students/{id}/evaluations` (#59) | 403 | 201 nếu phụ trách lớp + học viên thuộc lớp | 403 |
+| `PUT /evaluations/{id}` (#61) | 403 | 200 nếu phụ trách lớp hiện tại | 403 |
+| `DELETE /evaluations/{id}` (#62) | 403 | 200 nếu phụ trách lớp hiện tại | 403 |
+
+**Cơ chế triển khai:**
+
+- `ApiRoutePolicy` thêm `"ADMIN"` vào **hai route GET** (#58, #60); POST/PUT/DELETE giữ `TEACHER` only.
+- `StudentEvaluationService.requireReader` cho phép `ADMIN | TEACHER | STUDENT`; ADMIN bỏ qua kiểm tra `studentId` và `requireClassOwnedBy` (đọc không scope).
+- `StudentEvaluationService.update`/`delete` thay `requireAuthor(current, teacher)` bằng `requireClassOwnedBy(current.classId(), teacher)`; helper `requireAuthor` đã xoá.
+- `createForStudent` không đổi — ADMIN vẫn 403 qua `requireTeacher()`.
+- Pagination vẫn giới hạn `limit ≤ 100`; "không giới hạn" của ADMIN chỉ áp dụng cho phạm vi uỷ quyền, không phải số bản ghi.
+
+**Test đã cập nhật/bổ sung:** service thêm `adminCanListAnyStudentEvaluationsWithoutClassScoping`, `adminCanReadAnyEvaluationDetailWithoutClassScoping`, `adminCannotCreateUpdateOrDeleteEvaluations`, `updateRejectsOriginalAuthorWhoIsNoLongerTeachingTheClass`, `updateAllowsInChargeTeacherWhoIsNotTheOriginalAuthor`, `deleteAllowsInChargeTeacherWhoIsNotTheOriginalAuthor`; API integration đổi `adminCannotGetEvaluationDetail` → `adminCanGetEvaluationDetail`, admin list 403 → 200, và rework `createChecksCurrentTeacherAndMembershipThenOriginalAuthorCanEditAndDelete` → `classTransferMovesEditAndDeleteRightsToTheNewInChargeTeacher`.
+
+**Tác động cần Tester xác nhận lại:**
+
+- Các case cũ "ADMIN gọi #58/#60 → 403" (mục a và bảng checklist) nay **phải trả 200**.
+- Các case cũ "tác giả gốc sửa/xoá được sau khi lớp đổi giáo viên" (mục h) nay **phải trả 403**; giáo viên phụ trách mới **phải trả 200**.
+- ADMIN gọi #59/#61/#62 vẫn **403**.

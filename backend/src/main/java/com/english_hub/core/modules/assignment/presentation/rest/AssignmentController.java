@@ -4,6 +4,8 @@ import com.english_hub.core.modules.assignment.application.command.CreateAssignm
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentListResult;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentUpdateResult;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.AssignmentDetailResponse;
@@ -14,6 +16,7 @@ import com.english_hub.core.modules.assignment.presentation.rest.dto.CreateAssig
 import com.english_hub.core.modules.assignment.presentation.rest.dto.MessageResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.PaginationResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentRequest;
+import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentStatusRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -45,10 +48,13 @@ public class AssignmentController {
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
-		AssignmentPage result = assignmentService.listAssignments(status, classId, page, limit);
+		AssignmentListResult result = assignmentService.listAssignments(status, classId, page, limit);
+		AssignmentPage assignmentPage = result.assignmentPage();
 		return ResponseEntity.ok(new AssignmentListResponse(
-				result.assignments().stream().map(AssignmentSummaryResponse::from).toList(),
-				new PaginationResponse(result.page(), result.limit(), result.total())));
+				assignmentPage.assignments().stream()
+						.map(assignment -> AssignmentSummaryResponse.from(assignment, result.skillsFor(assignment.id())))
+						.toList(),
+				new PaginationResponse(assignmentPage.page(), assignmentPage.limit(), assignmentPage.total())));
 	}
 
 	@PostMapping("/classes/{classId}/assignments")
@@ -72,16 +78,20 @@ public class AssignmentController {
 	}
 
 	@PutMapping("/assignments/{assignmentId}")
-	public ResponseEntity<MessageResponse> updateAssignment(
+	public ResponseEntity<UpdateAssignmentResponse> updateAssignment(
 			@PathVariable long assignmentId,
 			@Valid @RequestBody UpdateAssignmentRequest request) {
-		assignmentService.updateAssignment(assignmentId, new UpdateAssignmentCommand(
-				request.title(),
-				request.description(),
-				request.openAt(),
-				request.closeAt(),
-				request.maxSubmissions()));
-		return ResponseEntity.ok(new MessageResponse("Cập nhật bài tập thành công."));
+		AssignmentUpdateResult result = assignmentService.updateAssignment(
+				assignmentId,
+				new UpdateAssignmentCommand(
+					request.title(),
+					request.description(),
+					request.openAt(),
+					request.closeAt(),
+					request.maxSubmissions()));
+		return ResponseEntity.ok(new UpdateAssignmentResponse(
+				"Cập nhật bài tập thành công.",
+				result.maxSubmissions()));
 	}
 
 	@DeleteMapping("/assignments/{assignmentId}")
@@ -96,7 +106,7 @@ public class AssignmentController {
 			@Valid @RequestBody UpdateAssignmentStatusRequest request) {
 		AssignmentStatus status = assignmentService.updateStatus(
 				assignmentId,
-				new UpdateAssignmentStatusCommand(request.status()));
+				new UpdateAssignmentStatusCommand(request.status(), request.closeAt()));
 		return ResponseEntity.ok(new MessageResponse(statusMessage(status)));
 	}
 

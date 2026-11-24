@@ -1,425 +1,1644 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ChevronRight, 
-  Sparkles, 
-  Download, 
-  RotateCcw, 
-  MessageSquare, 
-  FileText, 
-  Award,
-  UserCheck
+import React, { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import {
+  ArrowLeft,
+  RotateCcw,
+  FileText,
+  UserCheck,
+  AlertCircle,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  BookOpen,
+  Headphones,
+  Mic,
+  FileEdit,
+  HelpCircle,
+  File,
+  Download
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  submissionService,
+  type SubmissionDetail,
+  type SubmissionListItem,
+  type SubmissionModuleDetailResponse,
+  type SubmissionSkill,
+  type SubmittedAnswerItem
+} from '../api/services/submission.service';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
+import { gradingService, type StudentGradingResult } from '../api/services/grading.service';
+import { useStudentAnswerAnnotations } from '../hooks/useStudentAnswerAnnotations';
+import { Button, MarkdownView, useToast } from '../components/common';
+import {
+  formatAnnotationBadgeLabel,
+  normalizeAnnotationCategory,
+  type StudentAnnotationCategory,
+} from '../utils/annotationCategory.utils';
+import { extractAnnotationSnippet, extractAnswerContentText, extractTranscriptText } from '../utils/annotationSnippet.utils';
+import { useStudentSubmissionPolling } from '../hooks/useStudentSubmissionPolling';
+import '../styles/student-result.css';
 
-interface AnnotationItem {
+interface DisplayAnnotation {
   id: number;
-  type: 'grammar' | 'vocabulary' | 'positive';
+  type: StudentAnnotationCategory;
+  badgeLabel: string;
   original: string;
-  suggestion: string;
+  suggestion: string | null;
   explanation: string;
   teacherNote?: string;
   approved: boolean;
+  startOffset?: number;
+  endOffset?: number;
 }
 
-const StudentSubmissionResult: React.FC = () => {
+const ANNOTATION_FILTER_OPTIONS: ReadonlyArray<{
+  category: StudentAnnotationCategory;
+  labelKey: string;
+}> = [
+  { category: 'grammar', labelKey: 'studentResult.filterGrammar' },
+  { category: 'vocabulary', labelKey: 'studentResult.filterVocab' },
+  { category: 'cohesion', labelKey: 'studentResult.filterCohesion' },
+  { category: 'punctuation', labelKey: 'studentResult.filterPunctuation' },
+  { category: 'spelling', labelKey: 'studentResult.filterSpelling' },
+  { category: 'pronunciation', labelKey: 'studentResult.filterPronunciation' },
+  { category: 'fluency', labelKey: 'studentResult.filterFluency' },
+  { category: 'positive', labelKey: 'studentResult.filterPositive' },
+];
+
+interface QuestionDisplayItem {
+  id: number;
+  questionNumber: number;
+  prompt: string;
+  questionType: string;
+  options: { key: string; text: string }[];
+  studentAnswer: string;
+  correctAnswer: string;
+  isCorrect?: boolean;
+  explanation?: string;
+}
+
+function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
+  return extractAnswerContentText(answers);
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- exported for focused retry-selection coverage
+export function resolveRetryModuleId(
+  modules: SubmissionDetail['modules'] | undefined,
+  selectedModuleId: number | null,
+  moduleDetailId: number | undefined,
+): number | null {
+  if (!modules?.length) return null;
+
+  return modules.find(module => module.id === selectedModuleId)?.id
+    ?? modules.find(module => module.id === moduleDetailId)?.id
+    ?? modules[0]?.id
+    ?? null;
+}
+
+export const StudentSubmissionResult: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const location = useLocation();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+  const { user } = useAuth();
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'positive'>('all');
-  const [selectedAnnotationId, setSelectedAnnotationId] = useState<number>(1);
+  // State
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
+  const [gradingResult, setGradingResult] = useState<StudentGradingResult | null>(null);
+  const [fallbackAiTranscript, setFallbackAiTranscript] = useState<unknown | null>(null);
+  const [attempts, setAttempts] = useState<SubmissionListItem[]>([]);
+  const [isLoadingAnnotationAnswer, setIsLoadingAnnotationAnswer] = useState(false);
+  const annotationLoadId = useRef(0);
+  const moduleLoaderMounted = useRef(false);
+  const retryRequestId = useRef<number | null>(null);
 
-  const annotations: AnnotationItem[] = [
-    {
-      id: 1,
-      type: 'grammar',
-      original: 'has increase significantly',
-      suggestion: 'has increased significantly',
-      explanation: 'Lỗi thì hiện tại hoàn thành: sau trợ động từ "has", động từ chính phải chia ở dạng quá khứ phân từ (V3/ed).',
-      teacherNote: 'Em chú ý các động từ có quy tắc khi chia ở thì hoàn thành nhé.',
-      approved: true
-    },
-    {
-      id: 2,
-      type: 'vocabulary',
-      original: 'big dilemma',
-      suggestion: 'grave crisis / pressing predicament',
-      explanation: 'Nâng cao vốn từ vựng học thuật (Collocation IELTS Band 7.5+): thay vì dùng "big dilemma", nên dùng các tính từ học thuật như "pressing" hoặc "grave".',
-      teacherNote: 'Lựa chọn từ này rất tốt, giúp bài viết trang trọng hơn.',
-      approved: true
-    },
-    {
-      id: 3,
-      type: 'grammar',
-      original: 'affect on people life',
-      suggestion: 'affects people\'s lives',
-      explanation: 'Động từ "affect" là ngoại động từ tác động trực tiếp, không đi cùng giới từ "on". Sở hữu cách danh từ số nhiều: "people\'s lives".',
-      teacherNote: 'Lưu ý phân biệt danh từ "effect on" và động từ "affect something".',
-      approved: true
-    },
-    {
-      id: 4,
-      type: 'positive',
-      original: 'transitional shift toward renewable energy sources',
-      suggestion: 'Excellent academic phrasing',
-      explanation: 'Cấu trúc câu học thuật rất tự nhiên, vận dụng tốt danh từ ghép và cụm giới từ chỉ mục đích.',
-      teacherNote: 'Điểm sáng trong Task 2, phát huy em nhé!',
-      approved: true
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [noSubmissionFound, setNoSubmissionFound] = useState<boolean>(false);
+
+  // Tab & skill selection
+  const [selectedSkill, setSelectedSkill] = useState<SubmissionSkill>('WRITING');
+  const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | StudentAnnotationCategory>('all');
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
+  const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
+  const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
+  const toast = useToast();
+
+  const showToast = useCallback((msg: string, type: 'info' | 'error' | 'success' | 'warning' = 'info') => {
+    if (!moduleLoaderMounted.current) return;
+    if (type === 'error') toast.error(msg);
+    else if (type === 'success') toast.success(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else toast.info(msg);
+  }, [toast]);
+  const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
+  const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const [audioLoadingContext, setAudioLoadingContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRequestRef = useRef(0);
+  const audioFallbackUsedRef = useRef(false);
+  const pendingAudioTimeRef = useRef<number | null>(null);
+  const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
+
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : 1;
+  }, [id]);
+
+  const isAssignmentRoute = useMemo(() => {
+    return location.pathname.includes('/assignments/');
+  }, [location.pathname]);
+
+  useEffect(() => {
+    moduleLoaderMounted.current = true;
+    return () => {
+      moduleLoaderMounted.current = false;
+    };
+  }, []);
+
+  // Load active module details when selectedSkill changes or subModule changes
+  const loadModuleData = useCallback(async (subModuleId: number) => {
+    if (!moduleLoaderMounted.current) return;
+    const loadId = ++annotationLoadId.current;
+    const isCurrentLoad = () => moduleLoaderMounted.current && loadId === annotationLoadId.current;
+    setSelectedModuleId(subModuleId);
+    setGradingResult(null);
+    setFallbackAiTranscript(null);
+    setError(null);
+    setIsLoading(true);
+    setModuleDetail(null);
+    setIsLoadingAnnotationAnswer(true);
+    try {
+      const [modRes, gradingRes] = await Promise.allSettled([
+        submissionService.getSubmissionModuleDetail(subModuleId),
+        gradingService.getStudentGradingResult(subModuleId)
+      ]);
+
+      if (!isCurrentLoad()) return;
+      setGradingResult(gradingRes.status === 'fulfilled' ? gradingRes.value : null);
+      if (gradingRes.status === 'rejected') {
+        setError('Không thể tải kết quả chấm bài. Vui lòng thử lại.');
+      }
+
+      if (modRes.status === 'fulfilled') {
+        const modValue = modRes.value;
+        const needQuestions = (!modValue.questions || modValue.questions.length === 0) && !!modValue.moduleId;
+
+        if (needQuestions) {
+          try {
+            const qRes = await questionService.listQuestions(modValue.moduleId!);
+            if (!isCurrentLoad()) return;
+            const qList = qRes.questions || qRes.data || [];
+            if (qList.length > 0) {
+              modValue.questions = qList;
+            }
+          } catch {
+            if (!isCurrentLoad()) return;
+          }
+        }
+        setModuleDetail(modValue);
+      }
+    } catch {
+      if (isCurrentLoad()) {
+        setGradingResult(null);
+    setFallbackAiTranscript(null);
+        setError('Không thể tải kết quả chấm bài. Vui lòng thử lại.');
+      }
+    } finally {
+      if (isCurrentLoad()) {
+        setIsLoadingAnnotationAnswer(false);
+        setIsLoading(false);
+      }
     }
-  ];
+  }, []);
 
-  const selectedAnnotation = annotations.find(a => a.id === selectedAnnotationId) || annotations[0];
+  const [loadedDocText, setLoadedDocText] = useState<string | null>(null);
 
-  const isHighlightVisible = (type: string) => {
-    return activeFilter === 'all' || activeFilter === type;
+  useEffect(() => {
+    let isMounted = true;
+    const existing = extractAnswerText(moduleDetail?.answers);
+    if (existing && existing.trim()) {
+      return;
+    }
+    const isTxt = moduleDetail?.answers?.some(
+      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
+    );
+    if (!isTxt) {
+      return;
+    }
+    if (!selectedModuleId || selectedSkill !== 'WRITING' || typeof submissionService?.getDocumentFileBlob !== 'function') {
+      return;
+    }
+
+    submissionService
+      .getDocumentFileBlob(selectedModuleId)
+      .then((blob) => blob.text())
+      .then((text) => {
+        if (isMounted && text && text.trim()) {
+          setLoadedDocText(text);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load essay.txt in StudentSubmissionResult:', err);
+      });
+
+    return () => {
+      isMounted = false;
+      setLoadedDocText(null);
+    };
+  }, [moduleDetail, selectedModuleId, selectedSkill]);
+
+  useEffect(() => {
+    if (moduleDetail?.skill !== 'SPEAKING') {
+      return;
+    }
+    const gradingId = moduleDetail?.grading?.id;
+    if (!gradingResult?.aiTranscript && gradingId && typeof gradingService.getById === 'function') {
+      Promise.resolve(gradingService.getById(gradingId))
+        .then((res) => {
+          if (res?.aiTranscript) {
+            setFallbackAiTranscript(res.aiTranscript);
+          }
+        })
+        .catch(() => {
+          // ignore if forbidden or network error
+        });
+    }
+  }, [gradingResult?.aiTranscript, moduleDetail?.grading?.id, moduleDetail?.skill]);
+
+  const speakingTranscriptText = useMemo(() => {
+    const rawTranscript =
+      gradingResult?.aiTranscript ??
+      fallbackAiTranscript ??
+      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript;
+    const text = extractTranscriptText(rawTranscript);
+    return text.length > 0 ? text : null;
+  }, [gradingResult, fallbackAiTranscript, moduleDetail]);
+
+  const targetAnswer = moduleDetail?.answers?.find(answer => !!answer.audioStorageKey) || moduleDetail?.answers?.[0];
+  const annotationResult = useStudentAnswerAnnotations(targetAnswer?.id);
+  const annotationStatus = isLoading || isLoadingAnnotationAnswer ? 'loading' : annotationResult.status;
+  const annotations = useMemo<DisplayAnnotation[]>(() => {
+    const rawText = moduleDetail?.skill === 'SPEAKING'
+      ? (speakingTranscriptText || '')
+      : (extractAnswerContentText(moduleDetail?.answers, targetAnswer?.id) || loadedDocText || '');
+    return annotationResult.annotations
+      .filter(annotation => annotation.reviewStatus === 'ACCEPTED')
+      .map((annotation, index) => {
+        const category = normalizeAnnotationCategory(annotation.errorType);
+        return {
+          id: annotation.id || index + 1,
+          type: category,
+          badgeLabel: formatAnnotationBadgeLabel(annotation.errorType, category),
+          original: extractAnnotationSnippet(rawText, annotation.startOffset, annotation.endOffset, t('studentResult.segmentUnavailable')),
+          suggestion: annotation.suggestedFix?.trim() || null,
+          explanation: annotation.comment?.trim() || 'Nhận xét từ hệ thống AI',
+          teacherNote: annotation.source === 'TEACHER' ? 'Ghi chú từ giáo viên' : undefined,
+          approved: true,
+          startOffset: annotation.startOffset,
+          endOffset: annotation.endOffset,
+        };
+      });
+  }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, loadedDocText, speakingTranscriptText, t]);
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => {
+    const currentModuleId = resolveRetryModuleId(submission?.modules, selectedModuleId, moduleDetail?.id);
+    if (currentModuleId !== null) {
+      if (retryRequestId.current === annotationLoadId.current) return;
+      const moduleLoad = loadModuleData(currentModuleId);
+      const requestId = annotationLoadId.current;
+      retryRequestId.current = requestId;
+      void moduleLoad.finally(() => {
+        if (retryRequestId.current === requestId) retryRequestId.current = null;
+      });
+      return;
+    }
+
+    annotationLoadId.current++;
+    setGradingResult(null);
+    setFallbackAiTranscript(null);
+    setError(null);
+    setIsLoading(true);
+    setReloadKey((k) => k + 1);
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    const annotationRequests = annotationLoadId;
+
+    const loadData = async () => {
+      let moduleLoadStarted = false;
+      setGradingResult(null);
+    setFallbackAiTranscript(null);
+      setIsLoading(true);
+      setError(null);
+      setNoSubmissionFound(false);
+      setSelectedModuleId(null);
+
+      try {
+        let currentSubmission: SubmissionDetail | null = null;
+        let targetAssignmentId = numericId;
+
+        if (isAssignmentRoute) {
+          // Path is /student/assignments/:id/result -> numericId is assignmentId
+          targetAssignmentId = numericId;
+          const [asgRes, listRes] = await Promise.allSettled([
+            assignmentService.getAssignment(targetAssignmentId),
+            user?.id
+              ? submissionService.listSubmissions({
+                  assignmentId: targetAssignmentId,
+                  studentId: user.id,
+                  limit: 10
+                })
+              : Promise.reject('No user')
+          ]);
+
+          if (isMounted && asgRes.status === 'fulfilled') setAssignment(asgRes.value);
+
+          if (listRes.status === 'fulfilled' && listRes.value.data && listRes.value.data.length > 0) {
+            if (isMounted) setAttempts(listRes.value.data);
+            currentSubmission = await submissionService.getSubmission(listRes.value.data[0].id);
+          } else {
+            if (isMounted) setNoSubmissionFound(true);
+          }
+        } else {
+          // Path is /student/submissions/:id -> numericId is submissionId
+          try {
+            currentSubmission = await submissionService.getSubmission(numericId);
+            targetAssignmentId = currentSubmission.assignmentId;
+            const [asgRes, listRes] = await Promise.allSettled([
+              assignmentService.getAssignment(targetAssignmentId),
+              user?.id
+                ? submissionService.listSubmissions({
+                    assignmentId: targetAssignmentId,
+                    studentId: user.id,
+                    limit: 10
+                  })
+                : Promise.reject('No user')
+            ]);
+
+            if (isMounted && asgRes.status === 'fulfilled') setAssignment(asgRes.value);
+            if (isMounted && listRes.status === 'fulfilled' && listRes.value.data && listRes.value.data.length > 0) {
+              setAttempts(listRes.value.data);
+            }
+          } catch {
+            // If not found as submission, try assignment
+            const asg = await assignmentService.getAssignment(numericId);
+            if (isMounted) setAssignment(asg);
+            if (user?.id) {
+              const listRes = await submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10
+              });
+              if (listRes.data && listRes.data.length > 0) {
+                if (isMounted) setAttempts(listRes.data);
+                currentSubmission = await submissionService.getSubmission(listRes.data[0].id);
+              } else {
+                if (isMounted) setNoSubmissionFound(true);
+              }
+            }
+          }
+        }
+
+        if (isMounted) setSubmission(currentSubmission);
+
+        if (isMounted && currentSubmission && currentSubmission.modules && currentSubmission.modules.length > 0) {
+          const firstMod = currentSubmission.modules[0];
+          if (firstMod.skill && isMounted) {
+            setSelectedSkill(firstMod.skill);
+          }
+          moduleLoadStarted = true;
+          await loadModuleData(firstMod.id);
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu kết quả chấm bài.';
+        setError(msg);
+      } finally {
+        if (isMounted && !moduleLoadStarted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+      annotationRequests.current++;
+    };
+  }, [numericId, isAssignmentRoute, user?.id, loadModuleData, reloadKey]);
+
+  // Handle switching attempts
+  const handleSelectAttempt = async (attemptId: number) => {
+    let loadId = ++annotationLoadId.current;
+    setSubmission(null);
+    setGradingResult(null);
+    setFallbackAiTranscript(null);
+    setModuleDetail(null);
+    setSelectedModuleId(null);
+    setError(null);
+    setIsLoading(true);
+    setIsLoadingAnnotationAnswer(true);
+    setSelectedAnnotationId(null);
+    setActiveFilter('all');
+    setNoSubmissionFound(false);
+    try {
+      const sub = await submissionService.getSubmission(attemptId);
+      if (!moduleLoaderMounted.current || loadId !== annotationLoadId.current) return;
+      setSubmission(sub);
+      const subModule = sub.modules?.[0];
+      if (subModule) {
+        if (subModule.skill) setSelectedSkill(subModule.skill);
+        const moduleLoad = loadModuleData(subModule.id);
+        loadId = annotationLoadId.current;
+        await moduleLoad;
+      }
+    } catch {
+      if (!moduleLoaderMounted.current || loadId !== annotationLoadId.current) return;
+      setSubmission(null);
+      setModuleDetail(null);
+      setGradingResult(null);
+    setFallbackAiTranscript(null);
+      setSelectedModuleId(null);
+      setError('Không thể tải lần nộp đã chọn. Vui lòng thử lại.');
+    } finally {
+      if (moduleLoaderMounted.current && loadId === annotationLoadId.current) {
+        setIsLoadingAnnotationAnswer(false);
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Handle switching skill tabs
+  const handleSelectSkill = async (skill: SubmissionSkill) => {
+    setSelectedSkill(skill);
+    setActiveFilter('all');
+    const targetModule = submission?.modules?.find(m => m.skill === skill);
+    if (targetModule) {
+      await loadModuleData(targetModule.id);
+    }
+  };
+
+  // Compute active module
+  const activeSubModule = useMemo(() => {
+    if (!submission?.modules || submission.modules.length === 0) return null;
+    return submission.modules.find(module => module.id === selectedModuleId)
+      || submission.modules.find(module => module.skill === selectedSkill)
+      || submission.modules[0];
+  }, [submission, selectedModuleId, selectedSkill]);
+
+  const rawScore = gradingResult?.finalScore ?? null;
+  const maxScore = gradingResult?.maxScoreSnapshot ?? null;
+
+  const displayScore = useMemo<string | null>(() => {
+    if (rawScore === null || maxScore === null || !Number.isFinite(rawScore) || !Number.isFinite(maxScore) || maxScore <= 0) {
+      return null;
+    }
+    const scoreVal = Number(rawScore.toFixed(2)).toString();
+    const maxVal = Number(maxScore.toFixed(2)).toString();
+    return `${scoreVal}/${maxVal}`;
+  }, [rawScore, maxScore]);
+
+  const isGraded = useMemo<boolean>(() => {
+    if (submission?.status === 'GRADED') return true;
+    if (activeSubModule?.status === 'GRADED') return true;
+    if (moduleDetail?.status === 'GRADED') return true;
+    if (gradingResult) return true;
+    if (activeSubModule?.grading?.status === 'AI_GRADED' || activeSubModule?.grading?.status === 'COMPLETED') return true;
+    if (moduleDetail?.grading?.status === 'AI_GRADED' || moduleDetail?.grading?.status === 'COMPLETED') return true;
+    if (rawScore != null) return true;
+    return false;
+  }, [submission, activeSubModule, moduleDetail, gradingResult, rawScore]);
+
+  // Issue #379: Polling callback to automatically refresh AI grading results without F5
+  const handleGradingCompleted = useCallback(async (freshSubmission: SubmissionDetail) => {
+    setSubmission(freshSubmission);
+    const targetModuleId = selectedModuleId || freshSubmission.modules?.[0]?.id;
+    if (targetModuleId) {
+      await loadModuleData(targetModuleId);
+    }
+    showToast(isVi ? 'Đã có kết quả chấm điểm từ AI!' : 'AI grading results are ready!');
+  }, [selectedModuleId, loadModuleData, isVi, showToast]);
+
+  useStudentSubmissionPolling({
+    submissionId: submission?.id,
+    isGraded,
+    onGraded: handleGradingCompleted,
+  });
+
+  // Annotations
+  const filteredAnnotations = useMemo(() => {
+    if (activeFilter === 'all') return annotations;
+    return annotations.filter(a => a.type === activeFilter);
+  }, [annotations, activeFilter]);
+
+  const selectedAnnotation = useMemo(() => {
+    if (filteredAnnotations.length === 0) return null;
+    return filteredAnnotations.find(a => a.id === selectedAnnotationId) || filteredAnnotations[0];
+  }, [filteredAnnotations, selectedAnnotationId]);
+
+  const availableAnnotationFilters = useMemo(() => {
+    return ANNOTATION_FILTER_OPTIONS.map((opt) => ({
+      ...opt,
+      count: annotations.filter((a) => a.type === opt.category).length,
+    })).filter((opt) => opt.count > 0);
+  }, [annotations]);
+
+  // Questions derivation for Reading or Listening
+  const questionsList = useMemo<QuestionDisplayItem[]>(() => {
+    if (!moduleDetail?.questions || moduleDetail.questions.length === 0) return [];
+    return moduleDetail.questions.map((q, idx) => {
+      const studentAnsItem = moduleDetail.answers?.find(a => a.questionId === q.id);
+      const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+
+      // 1. Correct Answer & Options Parsing
+      let mcq = {
+        options: [] as string[],
+        correctOptionContent: '',
+        correctOptionIndex: 0,
+      };
+      let shortAns = '';
+
+      if (isMcq) {
+        mcq = extractMcqOptions(
+          q.correctAnswer as Record<string, unknown> | null,
+          Array.isArray((q as unknown as { options?: unknown[] }).options)
+            ? (q as unknown as { options?: unknown[] }).options
+            : undefined
+        );
+      } else {
+        shortAns = extractShortAnswerText(q.correctAnswer as Record<string, unknown> | null);
+      }
+
+      const displayOptions = isMcq
+        ? mcq.options.map((optText, optIdx) => ({
+            key: String.fromCharCode(65 + optIdx),
+            text: optText,
+          }))
+        : [];
+
+      const correctOptLetter = String.fromCharCode(65 + mcq.correctOptionIndex);
+      const cAnsText = isMcq
+        ? `${correctOptLetter}. ${mcq.correctOptionContent}`
+        : (shortAns || '--');
+
+      // 2. Student Answer & Score Parsing
+      let sAnsText = '--';
+      let studentSelectedOptId: number | null = null;
+      let isAnswerCorrect: boolean | undefined = undefined;
+
+      if (studentAnsItem) {
+        if (typeof studentAnsItem.content === 'string') {
+          sAnsText = studentAnsItem.content;
+        } else if (studentAnsItem.content && typeof studentAnsItem.content === 'object') {
+          const obj = studentAnsItem.content as Record<string, unknown>;
+
+          if (typeof obj.isCorrect === 'boolean') {
+            isAnswerCorrect = obj.isCorrect;
+          } else if (typeof obj.is_correct === 'boolean') {
+            isAnswerCorrect = obj.is_correct;
+          }
+
+          if (isMcq) {
+            const selIds = obj.selectedOptionIds;
+            if (Array.isArray(selIds) && selIds.length > 0 && typeof selIds[0] === 'number') {
+              studentSelectedOptId = selIds[0];
+            } else if (typeof obj.selectedOptionId === 'number') {
+              studentSelectedOptId = obj.selectedOptionId;
+            } else if (typeof obj.selectedOption === 'string') {
+              const upper = obj.selectedOption.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            } else if (typeof obj.answer === 'string') {
+              const upper = obj.answer.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            }
+
+            if (studentSelectedOptId !== null && studentSelectedOptId >= 1 && studentSelectedOptId <= mcq.options.length) {
+              const sLetter = String.fromCharCode(65 + studentSelectedOptId - 1);
+              const sText = mcq.options[studentSelectedOptId - 1] || '';
+              sAnsText = `${sLetter}. ${sText}`;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            } else if (typeof obj.selectedOption === 'string') {
+              sAnsText = obj.selectedOption;
+            }
+          } else {
+            if (typeof obj.text === 'string') {
+              sAnsText = obj.text;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            }
+          }
+        }
+      }
+
+      // Fallback for isAnswerCorrect
+      if (isAnswerCorrect === undefined) {
+        if (studentAnsItem && sAnsText !== '--') {
+          if (isMcq) {
+            if (studentSelectedOptId !== null) {
+              isAnswerCorrect = (studentSelectedOptId - 1) === mcq.correctOptionIndex;
+            }
+          } else if (shortAns) {
+            isAnswerCorrect = sAnsText.trim().toLowerCase() === shortAns.trim().toLowerCase();
+          }
+        } else {
+          isAnswerCorrect = false;
+        }
+      }
+
+      return {
+        id: q.id,
+        questionNumber: q.orderIndex || idx + 1,
+        prompt: q.content,
+        questionType: q.questionType,
+        options: displayOptions,
+        studentAnswer: sAnsText,
+        correctAnswer: cAnsText,
+        isCorrect: isAnswerCorrect,
+        explanation: 'Đối chiếu theo đáp án chuẩn của bài học.',
+      };
+    });
+  }, [moduleDetail]);
+
+  const filteredQuestions = useMemo(() => {
+    if (questionFilter === 'correct') return questionsList.filter(q => q.isCorrect === true);
+    if (questionFilter === 'incorrect') return questionsList.filter(q => q.isCorrect === false);
+    return questionsList;
+  }, [questionsList, questionFilter]);
+
+  // Extracted student contents
+  const studentEssay = useMemo(() => {
+    return extractAnswerText(moduleDetail?.answers) || loadedDocText || '';
+  }, [moduleDetail?.answers, loadedDocText]);
+
+  const attachedDocKey = useMemo(() => {
+    return moduleDetail?.answers?.find(a => a.docStorageKey)?.docStorageKey || null;
+  }, [moduleDetail?.answers]);
+
+  const currentModuleDetail = moduleDetail?.id === selectedModuleId ? moduleDetail : null;
+  const audioAnswer = useMemo(() => currentModuleDetail?.answers?.find(answer =>
+    Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
+  ), [currentModuleDetail?.answers]);
+  const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
+  const currentAudioContext = selectedModuleId !== null && audioAnswer
+    ? { moduleId: selectedModuleId, answerId: audioAnswer.id }
+    : null;
+  const currentAudioModuleId = currentAudioContext?.moduleId ?? null;
+  const currentAudioAnswerId = currentAudioContext?.answerId ?? null;
+  useLayoutEffect(() => {
+    audioContextRef.current = currentAudioModuleId !== null && currentAudioAnswerId !== null
+      ? { moduleId: currentAudioModuleId, answerId: currentAudioAnswerId }
+      : null;
+  }, [currentAudioModuleId, currentAudioAnswerId]);
+
+  const audioUrl = currentAudioContext && audioUrlOverride?.moduleId === currentAudioContext.moduleId &&
+    audioUrlOverride.answerId === currentAudioContext.answerId
+    ? audioUrlOverride.url
+    : directAudioUrl;
+  const audioError = Boolean(currentAudioContext && audioErrorContext?.moduleId === currentAudioContext.moduleId &&
+    audioErrorContext.answerId === currentAudioContext.answerId);
+  const isAudioLoading = Boolean(currentAudioContext && audioLoadingContext?.moduleId === currentAudioContext.moduleId &&
+    audioLoadingContext.answerId === currentAudioContext.answerId);
+  const showAudioLoading = isAudioLoading || Boolean(currentAudioContext && !audioUrl && !audioError);
+
+  const loadAudioFallback = useCallback(async (
+    moduleId: number,
+    answerId: number,
+    requestId: number,
+    preserveTime: boolean,
+  ) => {
+    if (preserveTime && audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    setAudioLoadingContext({ moduleId, answerId });
+    setAudioErrorContext(null);
+    try {
+      const response = await submissionService.getAudioDownloadUrl(moduleId);
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      const downloadUrl = response.downloadUrl?.trim();
+      if (!downloadUrl) throw new Error('Audio URL is empty.');
+      setAudioUrlOverride({ moduleId, answerId, url: downloadUrl });
+    } catch {
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      setAudioErrorContext({ moduleId, answerId });
+    } finally {
+      if (requestId === audioRequestRef.current &&
+        audioContextRef.current?.moduleId === moduleId && audioContextRef.current.answerId === answerId) {
+        setAudioLoadingContext(null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const requestId = ++audioRequestRef.current;
+    audioFallbackUsedRef.current = false;
+    pendingAudioTimeRef.current = null;
+    const audio = audioRef.current;
+    audio?.pause();
+
+    if (currentAudioModuleId !== null && currentAudioAnswerId !== null && !directAudioUrl) {
+      audioFallbackUsedRef.current = true;
+      void loadAudioFallback(currentAudioModuleId, currentAudioAnswerId, requestId, false);
+    }
+
+    return () => {
+      audioRequestRef.current += 1;
+      audio?.pause();
+    };
+  }, [
+    currentAudioModuleId,
+    currentAudioAnswerId,
+    directAudioUrl,
+    loadAudioFallback,
+  ]);
+
+  const handleAudioError = () => {
+    if (!currentAudioContext || isAudioLoading) return;
+    if (audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    audioRef.current?.pause();
+
+    if (audioFallbackUsedRef.current) {
+      setAudioErrorContext(currentAudioContext);
+      return;
+    }
+
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    const pendingTime = pendingAudioTimeRef.current;
+    if (!audio || pendingTime === null) return;
+    pendingAudioTimeRef.current = null;
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = Math.min(Math.max(pendingTime, 0), audio.duration);
+    }
+  };
+
+  const handleAudioRetry = () => {
+    if (!currentAudioContext) return;
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const hasDocToDownload = Boolean(
+    attachedDocKey ||
+    moduleDetail?.answers?.some(a => !!a.docStorageKey)
+  );
+
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
+
+  const hasAudioToDownload = Boolean(
+    audioStorageKey ||
+    audioUrl ||
+    moduleDetail?.answers?.some(a => !!a.audioStorageKey || !!a.audioDownloadUrl)
+  );
+
+  const handleDownloadDoc = async () => {
+    const moduleId = selectedModuleId || moduleDetail?.id;
+    if (!moduleId) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.', 'error');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...', 'info');
+    try {
+      setIsDownloadingDoc(true);
+      const res = await submissionService.getDocumentDownloadUrl(moduleId, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.', 'error');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (attachedDocKey ? attachedDocKey.split('/').pop() : 'submission-document');
+      link.download = fileName || 'submission-document';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.', 'error');
+    } finally {
+      setIsDownloadingDoc(false);
+    }
+  };
+
+  const handleDownloadAudio = async () => {
+    const moduleId = selectedModuleId || moduleDetail?.id;
+    if (!moduleId) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.', 'error');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...', 'info');
+    try {
+      setIsDownloadingAudio(true);
+      const res = await submissionService.getAudioDownloadUrl(moduleId, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.', 'error');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (audioStorageKey ? audioStorageKey.split('/').pop() : 'submission-audio.webm');
+      link.download = fileName || 'submission-audio.webm';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.', 'error');
+    } finally {
+      setIsDownloadingAudio(false);
+    }
+  };
+
+  const teacherFeedbackText = gradingResult?.finalFeedback || '';
+
+  // Available skills in submission
+  const availableSkills: SubmissionSkill[] = useMemo(() => {
+    const list: SubmissionSkill[] = [];
+    if (submission?.modules && submission.modules.length > 0) {
+      submission.modules.forEach(m => {
+        if (m.skill) list.push(m.skill);
+      });
+    }
+    if (assignment?.modules && assignment.modules.length > 0) {
+      assignment.modules.forEach(m => {
+        if (m.skill) list.push(m.skill);
+      });
+    }
+    if (list.length === 0) return [selectedSkill || 'READING'];
+    const unique = Array.from(new Set(list));
+    const standardOrder: SubmissionSkill[] = ['LISTENING', 'READING', 'WRITING', 'SPEAKING'];
+    return unique.sort((a, b) => {
+      const idxA = standardOrder.indexOf(a);
+      const idxB = standardOrder.indexOf(b);
+      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+    });
+  }, [submission, assignment, selectedSkill]);
+
+  // Empty submission state
+  if (noSubmissionFound) {
+    return (
+      <div className="student-result-page">
+        <div className="result-breadcrumbs">
+          <button
+            type="button"
+            className="result-back-btn"
+            onClick={() => navigate('/student/assignments')}
+          >
+            <ArrowLeft size={14} />
+            <span>{t('studentResult.backToList')}</span>
+          </button>
+        </div>
+
+        <div className="result-card p-24 result-empty-card">
+          <AlertCircle size={48} className="result-empty-icon" />
+          <h2 className="result-empty-title">
+            Chưa tìm thấy bài nộp nào
+          </h2>
+          <p className="result-empty-desc">
+            {assignment?.title
+              ? `Bạn chưa nộp bài cho bài tập "${assignment.title}". Hãy vào phần làm bài để hoàn thành và nhận đánh giá từ hệ thống.`
+              : 'Hiện tại chưa ghi nhận lượt nộp bài nào của bạn cho mã bài tập này.'}
+          </p>
+          <div className="result-empty-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate('/student/assignments')}
+            >
+              Danh sách bài tập
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate(`/student/assignments/${assignment?.id || numericId}/overview`)}
+            >
+              Làm bài tập ngay
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (submission && (!submission.modules || submission.modules.length === 0) && !isLoading) {
+    return (
+      <div className="student-result-page">
+        <div className="result-breadcrumbs">
+          <button
+            type="button"
+            className="result-back-btn"
+            onClick={() => navigate('/student/assignments')}
+          >
+            <ArrowLeft size={14} />
+            <span>{t('studentResult.backToList')}</span>
+          </button>
+          <span className="result-crumb-sep">/</span>
+          <span className="result-crumb-link">
+            {assignment?.title || t('studentResult.assignmentDetails')}
+          </span>
+          <span className="result-crumb-sep">/</span>
+          <span className="result-crumb-current">
+            {t('studentResult.resultAndFeedback')}
+          </span>
+        </div>
+
+        <div role="status" className="result-card p-24 result-empty-card">
+          <AlertCircle size={48} className="result-empty-icon" />
+          <h2 className="result-empty-title">
+            {isVi ? 'Chưa có dữ liệu mô-đun' : 'No module data available'}
+          </h2>
+          <p className="result-empty-desc">
+            {isVi
+              ? 'Lần nộp này chưa có mô-đun bài tập để hiển thị kết quả.'
+              : 'This submission has no assignment modules to display.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container p-24">
-      {/* Breadcrumbs */}
-      <div className="flex items-center gap-8 mb-24 text-sm text-on-surface-variant">
-        <button 
-          className="flex items-center gap-4 bg-transparent border-none cursor-pointer text-on-surface-variant font-medium p-0" 
-          onClick={() => navigate('/student/assignments')}
+    <div className="student-result-page">
+      {/* 1. Breadcrumbs */}
+      <div className="result-breadcrumbs">
+        <button
           type="button"
+          className="result-back-btn"
+          onClick={() => navigate('/student/assignments')}
         >
           <ArrowLeft size={14} />
-          <span>{t('studentSpeaking.backToList') || 'Quay lại danh sách bài tập'}</span>
+          <span>{t('studentResult.backToList')}</span>
         </button>
-        <span className="text-outline">/</span>
-        <span>Hệ thống</span>
-        <ChevronRight size={12} className="text-outline" />
-        <span 
-          className="text-primary cursor-pointer font-medium"
-          onClick={() => navigate('/student/classes')}
+        <span className="result-crumb-sep">/</span>
+        <span
+          className="result-crumb-link"
+          onClick={() => navigate(`/student/assignments/${assignment?.id || numericId}/overview`)}
           role="button"
           tabIndex={0}
         >
-          Lớp học của tôi
+          {assignment?.title || t('studentResult.assignmentDetails')}
         </span>
-        <ChevronRight size={12} className="text-outline" />
-        <span className="text-primary font-medium">ENG-IELTS-6.5A</span>
-        <ChevronRight size={12} className="text-outline" />
-        <span className="font-semibold text-on-surface">
-          Kết quả &amp; Feedback ({id || 'HW-01'})
+        <span className="result-crumb-sep">/</span>
+        <span className="result-crumb-current">
+          {t('studentResult.resultAndFeedback')}
         </span>
       </div>
 
-      {/* Hero Banner */}
-      <section className="flex-between flex-wrap gap-24 p-32 rounded-xl mb-32 text-white" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)', boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.3)' }}>
-        <div className="flex-col gap-12">
-          <div className="inline-flex items-center gap-6 font-semibold text-xs tracking-wide uppercase px-12 py-4 rounded-full" style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', width: 'fit-content' }}>
-            <Award size={13} />
-            Đã chấm điểm hoàn tất • Lần nộp 1/3
+      {/* Error Alert */}
+      {error && (
+        <div className="result-alert-error">
+          <div className="result-alert-msg">
+            <AlertCircle size={20} />
+            <span>{error}</span>
           </div>
-          <h1 className="m-0 font-bold" style={{ fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            HW-01: Renewable Energy &amp; Environmental Protection (Task 2)
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="btn btn-danger btn-sm"
+          >
+            <RefreshCw size={13} /> Thử lại
+          </button>
+        </div>
+      )}
+
+      {/* Pending Grading Alert */}
+      {!isGraded && !isLoading && (
+        <div className="result-alert-pending">
+          <Clock size={32} className="result-pending-icon" />
+          <div>
+            <h3 className="result-pending-title">
+              {t('studentResult.statusPending')} ({submission?.status || 'SUBMITTED'})
+            </h3>
+            <p className="result-pending-text">
+              Bài nộp của bạn đã được tiếp nhận thành công vào lúc {submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('vi-VN') : 'vừa xong'}. Điểm số và bài chữa chi tiết từ AI và Giảng viên sẽ xuất hiện tại đây ngay khi hoàn tất.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Hero Score Header */}
+      <section className="result-hero-banner">
+        <div className="result-hero-left">
+          <div className="result-badge-row">
+            <span className="result-hero-tag">
+              {isGraded ? t('studentResult.statusGraded') : t('studentResult.statusAiGrading')}
+            </span>
+
+            {/* Attempt Switcher if multiple attempts exist */}
+            {attempts.length > 1 ? (
+              <select
+                className="result-attempt-select"
+                value={submission?.id || attempts[0]?.id}
+                onChange={(e) => void handleSelectAttempt(Number(e.target.value))}
+              >
+                {attempts.map((att) => (
+                  <option key={att.id} value={att.id}>
+                    {t('studentResult.attemptPrefix')}{att.attemptNumber} {att.id === submission?.id ? `(${t('studentResult.latestBadge')})` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="result-hero-tag">
+                {t('studentResult.attemptPrefix')}{submission?.attemptNumber ?? 1}
+              </span>
+            )}
+          </div>
+
+          <h1 className="result-hero-title">
+            {assignment?.title ? assignment.title : `Kết quả đánh giá bài làm #${submission?.id || numericId}`}
           </h1>
-          <div className="flex items-center gap-12 text-sm opacity-80" style={{ fontSize: '13.5px' }}>
-            <span><strong>Khóa học:</strong> IELTS Intensive Band 6.5 - 7.5</span>
+
+          <div className="result-hero-meta">
+            <span><strong>{t('studentResult.submittedOn')}:</strong> {submission?.submittedAt ? new Date(submission.submittedAt).toLocaleDateString('vi-VN') : 'Hôm nay'}</span>
             <span>•</span>
-            <span><strong>Nộp ngày:</strong> 04/09/2026</span>
-            <span>•</span>
-            <span><strong>Chấm bởi:</strong> Cô Trần Thị Mai Lan &amp; AI Engine</span>
+            <span><strong>Kỹ năng:</strong> {selectedSkill}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-16 flex-wrap">
-          <div className="flex items-center gap-20 bg-white p-16-24 rounded-lg" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-            <div className="flex-col items-center">
-              <span className="font-bold leading-none" style={{ fontSize: '32px' }}>7.5</span>
-              <span className="text-xs uppercase tracking-wide opacity-80 mt-4">IELTS Band</span>
+        <div className="flex items-center gap-20 flex-wrap">
+          {/* Main Score Capsule */}
+          {displayScore !== null && (
+            <div className="result-hero-score-box">
+              <span className="result-score-number">{displayScore}</span>
             </div>
-            <div style={{ width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.25)' }}></div>
-            <div className="flex-col">
-              <span className="font-bold text-lg" style={{ color: '#93c5fd' }}>86 / 100</span>
-              <span className="text-xs opacity-80">Điểm hệ 100</span>
-              <span className="text-xs font-bold mt-2" style={{ color: '#86efac' }}>
-                ✓ Đạt chuẩn đầu ra
-              </span>
-            </div>
-          </div>
+          )}
 
-          <div className="flex-col gap-10">
-            <button 
-              className="btn bg-white text-on-surface" 
-              onClick={() => navigate(`/student/assignments/${id || 'HW-01'}/overview`)}
+          {/* Quick Actions */}
+          <div className="result-hero-actions">
+            <button
+              className="result-btn-white"
+              onClick={() => navigate(`/student/assignments/${submission?.assignmentId || assignment?.id || numericId}/overview`)}
               type="button"
             >
               <RotateCcw size={14} />
-              Làm lại bài (Còn 2 lượt)
-            </button>
-            <button 
-              className="btn btn-secondary text-white"
-              style={{ border: '1px solid rgba(255, 255, 255, 0.4)' }}
-              onClick={() => alert('Đang xuất báo cáo kết quả đánh giá chi tiết (PDF)...')}
-              type="button"
-            >
-              <Download size={14} />
-              Tải báo cáo PDF
+              {t('studentResult.btnRetake')}
             </button>
           </div>
         </div>
       </section>
 
-      {/* 4 Rubrics Breakdown */}
-      <section className="grid gap-20 mb-32" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-        <div className="card p-20" style={{ borderTop: '4px solid #3b82f6' }}>
-          <div className="flex-between items-center mb-12">
-            <h3 className="m-0 font-bold text-on-surface text-base">Task Achievement</h3>
-            <span className="font-bold text-primary text-base">7.5 / 9.0</span>
+      {/* 3. Skill / Module Switcher */}
+      {availableSkills.length > 0 && (
+        <section className="result-skill-switcher" aria-label={t('studentResult.moduleSwitcherLabel')}>
+          <span className="result-filter-count">
+            {t('studentResult.moduleSwitcherLabel')}
+          </span>
+
+          <div className="result-skill-buttons-group">
+            {availableSkills.map((skill) => {
+              const Icon = skill === 'LISTENING' ? Headphones : skill === 'READING' ? BookOpen : skill === 'SPEAKING' ? Mic : FileEdit;
+              const label = skill.charAt(0) + skill.slice(1).toLowerCase();
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  className={`result-skill-btn ${selectedSkill === skill ? 'active' : ''}`}
+                  onClick={() => void handleSelectSkill(skill)}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
-          <p className="m-0 text-sm text-on-surface-variant leading-relaxed">
-            Trả lời đầy đủ các vế của đề bài. Lập luận chặt chẽ và đưa ra ví dụ minh họa xác đáng về năng lượng tái tạo.
-          </p>
+        </section>
+      )}
+
+      {/* 4. Tab Navigation Bar */}
+      <div className="result-nav-tabs">
+        <button
+          type="button"
+          className="result-nav-tab active"
+        >
+          <FileText size={16} />
+          <span>{t('studentResult.tabDetailedReview')}</span>
+        </button>
+      </div>
+
+      {annotationStatus !== 'success' && (
+        <div role={annotationStatus === 'loading' ? 'status' : 'alert'} className="result-card p-20">
+          <p>{t(`annotationStatus.${annotationStatus}`)}</p>
+          {annotationStatus === 'network' && (
+            <Button type="button" onClick={annotationResult.retry}>{t('annotationStatus.retry')}</Button>
+          )}
         </div>
+      )}
 
-        <div className="card p-20" style={{ borderTop: '4px solid #8b5cf6' }}>
-          <div className="flex-between items-center mb-12">
-            <h3 className="m-0 font-bold text-on-surface text-base">Coherence &amp; Cohesion</h3>
-            <span className="font-bold text-base" style={{ color: '#8b5cf6' }}>8.0 / 9.0</span>
-          </div>
-          <p className="m-0 text-sm text-on-surface-variant leading-relaxed">
-            Cấu trúc đoạn văn chuẩn học thuật 4 phần. Sử dụng linh hoạt các liên từ chuyển tiếp ý tưởng mạch lạc.
-          </p>
-        </div>
-
-        <div className="card p-20" style={{ borderTop: '4px solid #f59e0b' }}>
-          <div className="flex-between items-center mb-12">
-            <h3 className="m-0 font-bold text-on-surface text-base">Lexical Resource</h3>
-            <span className="font-bold text-base" style={{ color: '#f59e0b' }}>7.0 / 9.0</span>
-          </div>
-          <p className="m-0 text-sm text-on-surface-variant leading-relaxed">
-            Vốn từ phong phú về chủ đề môi trường. Cần hạn chế một số từ vựng lặp lại và chú ý thêm Collocations học thuật.
-          </p>
-        </div>
-
-        <div className="card p-20" style={{ borderTop: '4px solid #10b981' }}>
-          <div className="flex-between items-center mb-12">
-            <h3 className="m-0 font-bold text-on-surface text-base">Grammatical Range &amp; Acc</h3>
-            <span className="font-bold text-base" style={{ color: '#10b981' }}>7.5 / 9.0</span>
-          </div>
-          <p className="m-0 text-sm text-on-surface-variant leading-relaxed">
-            Phối hợp tốt giữa câu đơn và câu ghép phức. Mắc 2 lỗi nhỏ chia thì hoàn thành và mạo từ sở hữu.
-          </p>
-        </div>
-      </section>
-
-      {/* Main Workspace: Left Essay Annotations, Right Inspector & Thread */}
-      <div className="grid gap-32 items-start" style={{ gridTemplateColumns: '6fr 4fr' }}>
-        
-        {/* Left Column: Submission with Inline Annotations */}
-        <div className="card p-0 overflow-hidden">
-          <div className="flex-between items-center border-b bg-surface-container-low p-16-24">
-            <h2 className="flex items-center gap-10 m-0 font-bold text-on-surface text-base">
-              <FileText size={18} className="text-primary" />
-              Bài Nộp &amp; Highlight Sửa Lỗi Tương Tác
-            </h2>
-            <span className="text-xs font-medium text-on-surface-variant">
-              Tổng cộng 4 ghi chú sửa lỗi
-            </span>
-          </div>
-
-          <div className="p-24">
-            {/* Filter Buttons */}
-            <div className="flex items-center gap-8 mb-24 flex-wrap">
-              <span className="text-xs font-semibold text-on-surface-variant mr-4">
-                Lọc sửa lỗi:
-              </span>
-              <button 
-                className={`text-xs text-nowrap flex-shrink-0 font-semibold rounded-full border cursor-pointer px-14 py-6 transition-all ${activeFilter === 'all' ? 'bg-on-surface text-white border-on-surface' : 'bg-transparent text-on-surface-variant'}`}
-                onClick={() => setActiveFilter('all')}
-                type="button"
-              >
-                Tất cả ({annotations.length})
-              </button>
-              <button 
-                className={`text-xs text-nowrap flex-shrink-0 font-semibold rounded-full border cursor-pointer px-14 py-6 transition-all ${activeFilter === 'grammar' ? 'bg-error text-white border-error' : 'bg-transparent text-on-surface-variant'}`}
-                onClick={() => setActiveFilter('grammar')}
-                type="button"
-              >
-                Ngữ pháp (2)
-              </button>
-              <button 
-                className={`text-xs text-nowrap flex-shrink-0 font-semibold rounded-full border cursor-pointer px-14 py-6 transition-all ${activeFilter === 'vocabulary' ? 'bg-tertiary text-white border-tertiary' : 'bg-transparent text-on-surface-variant'}`}
-                onClick={() => setActiveFilter('vocabulary')}
-                type="button"
-              >
-                Từ vựng (1)
-              </button>
-              <button 
-                className={`text-xs text-nowrap flex-shrink-0 font-semibold rounded-full border cursor-pointer px-14 py-6 transition-all ${activeFilter === 'positive' ? 'bg-secondary text-white border-secondary' : 'bg-transparent text-on-surface-variant'}`}
-                onClick={() => setActiveFilter('positive')}
-                type="button"
-              >
-                Khen ngợi (1)
-              </button>
+      {/* =========================================================================
+          TAB 1: DETAILED REVIEW
+          ========================================================================= */}
+      {/* WRITING SKILL VIEW */}
+      {selectedSkill === 'WRITING' && (
+        <div className="result-workspace-grid">
+          {/* Left Essay Canvas */}
+          <div className="result-card">
+            <div className="result-card-header">
+              <h2 className="result-card-title">
+                Bài Nộp &amp; Chữa Lỗi Trực Tuyến
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {annotationStatus === 'success' && (
+                  <span className="result-filter-badge-text">
+                    {annotations.length > 0 ? (
+                      <>Tổng cộng <strong>{annotations.length}</strong> {t('studentResult.annotationsCount')}</>
+                    ) : (
+                      'Chưa có ghi chú'
+                    )}
+                  </span>
+                )}
+                {hasDocToDownload && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={Download}
+                    loading={isDownloadingDoc}
+                    onClick={handleDownloadDoc}
+                  >
+                    {isVi ? 'Tải tệp bài làm' : 'Download Submission File'}
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* Essay Text Canvas with Highlights */}
-            <div className="rounded-lg p-24 bg-surface-container-low leading-loose text-on-surface text-base" style={{ border: '1px solid var(--outline-variant)' }}>
-              <p className="m-0 mb-16">
-                In the modern era, the depletion of fossil fuels and rising environmental pollution have emerged as a{' '}
-                <span 
-                  className={`font-semibold cursor-pointer px-4 rounded ${isHighlightVisible('vocabulary') ? 'bg-tertiary-fixed text-on-tertiary-container border-b-2' : ''}`}
-                  style={{ borderBottomColor: isHighlightVisible('vocabulary') ? 'var(--tertiary)' : 'transparent' }}
-                  onClick={() => setSelectedAnnotationId(2)}
-                  title="Click để xem gợi ý sửa từ vựng"
-                >
-                  big dilemma
-                </span>{' '}
-                for developing nations. Over the past two decades, energy consumption{' '}
-                <span 
-                  className={`font-semibold cursor-pointer px-4 rounded ${isHighlightVisible('grammar') ? 'bg-error-container text-on-error-container border-b-2' : ''}`}
-                  style={{ borderBottomColor: isHighlightVisible('grammar') ? 'var(--error)' : 'transparent' }}
-                  onClick={() => setSelectedAnnotationId(1)}
-                  title="Click để xem lỗi ngữ pháp"
-                >
-                  has increase significantly
-                </span>{' '}
-                due to rapid industrialization and private vehicular usage.
-              </p>
-
-              <p className="m-0 mb-16">
-                Consequently, the emission of toxic exhaust gases directly{' '}
-                <span 
-                  className={`font-semibold cursor-pointer px-4 rounded ${isHighlightVisible('grammar') ? 'bg-error-container text-on-error-container border-b-2' : ''}`}
-                  style={{ borderBottomColor: isHighlightVisible('grammar') ? 'var(--error)' : 'transparent' }}
-                  onClick={() => setSelectedAnnotationId(3)}
-                  title="Click để xem lỗi ngữ pháp"
-                >
-                  affect on people life
+            {/* Filter Bar */}
+            {annotations.length > 0 && (
+              <div className="annotation-filters-bar">
+                <span className="result-filter-count">
+                  Lọc ghi chú:
                 </span>
-                , leading to higher rates of cardiovascular and respiratory ailments among residents living near metropolis centers.
-              </p>
-
-              <p className="m-0">
-                To mitigate this environmental catastrophe, international governments must advocate for a{' '}
-                <span 
-                  className={`font-semibold cursor-pointer px-4 rounded ${isHighlightVisible('positive') ? 'bg-secondary-container text-on-secondary-container border-b-2' : ''}`}
-                  style={{ borderBottomColor: isHighlightVisible('positive') ? 'var(--secondary)' : 'transparent' }}
-                  onClick={() => setSelectedAnnotationId(4)}
-                  title="Click để xem lời khen ngợi"
+                <button
+                  type="button"
+                  className={`annotation-filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setActiveFilter('all')}
                 >
-                  transitional shift toward renewable energy sources
-                </span>{' '}
-                such as solar and wind turbines. In conclusion, collective action from both policymakers and individuals is paramount to securing a sustainable future for forthcoming generations.
-              </p>
-            </div>
+                  {t('studentResult.filterAll')} ({annotations.length})
+                </button>
+                {availableAnnotationFilters.map((opt) => (
+                  <button
+                    key={opt.category}
+                    type="button"
+                    className={`annotation-filter-btn ${activeFilter === opt.category ? 'active' : ''}`}
+                    onClick={() => setActiveFilter(opt.category)}
+                  >
+                    {t(opt.labelKey)} ({opt.count})
+                  </button>
+                ))}
+              </div>
+            )}
 
-            <div className="flex items-center gap-16 mt-16 text-xs text-on-surface-variant">
-              <span className="flex items-center gap-6">
-                <span className="rounded-sm bg-error" style={{ width: 10, height: 10 }}></span>
-                Đỏ: Lỗi ngữ pháp
-              </span>
-              <span className="flex items-center gap-6">
-                <span className="rounded-sm bg-tertiary" style={{ width: 10, height: 10 }}></span>
-                Vàng: Gợi ý nâng cao từ vựng
-              </span>
-              <span className="flex items-center gap-6">
-                <span className="rounded-sm bg-secondary" style={{ width: 10, height: 10 }}></span>
-                Xanh: Lối diễn đạt xuất sắc
-              </span>
+            {/* Essay Text Canvas */}
+            <div className="essay-text-canvas">
+              {studentEssay ? (
+                studentEssay.split('\n').filter(Boolean).map((paragraph, pIdx) => (
+                  <p key={pIdx} className="result-essay-paragraph">
+                    {paragraph}
+                  </p>
+                ))
+              ) : attachedDocKey ? (
+                <div className="result-doc-card">
+                  <File size={36} className="result-doc-icon" />
+                  <div className="result-doc-title">{isVi ? 'Tệp tài liệu bài nộp' : 'Submission Document'}</div>
+                  <div className="result-doc-name">{attachedDocKey.split('/').pop() || attachedDocKey}</div>
+                  <div style={{ marginTop: '14px' }}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={Download}
+                      loading={isDownloadingDoc}
+                      onClick={handleDownloadDoc}
+                    >
+                      {isVi ? 'Tải tệp bài làm' : 'Download Submission File'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="result-empty-tab-content">
+                  <FileText size={32} className="result-empty-tab-icon" />
+                  <p className="result-empty-tab-msg">Chưa có nội dung văn bản bài nộp cho phần này.</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Right Column: Annotation Inspector & Feedback Thread */}
-        <div className="flex-col gap-24">
-          
-          {/* Selected Annotation Inspector */}
-          <div className="card p-0 overflow-hidden">
-            <div className="flex-between items-center border-b p-16-24">
-              <h3 className="flex items-center gap-8 m-0 font-bold text-on-surface text-base">
-                <Sparkles size={16} className="text-primary" />
-                Chi Tiết Lỗi &amp; Gợi Ý Sửa
-              </h3>
-              <span className="text-xs font-bold text-uppercase text-primary tracking-wide">
-                #{selectedAnnotation.id} • {selectedAnnotation.type}
-              </span>
-            </div>
+          {/* Right Sidebar: Inspector */}
+          <div className="flex-col gap-20">
+            <div className="result-card">
+              <div className="result-card-header">
+                <h3 className="result-card-title">
+                  {t('studentResult.selectedAnnotationHeader')}
+                </h3>
+                {selectedAnnotation && (
+                  <span className={`question-status-badge ${selectedAnnotation.type === 'positive' ? 'correct' : 'incorrect'}`}>
+                    {selectedAnnotation.badgeLabel}
+                  </span>
+                )}
+              </div>
 
-            <div className="p-24">
-              <div className="flex-col gap-16 rounded-lg p-20" style={{ 
-                backgroundColor: selectedAnnotation.type === 'grammar' ? '#FEF2F2' : selectedAnnotation.type === 'vocabulary' ? '#FFFBEB' : '#F0FDF4',
-                border: `1px solid ${selectedAnnotation.type === 'grammar' ? '#FECACA' : selectedAnnotation.type === 'vocabulary' ? '#FDE68A' : '#BBF7D0'}`
-              }}>
-                <div>
-                  <div className="text-xs font-bold text-uppercase text-on-surface-variant mb-4">
-                    Cụm từ gốc trong bài làm:
-                  </div>
-                  <div className="p-12 rounded bg-white border text-error font-medium" style={{ borderColor: 'var(--outline-variant)' }}>
-                    "{selectedAnnotation.original}"
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-bold text-uppercase text-on-surface-variant mb-4">
-                    AI Đề xuất chỉnh sửa chuẩn IELTS:
-                  </div>
-                  <div className="p-12 rounded bg-white border text-secondary font-medium" style={{ borderColor: 'var(--outline-variant)' }}>
-                    "{selectedAnnotation.suggestion}"
-                  </div>
-                </div>
-
-                <div className="text-sm text-on-surface leading-relaxed">
-                  <strong>Giải thích nguyên tắc:</strong> {selectedAnnotation.explanation}
-                </div>
-
-                {selectedAnnotation.teacherNote && (
-                  <div className="p-10-16 rounded text-xs mt-8" style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}>
-                    <div className="flex items-center gap-4 font-bold mb-4">
-                      <UserCheck size={14} />
-                      Lời phê của Cô Mai Lan:
+              <div className="result-card-body annotation-inspect-box">
+                {selectedAnnotation ? (
+                  <>
+                    <div>
+                      <div className="result-ann-section-label">
+                        {t('studentResult.originalSegment')}
+                      </div>
+                      <div className="diff-box original">
+                        &quot;{selectedAnnotation.original}&quot;
+                      </div>
                     </div>
-                    "{selectedAnnotation.teacherNote}"
+
+                    {selectedAnnotation.suggestion && (
+                      <div>
+                        <div className="result-ann-section-label">
+                          {t('studentResult.suggestedFix')}
+                        </div>
+                        <div className="diff-box suggestion">
+                          &quot;{selectedAnnotation.suggestion}&quot;
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="explanation-card">
+                      <div className="result-ann-header-title">
+                        {t('studentResult.ruleExplanation')}
+                      </div>
+                      {selectedAnnotation.explanation}
+                    </div>
+
+                    {selectedAnnotation.teacherNote && (
+                      <div className="teacher-annotation-note">
+                        <div className="result-ann-item-row">
+                          <UserCheck size={14} />
+                          {t('studentResult.teacherAdvice')}
+                        </div>
+                        &quot;{selectedAnnotation.teacherNote}&quot;
+                      </div>
+                    )}
+                  </>
+                ) : annotationStatus === 'success' ? (
+                  <div className="result-ann-empty">
+                    {annotations.length === 0
+                      ? t('annotationStatus.empty')
+                      : 'Chọn một ghi chú ở danh sách để xem chi tiết.'}
+                  </div>
+                ) : null}
+
+                {/* Annotation list chips */}
+                {filteredAnnotations.length > 0 && (
+                  <div className="result-ann-summary-list">
+                    <div className="result-ann-summary-title">
+                      Danh sách điểm chữa ({filteredAnnotations.length})
+                    </div>
+                    {filteredAnnotations.map(ann => (
+                      <button
+                        key={ann.id}
+                        type="button"
+                        onClick={() => setSelectedAnnotationId(ann.id)}
+                        className={`result-ann-chip ${selectedAnnotation?.id === ann.id ? 'is-active' : ''}`}
+                      >
+                        <span className="result-ann-summary-text">#{ann.id} {ann.badgeLabel}</span>: {ann.suggestion || ann.original}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Teacher Feedback */}
+            <div className="result-card">
+              <div className="result-card-header">
+                <h3 className="result-card-title">
+                  {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
+                </h3>
+              </div>
+              <div className="result-card-body">
+                {teacherFeedbackText ? (
+                  <div className="result-teacher-feedback-content">
+                    <MarkdownView content={teacherFeedbackText} />
+                  </div>
+                ) : (
+                  <p className="result-teacher-feedback-empty">
+                    {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SPEAKING SKILL VIEW */}
+      {selectedSkill === 'SPEAKING' && (
+        <div className="flex-col gap-20">
+          {/* Student Audio Recording */}
+          <div className="result-card">
+            <div className="result-card-header">
+              <h3 className="result-card-title">
+                {isVi ? 'Bài nói của bạn' : 'Your Speaking Submission'}
+              </h3>
+              {hasAudioToDownload && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Download}
+                  loading={isDownloadingAudio}
+                  onClick={handleDownloadAudio}
+                >
+                  {isVi ? 'Tải bản ghi âm' : 'Download Audio'}
+                </Button>
+              )}
+            </div>
+
+            <div className="result-card-body">
+              {showAudioLoading ? (
+                <div className="result-audio-empty" role="status">
+                  {isVi ? 'Đang tải audio bài nộp...' : 'Loading submission audio...'}
+                </div>
+              ) : audioError ? (
+                <div className="result-audio-error">
+                  <div className="result-audio-error-msg">
+                    <AlertCircle size={16} />
+                    <span>
+                      {isVi ? 'Không thể tải audio bài nộp. Vui lòng thử lại.' : 'Unable to load submission audio. Please try again.'}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={RefreshCw}
+                    onClick={handleAudioRetry}
+                  >
+                    {isVi ? 'Thử lại' : 'Retry'}
+                  </Button>
+                </div>
+              ) : audioUrl ? (
+                <div className="result-audio-player-wrap">
+                  <audio
+                    ref={audioRef}
+                    controls
+                    src={audioUrl}
+                    className="result-audio-player"
+                    onError={handleAudioError}
+                    onLoadedMetadata={handleAudioMetadata}
+                  >
+                    {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                  </audio>
+                </div>
+              ) : (
+                <div className="result-audio-empty">
+                  {isVi ? 'Chưa tìm thấy bản ghi âm của bài nộp này.' : 'No audio recording found for this submission.'}
+                </div>
+              )}
+
+              {/* Spoken Transcript for Student */}
+              {speakingTranscriptText && (
+                <div className="result-speaking-transcript-wrap">
+                  <div className="result-speaking-transcript-label">
+                    <FileText size={16} />
+                    <span>{isVi ? 'Bản ghi lời nói (AI Transcript):' : 'Spoken Transcript (AI Transcribed):'}</span>
+                  </div>
+                  <div className="result-speaking-transcript-text">
+                    {speakingTranscriptText}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Teacher & AI General Feedback */}
-          <div className="card p-0 overflow-hidden">
-            <div className="border-b p-16-24">
-              <h3 className="flex items-center gap-8 m-0 font-bold text-on-surface text-base">
-                <MessageSquare size={16} className="text-primary" />
-                Nhận Xét Chung Của Giảng Viên
+          {annotationStatus === 'success' && annotations.length === 0 && (
+            <div className="result-ann-empty">{t('annotationStatus.empty')}</div>
+          )}
+
+          {/* Accepted Speaking Annotations */}
+          {annotations.length > 0 && (
+            <div className="result-card">
+              <div className="result-card-header">
+                <h3 className="result-card-title">
+                  {isVi ? 'Chi tiết điểm sửa lỗi đã duyệt' : 'Approved Annotations'}
+                </h3>
+                <span className="result-filter-badge-text">
+                  <strong>{annotations.length}</strong> {t('studentResult.annotationsCount')}
+                </span>
+              </div>
+              <div className="result-card-body annotation-inspect-box">
+                {annotations.map((ann) => (
+                  <div key={ann.id} className="explanation-card">
+                    <div className="result-speaking-ann-header">
+                      <span className="result-ann-type-pill">{ann.badgeLabel}</span>
+                      <div className="result-ann-header-title">
+                        <span>&ldquo;{ann.original}&rdquo;</span>
+                        {ann.suggestion && (
+                          <>
+                            {' '}&rarr; <strong>{ann.suggestion}</strong>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div>{ann.explanation}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Teacher Feedback */}
+          <div className="result-card">
+            <div className="result-card-header">
+              <h3 className="result-card-title">
+                {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
               </h3>
             </div>
 
-            <div className="flex-col gap-16 p-24">
-              <div className="p-20 rounded-lg bg-surface-container-low border relative" style={{ borderColor: 'var(--outline-variant)' }}>
-                <div className="flex-between items-center mb-12">
-                  <div className="flex items-center gap-10">
-                    <span className="flex-center rounded-full text-white font-bold bg-primary" style={{ width: 26, height: 26, fontSize: 11 }}>
-                      ML
-                    </span>
-                    <span className="font-semibold text-sm">ThS. Trần Thị Mai Lan (GV Phụ Trách)</span>
-                  </div>
-                  <span className="text-xs text-on-surface-variant">05/09/2026 14:20</span>
+            <div className="result-card-body">
+              {teacherFeedbackText ? (
+                <div className="result-teacher-feedback-content">
+                  <MarkdownView content={teacherFeedbackText} />
                 </div>
-                <p className="m-0 text-sm leading-relaxed text-on-surface italic">
-                  "Bài viết của Alice có cấu trúc rất vững, bố cục các luận điểm rõ ràng và giải quyết trọn vẹn yêu cầu của đề bài Task 2. Em đã tiến bộ vượt bậc so với tuần trước ở phần liên kết câu. Hãy chú ý hơn khi chia động từ ở các thì quá khứ/hoàn thành để không bị trừ điểm Grammatical Accuracy đáng tiếc nhé!"
+              ) : (
+                <p className="result-teacher-feedback-empty">
+                  {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
                 </p>
-              </div>
-
-              <button 
-                type="button" 
-                className="btn btn-primary w-full"
-                onClick={() => alert('Mở hộp thư trao đổi riêng với giảng viên lớp ENG-IELTS-6.5A!')}
-              >
-                <MessageSquare size={15} />
-                Gửi câu hỏi / Thảo luận thêm với Giảng viên
-              </button>
+              )}
             </div>
           </div>
-
         </div>
+      )}
 
-      </div>
+      {/* READING OR LISTENING SKILL VIEW */}
+      {(selectedSkill === 'READING' || selectedSkill === 'LISTENING') && (
+        <div className="flex-col gap-20">
+          <div className="result-card p-20">
+            <div className="flex-between items-center mb-16 flex-wrap">
+              <div className="result-mcq-header-title">
+                {selectedSkill === 'READING' ? <BookOpen size={20} className="text-primary" /> : <Headphones size={20} className="text-primary" />}
+                <h3 className="result-mcq-title-h3">
+                  {t('studentResult.questionReview')} ({questionsList.length} câu)
+                </h3>
+              </div>
+
+              {questionsList.length > 0 && (
+                <div className="result-mcq-filter-group">
+                  <button
+                    type="button"
+                    className={`annotation-filter-btn ${questionFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setQuestionFilter('all')}
+                  >
+                    {t('studentResult.filterAll')} ({questionsList.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`annotation-filter-btn ${questionFilter === 'correct' ? 'active' : ''}`}
+                    onClick={() => setQuestionFilter('correct')}
+                  >
+                    {t('studentResult.filterCorrect')} ({questionsList.filter(q => q.isCorrect === true).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`annotation-filter-btn ${questionFilter === 'incorrect' ? 'active' : ''}`}
+                    onClick={() => setQuestionFilter('incorrect')}
+                  >
+                    {t('studentResult.filterIncorrect')} ({questionsList.filter(q => q.isCorrect === false).length})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {questionsList.length === 0 ? (
+              <div className="result-empty-tab-content">
+                <HelpCircle size={32} className="result-empty-tab-icon" />
+                <p className="result-empty-tab-msg">Không có câu hỏi trắc nghiệm nào trong module này.</p>
+              </div>
+            ) : (
+              <div className="result-mcq-list">
+                {filteredQuestions.map((q) => (
+                  <div
+                    key={q.id}
+                    className={`result-mcq-card ${q.isCorrect === true ? 'is-correct' : q.isCorrect === false ? 'is-incorrect' : ''}`}
+                  >
+                    <div className="result-mcq-card-top">
+                      <span className="result-mcq-card-num">
+                        Câu {q.questionNumber}: {q.prompt}
+                      </span>
+                      {q.isCorrect !== undefined && (
+                        <span className={`result-mcq-status-badge ${q.isCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                          {q.isCorrect ? 'ĐÚNG' : 'SAI'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="result-mcq-meta">
+                      <div>
+                        <span className="text-on-surface-variant">{t('studentResult.yourAnswer')}: </span>
+                        <strong className={q.isCorrect === true ? 'result-mcq-answer-correct' : q.isCorrect === false ? 'result-mcq-answer-incorrect' : ''}>
+                          {q.studentAnswer}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-on-surface-variant">{t('studentResult.correctAnswer')}: </span>
+                        <strong className="result-mcq-answer-correct">{q.correctAnswer}</strong>
+                      </div>
+                    </div>
+
+                    {q.options && q.options.length > 0 && (
+                      <div className="result-mcq-options-grid">
+                        {q.options.map((opt) => {
+                          const isStudentPick = q.studentAnswer.startsWith(opt.key);
+                          const isCorrectOption = q.correctAnswer.startsWith(opt.key);
+                          return (
+                            <div
+                              key={opt.key}
+                              className={`result-mcq-opt-item ${isCorrectOption ? 'is-correct' : isStudentPick && !q.isCorrect ? 'is-student-wrong' : ''}`}
+                            >
+                              <span className={`result-mcq-opt-key ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                {opt.key}
+                              </span>
+                              <span className={`result-mcq-opt-text ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                {opt.text}
+                              </span>
+                              {isCorrectOption && (
+                                <span className="result-mcq-tag-correct inline-flex items-center gap-1">
+                                  <CheckCircle2 size={12} />
+                                  <span>Đáp án đúng</span>
+                                </span>
+                              )}
+                              {isStudentPick && !isCorrectOption && (
+                                <span className="result-mcq-tag-wrong inline-flex items-center gap-1">
+                                  <XCircle size={12} />
+                                  <span>Lựa chọn của bạn</span>
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Teacher Feedback */}
+          <div className="result-card">
+            <div className="result-card-header">
+              <h3 className="result-card-title">
+                {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
+              </h3>
+            </div>
+            <div className="result-card-body">
+              {teacherFeedbackText ? (
+                <div className="result-teacher-feedback-content">
+                  <MarkdownView content={teacherFeedbackText} />
+                </div>
+              ) : (
+                <p className="result-teacher-feedback-empty">
+                  {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

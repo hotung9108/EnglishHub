@@ -1,4 +1,4 @@
-export type SettingsTab = 'profile' | 'security' | 'notifications' | 'preferences';
+export type SettingsTab = 'profile' | 'security';
 
 export interface ActiveSession {
   id: string;

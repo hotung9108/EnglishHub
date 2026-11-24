@@ -140,7 +140,7 @@ export const ResetPassword: React.FC = () => {
               {email && (
                 <p className="login-form-desc">
                   {isVi ? `Đang đặt lại mật khẩu cho tài khoản: ` : `Resetting password for: `}
-                  <strong style={{ color: 'var(--primary)' }}>{email}</strong>
+                  <strong className="text-primary">{email}</strong>
                 </p>
               )}
             </div>

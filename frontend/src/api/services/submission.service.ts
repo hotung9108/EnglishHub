@@ -1,12 +1,19 @@
 import { httpClient } from '../core/client';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 import type { AssignmentSkill } from './assignment.service';
+import {
+  fetchFileBlobFromPresignedUrl,
+  normalizeStorageUrl,
+  uploadDirectToStorage as uploadDirectStorageHelper,
+} from '../../utils/storage.utils';
 
 export type SubmissionStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'GRADED';
 export type SubmissionGradingStatus = 'PENDING' | 'AI_GRADED' | 'COMPLETED' | 'FAILED';
 export type SubmissionGradingMethod = 'AUTO' | 'TEACHER_MANUAL';
 export type SubmissionTaskType = 'QUIZ' | 'REWRITE' | 'RECORDING' | 'ESSAY';
 export type SubmissionSkill = AssignmentSkill;
+
+export const MAX_SUBMISSION_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export interface SubmissionStartModuleResponse {
   id: number;
@@ -71,6 +78,7 @@ export interface SubmissionModuleSummary {
 
 export interface SubmissionListItem {
   id: number;
+  assignmentId: number;
   studentId: number;
   attemptNumber: number;
   status: SubmissionStatus;
@@ -95,7 +103,77 @@ export interface SubmitResponse {
   submittedAt: string;
 }
 
+export interface SubmittedAnswerItem {
+  id: number;
+  questionId: number | null;
+  content: unknown;
+  docStorageKey?: string | null;
+  docMimeType?: string | null;
+  docUploadStatus?: string | null;
+  audioStorageKey?: string | null;
+  audioMimeType?: string | null;
+  audioUploadStatus?: string | null;
+  audioDownloadUrl?: string | null;
+  docDownloadUrl?: string | null;
+}
+
+export type AnswerDetailResponse = SubmittedAnswerItem;
+
+export interface SubmissionFileDownloadUrlResponse {
+  submissionModuleId: number;
+  downloadUrl: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  expiresAt: string;
+}
+
+export interface SubmitModuleAnswerPayload {
+  questionId: number;
+  content: Record<string, unknown>;
+}
+
+export interface SubmitModulePayload {
+  answers?: SubmitModuleAnswerPayload[];
+  audioStorageKey?: string;
+  storageKey?: string;
+}
+
+export interface SubmitModuleResponse {
+  message: string;
+  submissionModuleId: number;
+  status: SubmissionStatus;
+  answers: SubmittedAnswerItem[];
+}
+
+export interface UploadUrlResponse {
+  uploadUrl: string;
+  storageKey: string;
+  expiresAt: string;
+}
+
+export interface SubmissionModuleQuestionDetail {
+  id: number;
+  content: string;
+  questionType: string;
+  score: number;
+  orderIndex: number;
+  correctAnswer?: unknown;
+}
+
+export interface SubmissionModuleDetailResponse {
+  id: number;
+  moduleId: number;
+  skill: SubmissionSkill | null;
+  taskType: SubmissionTaskType | null;
+  status: SubmissionStatus;
+  grading: SubmissionGradingDetail | null;
+  questions: SubmissionModuleQuestionDetail[];
+  answers: SubmittedAnswerItem[];
+}
+
 export interface SubmissionListParams {
+  classId?: number;
   assignmentId?: number;
   studentId?: number;
   status?: SubmissionStatus;
@@ -115,6 +193,7 @@ export function normalizeSubmissionListParams(params: SubmissionListParams = {})
       : Math.min(100, Math.max(1, Math.floor(requestedLimit)));
 
   return {
+    ...(params.classId !== undefined ? { classId: params.classId } : {}),
     ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
     ...(params.studentId !== undefined ? { studentId: params.studentId } : {}),
     ...(params.status !== undefined ? { status: params.status } : {}),
@@ -149,6 +228,93 @@ export function findInProgressAttempt(items: SubmissionListItem[]): SubmissionLi
   }
 
   return newestAttempt;
+}
+
+export interface SubmissionGradedCheckInput {
+  status?: string | null;
+  modules?: Array<{
+    status?: string | null;
+    grading?: {
+      status?: string | null;
+      finalScore?: number | null;
+    } | null;
+  }> | null;
+}
+
+/**
+ * Checks if a specific module in a submission has been graded.
+ */
+export function isModuleGraded(module?: {
+  status?: string | null;
+  grading?: {
+    status?: string | null;
+    finalScore?: number | null;
+  } | null;
+} | null): boolean {
+  if (!module) return false;
+  return (
+    module.status === 'GRADED' ||
+    module.grading?.status === 'COMPLETED' ||
+    (module.grading?.finalScore !== null && module.grading?.finalScore !== undefined)
+  );
+}
+
+/**
+ * Checks if a submission is fully graded.
+ * For assignments with multiple modules (e.g. Speaking, Writing, Reading),
+ * a submission is ONLY considered graded when ALL submitted modules are graded.
+ * If only Reading is auto-graded while Speaking/Writing are still pending teacher review,
+ * the submission as a whole remains pending grading.
+ */
+export function isSubmissionGraded(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub) return false;
+  if (sub.status === 'GRADED') return true;
+  if (!sub.modules || sub.modules.length === 0) return false;
+  return sub.modules.every((m) => isModuleGraded(m));
+}
+
+/**
+ * Checks if some (but not all) modules are graded in a multi-module submission.
+ */
+export function isSubmissionPartiallyGraded(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub?.modules || sub.modules.length <= 1) return false;
+  const gradedCount = sub.modules.filter((m) => isModuleGraded(m)).length;
+  return gradedCount > 0 && gradedCount < sub.modules.length;
+}
+
+/**
+ * Checks if at least one module has been graded in the submission.
+ */
+export function hasAnyGradedModule(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub) return false;
+  if (sub.status === 'GRADED') return true;
+  if (!sub.modules || sub.modules.length === 0) return false;
+  return sub.modules.some((m) => isModuleGraded(m));
+}
+
+/**
+ * Calculates overall final score for a submission.
+ * For multi-module submissions, returns the average score across modules only when all are graded.
+ * Returns null if the submission has not been fully graded yet.
+ */
+export function getSubmissionFinalScore(sub?: SubmissionGradedCheckInput | null): number | null {
+  if (!sub?.modules || sub.modules.length === 0) return null;
+
+  // All modules must be graded to have a finalized overall score
+  if (!isSubmissionGraded(sub)) {
+    return null;
+  }
+
+  const validScores: number[] = [];
+  for (const m of sub.modules) {
+    if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
+      validScores.push(Number(m.grading.finalScore));
+    }
+  }
+
+  if (validScores.length === 0) return null;
+  const avg = validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length;
+  return Math.round(avg * 10) / 10;
 }
 
 export class SubmissionService {
@@ -186,6 +352,37 @@ export class SubmissionService {
     });
   }
 
+  async listAllSubmissions(
+    params: Omit<SubmissionListParams, 'page' | 'limit'> = {},
+    options?: ApiRequestOptions
+  ): Promise<SubmissionListItem[]> {
+    const limit = 100;
+    const errorMessage = 'Dữ liệu phân trang không nhất quán';
+    const firstPage = await this.listSubmissions({ ...params, page: 1, limit }, options);
+    const total = firstPage.pagination?.total;
+    if (!Number.isInteger(total) || total < 0) throw new Error(errorMessage);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const submissions: SubmissionListItem[] = [];
+    const submissionIds = new Set<number>();
+
+    for (let page = 1; page <= totalPages; page++) {
+      const response = page === 1
+        ? firstPage
+        : await this.listSubmissions({ ...params, page, limit }, options);
+      const pageTotal = response.pagination?.total;
+      if (!Number.isInteger(pageTotal) || pageTotal < 0 || (page < totalPages && response.data.length !== limit)) {
+        throw new Error(errorMessage);
+      }
+      for (const submission of response.data) {
+        if (submissionIds.has(submission.id)) throw new Error(errorMessage);
+        submissionIds.add(submission.id);
+        submissions.push(submission);
+      }
+    }
+
+    return submissions;
+  }
+
   submitSubmission(
     submissionId: number,
     options?: ApiRequestOptions
@@ -195,6 +392,255 @@ export class SubmissionService {
       undefined,
       options
     );
+  }
+
+  submitModule(
+    submissionModuleId: number,
+    payload?: SubmitModulePayload,
+    options?: ApiRequestOptions
+  ): Promise<SubmitModuleResponse> {
+    return this.http.post<SubmitModuleResponse>(
+      `/submission-modules/${submissionModuleId}/submit`,
+      payload ?? {},
+      options
+    );
+  }
+
+  getSubmissionModuleDetail(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionModuleDetailResponse> {
+    return this.http.get<SubmissionModuleDetailResponse>(
+      `/submission-modules/${submissionModuleId}`,
+      options
+    );
+  }
+
+  getAudioUploadUrl(
+    submissionModuleId: number,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    fileSizeBytesOrOptions?: number | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let fileSizeBytes: number | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (typeof fileSizeBytesOrOptions === 'number') {
+      fileSizeBytes = fileSizeBytesOrOptions;
+    } else if (fileSizeBytesOrOptions && typeof fileSizeBytesOrOptions === 'object') {
+      requestOptions = fileSizeBytesOrOptions;
+    }
+
+    const payload: { mimeType?: string; fileSizeBytes?: number } = {};
+    if (mimeType) {
+      payload.mimeType = mimeType;
+    }
+    if (typeof fileSizeBytes === 'number') {
+      payload.fileSizeBytes = fileSizeBytes;
+    }
+
+    return this.http.post<UploadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/audio-upload-url`,
+      payload,
+      requestOptions
+    );
+  }
+
+  getDocumentUploadUrl(
+    submissionModuleId: number,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    fileSizeBytesOrOptions?: number | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let fileSizeBytes: number | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (typeof fileSizeBytesOrOptions === 'number') {
+      fileSizeBytes = fileSizeBytesOrOptions;
+    } else if (fileSizeBytesOrOptions && typeof fileSizeBytesOrOptions === 'object') {
+      requestOptions = fileSizeBytesOrOptions;
+    }
+
+    const payload: { mimeType?: string; fileSizeBytes?: number } = {};
+    if (mimeType) {
+      payload.mimeType = mimeType;
+    }
+    if (typeof fileSizeBytes === 'number') {
+      payload.fileSizeBytes = fileSizeBytes;
+    }
+
+    return this.http.post<UploadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/document-upload-url`,
+      payload,
+      requestOptions
+    );
+  }
+
+  /**
+   * Step 1: Requests a temporary presigned GET URL to stream or download a student speaking audio submission.
+   */
+  async getAudioDownloadUrl(
+    submissionModuleId: number,
+    modeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionFileDownloadUrlResponse> {
+    const mode = typeof modeOrOptions === 'string' ? modeOrOptions : undefined;
+    const requestOptions = typeof modeOrOptions === 'object' ? modeOrOptions : options;
+    const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
+    const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/audio-download-url${query}`,
+      requestOptions
+    );
+    return {
+      ...res,
+      downloadUrl: normalizeStorageUrl(res.downloadUrl),
+    };
+  }
+
+  /**
+   * Step 1: Requests a temporary presigned GET URL to stream or download a student essay document submission.
+   */
+  async getDocumentDownloadUrl(
+    submissionModuleId: number,
+    modeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionFileDownloadUrlResponse> {
+    const mode = typeof modeOrOptions === 'string' ? modeOrOptions : undefined;
+    const requestOptions = typeof modeOrOptions === 'object' ? modeOrOptions : options;
+    const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
+    const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/document-download-url${query}`,
+      requestOptions
+    );
+    return {
+      ...res,
+      downloadUrl: normalizeStorageUrl(res.downloadUrl),
+    };
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to retrieve a student speaking submission audio file as a Blob.
+   * Step 1: Calls backend API to create a presigned GET URL.
+   * Step 2: Uses the presigned URL to fetch file binary data (Blob).
+   */
+  async getAudioFileBlob(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    const { downloadUrl } = await this.getAudioDownloadUrl(submissionModuleId, options);
+    return fetchFileBlobFromPresignedUrl(downloadUrl);
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to retrieve a student essay submission document as a Blob.
+   * Step 1: Calls backend API to create a presigned GET URL.
+   * Step 2: Uses the presigned URL to fetch file binary data (Blob).
+   */
+  async getDocumentFileBlob(
+    submissionModuleId: number,
+    mode?: string,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    const { downloadUrl } = await this.getDocumentDownloadUrl(submissionModuleId, mode, options);
+    return fetchFileBlobFromPresignedUrl(downloadUrl);
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to upload a student speaking recording.
+   * Step 1: Calls backend API to request a presigned PUT URL and storageKey.
+   * Step 2: Uploads audio binary data directly to the object storage URL.
+   * Returns { uploadUrl, storageKey, expiresAt } ready for submitModule.
+   */
+  async uploadAudio(
+    submissionModuleId: number,
+    fileOrBlob: Blob | File,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (fileOrBlob && typeof fileOrBlob.size === 'number' && fileOrBlob.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+      throw new Error(`Dung lượng tệp (${(fileOrBlob.size / (1024 * 1024)).toFixed(1)}MB) vượt quá giới hạn tối đa cho phép (10MB).`);
+    }
+
+    const resolvedMime = mimeType || fileOrBlob.type || 'audio/webm';
+    const uploadRes = await this.getAudioUploadUrl(
+      submissionModuleId,
+      resolvedMime,
+      fileOrBlob.size,
+      requestOptions
+    );
+    await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
+    return uploadRes;
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to upload a student essay document.
+   * Step 1: Calls backend API to request a presigned PUT URL and storageKey.
+   * Step 2: Uploads document binary data directly to the object storage URL.
+   * Returns { uploadUrl, storageKey, expiresAt } ready for submitModule.
+   */
+  async uploadDocument(
+    submissionModuleId: number,
+    fileOrBlob: Blob | File,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (fileOrBlob && typeof fileOrBlob.size === 'number' && fileOrBlob.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+      throw new Error(`Dung lượng tệp (${(fileOrBlob.size / (1024 * 1024)).toFixed(1)}MB) vượt quá giới hạn tối đa cho phép (10MB).`);
+    }
+
+    const resolvedMime = mimeType || fileOrBlob.type || 'application/pdf';
+    const uploadRes = await this.getDocumentUploadUrl(
+      submissionModuleId,
+      resolvedMime,
+      fileOrBlob.size,
+      requestOptions
+    );
+    await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
+    return uploadRes;
+  }
+
+  /**
+   * Uploads raw binary data (Blob or File) directly to a presigned S3/MinIO upload URL.
+   * Direct PUT to object storage does not send backend auth headers so as not to break S3 presigned URL signature.
+   */
+  async uploadDirectToStorage(
+    uploadUrl: string,
+    fileOrBlob: Blob | File,
+    mimeType: string
+  ): Promise<void> {
+    return uploadDirectStorageHelper(uploadUrl, fileOrBlob, mimeType);
   }
 }
 

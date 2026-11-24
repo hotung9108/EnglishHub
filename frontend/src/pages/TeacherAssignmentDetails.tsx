@@ -1,440 +1,998 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  ArrowLeft, Edit2, Download, Calendar, Shield, PenTool, 
-  Zap, FileText, Search, Bell
+  ArrowLeft, Edit2, FileText, 
+  RefreshCw, AlertCircle, CheckCircle2, HelpCircle, Lock, Headphones,
+  Users, Clock, PenTool, Mic, BookOpen, Trash2, Download
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import {
+  submissionService,
+  type SubmissionListItem,
+  isSubmissionGraded,
+  getSubmissionFinalScore
+} from '../api/services/submission.service';
+import { moduleService } from '../api/services/module.service';
+import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
+import { Button, MetricCard, LoadingState, useToast } from '../components/common';
+import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
 
-const TeacherAssignmentDetails = () => {
+export interface AssignmentModuleData {
+  id: number;
+  skill: string;
+  orderIndex?: number;
+  instructions?: string;
+  audioUrl?: string;
+  questions: QuestionResponse[];
+}
+
+interface EnrolledStudentSubmissionRow {
+  studentId: number;
+  code: string;
+  name: string;
+  initials: string;
+  avatarBg: string;
+  avatarColor: string;
+  status: 'submitted' | 'in_progress' | 'missing';
+  gradingStatus: 'graded' | 'pending' | 'none';
+  submissionId?: number;
+  finalScore?: number | null;
+}
+
+export const TeacherAssignmentDetails: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const { id } = useParams();
-  const [activeTab, setActiveTab] = useState('all');
-  const [subTab, setSubTab] = useState('graded');
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
+  const { id } = useParams<{ id: string }>();
 
-  const students = [
-    {
-      id: 'HV-8881',
-      name: 'Alice Johnson',
-      email: 'alice.j@gmail.com',
-      initials: 'AJ',
-      avatarBg: '#E0E7FF',
-      avatarColor: '#4338CA',
-      status: 'submitted',
-      gradingStatus: 'graded'
-    },
-    {
-      id: 'HV-8882',
-      name: 'David Pham',
-      email: 'david.p@outlook.com',
-      initials: 'DP',
-      avatarBg: '#FEF3C7',
-      avatarColor: '#D97706',
-      status: 'submitted',
-      gradingStatus: 'pending'
-    },
-    {
-      id: 'HV-8883',
-      name: 'Lê Bảo Trâm',
-      email: 'tram.lb@gmail.com',
-      initials: 'BT',
-      avatarBg: '#FCE7F3',
-      avatarColor: '#BE185D',
-      status: 'missing',
-      gradingStatus: 'none'
-    },
-    {
-      id: 'HV-8885',
-      name: 'Trần Hoàng Long',
-      email: 'long.th@yahoo.com',
-      initials: 'HL',
-      avatarBg: '#E0E7FF',
-      avatarColor: '#4338CA',
-      status: 'submitted',
-      gradingStatus: 'graded'
-    },
-    {
-      id: 'HV-8886',
-      name: 'Nguyễn Thảo Hương',
-      email: 'huong.nguyen@gmail.com',
-      initials: 'TH',
-      avatarBg: '#F3E8FF',
-      avatarColor: '#7E22CE',
-      status: 'submitted',
-      gradingStatus: 'pending'
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
+  const toast = useToast();
+  const [isClosing, setIsClosing] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  const { user } = useAuth();
+  const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
+  const [currentClass, setCurrentClass] = useState<ClassSummary | null>(null);
+
+  const isOwner = useMemo(() => {
+    if (!user || user.role !== 'teacher') return false;
+    if (currentClass) {
+      return currentClass.teacherId ? currentClass.teacherId === user.id : true;
     }
-  ];
+    return true;
+  }, [user, currentClass]);
+
+  // Data
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [className, setClassName] = useState<string>('');
+  const [closeAtDate, setCloseAtDate] = useState<string>('');
+  const [instructions, setInstructions] = useState<string>('');
+  const [skillLabel, setSkillLabel] = useState<string>('Writing Task');
+  const [students, setStudents] = useState<EnrolledStudentSubmissionRow[]>([]);
+  const [questions, setQuestions] = useState<QuestionResponse[]>([]);
+  const [modulesList, setModulesList] = useState<AssignmentModuleData[]>([]);
+  const [selectedModuleIndex, setSelectedModuleIndex] = useState<number>(0);
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
+  };
+
+  const handleOpenCloseModal = () => {
+    if (!assignment || assignment.status !== 'PUBLISHED' || !isOwner) return;
+    setShowCloseModal(true);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!assignment || assignment.status !== 'PUBLISHED' || !isOwner) return;
+
+    setIsClosing(true);
+    try {
+      const response = await assignmentService.updateAssignmentStatus(assignment.id, 'CLOSED');
+      setAssignment((prev) => (prev ? { ...prev, status: 'CLOSED' } : null));
+      setStudents((prev) =>
+        prev.map((s) => (s.status === 'in_progress' ? { ...s, status: 'missing' } : s))
+      );
+      setShowCloseModal(false);
+      showToast(response?.message || (isVi ? 'Đã đóng bài tập thành công.' : 'Assignment closed successfully.'));
+    } catch (err: unknown) {
+      console.error('Failed to close assignment:', err);
+      let errorMsg = isVi ? 'Không thể đóng bài tập. Vui lòng thử lại.' : 'Failed to close assignment. Please retry.';
+      if (err && typeof err === 'object') {
+        const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+        if (apiErr.response?.data?.message) {
+          errorMsg = apiErr.response.data.message;
+        } else if (apiErr.message) {
+          errorMsg = apiErr.message;
+        }
+      }
+      showToast(errorMsg);
+    } finally {
+      setIsClosing(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!assignment || !isOwner) return;
+
+    setIsDeleting(true);
+    try {
+      await assignmentService.deleteAssignment(assignment.id);
+      setShowDeleteModal(false);
+      showToast(isVi ? 'Đã xóa bài tập thành công.' : 'Assignment deleted successfully.');
+      navigate('/teacher/assignments');
+    } catch (err: unknown) {
+      console.error('Failed to delete assignment:', err);
+      let errorMsg = isVi ? 'Không thể xóa bài tập. Vui lòng thử lại.' : 'Failed to delete assignment. Please retry.';
+      if (err && typeof err === 'object') {
+        const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+        if (apiErr.response?.data?.message) {
+          errorMsg = apiErr.response.data.message;
+        } else if (apiErr.message) {
+          errorMsg = apiErr.message;
+        }
+      }
+      showToast(errorMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleExportSubmissions = async () => {
+    if (isExporting || !id) return;
+    if (students.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu bài nộp để xuất file.' : 'No submission data to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      try {
+        const blob = await assignmentService.exportSubmissionsExcel(Number(id));
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateStr = new Date().toISOString().slice(0, 10);
+          link.download = `submissions-assignment-${id}-${dateStr}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+          return;
+        }
+      } catch {
+        // Fallback to client-side CSV export
+      }
+
+      exportSubmissionsToCsv({
+        assignmentId: id,
+        assignmentTitle: assignment?.title,
+        className,
+        students,
+        isVi
+      });
+      showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+    } catch (err) {
+      console.error('Export submissions failed:', err);
+      showToast(isVi ? 'Không thể xuất danh sách bài nộp. Vui lòng thử lại!' : 'Failed to export submissions. Please try again!');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showCloseModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isClosing) {
+        setShowCloseModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCloseModal, isClosing]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!id) return;
+
+    const fetchData = async () => {
+
+    try {
+      const assignmentIdNum = Number(id);
+
+      // 1. Fetch assignment detail, modules list, all classes, and submissions all in parallel
+      const [assignRes, modRes, classRes, subRes] = await Promise.allSettled([
+        assignmentService.getAssignment(assignmentIdNum),
+        moduleService.listModules(assignmentIdNum),
+        classService.list({ limit: 100 }),
+        submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+      ]);
+
+      if (!isMounted) return;
+
+      const assignDetail = assignRes.status === 'fulfilled' ? assignRes.value : null;
+      if (assignDetail) setAssignment(assignDetail);
+
+      const classesList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
+      const submissionsList: SubmissionListItem[] = subRes.status === 'fulfilled' ? (subRes.value.data || []) : [];
+
+      let rawMods: Array<{ id: number; skill: string; orderIndex?: number }> = [];
+      if (modRes.status === 'fulfilled') {
+        rawMods = (modRes.value.modules || modRes.value.data || []).map((m) => ({
+          id: m.id,
+          skill: m.skill,
+          orderIndex: m.orderIndex,
+        }));
+      }
+
+      if (rawMods.length === 0 && assignDetail?.modules && assignDetail.modules.length > 0) {
+        rawMods = assignDetail.modules.map((m, idx) => ({
+          id: m.id,
+          skill: m.skill,
+          orderIndex: idx + 1,
+        }));
+      }
+
+      // 2. Fetch module details and search classes in parallel
+      const [detailedMods, classAssignmentsResults] = await Promise.all([
+        Promise.all(
+          rawMods.map(async (m): Promise<AssignmentModuleData> => {
+            const needQuestions = m.skill === 'READING' || m.skill === 'LISTENING';
+            const [mDetailRes, qRes] = await Promise.allSettled([
+              moduleService.getModule(m.id),
+              needQuestions ? questionService.listQuestions(m.id) : Promise.reject('No questions needed')
+            ]);
+            const inst = mDetailRes.status === 'fulfilled' ? (mDetailRes.value.instructions || '') : '';
+            let audio = '';
+            if (mDetailRes.status === 'fulfilled') {
+              const detailVal = mDetailRes.value;
+              const detailRecord = detailVal as unknown as Record<string, unknown>;
+              audio = detailVal.sourceAudioDownloadUrl || (typeof detailRecord.audioDownloadUrl === 'string' ? detailRecord.audioDownloadUrl : '') || '';
+              if (!audio && detailVal.sourceAudioStorageKey) {
+                if (detailVal.sourceAudioStorageKey.startsWith('http')) {
+                  audio = detailVal.sourceAudioStorageKey;
+                } else if (m.skill === 'LISTENING') {
+                  try {
+                    const audioRes = await moduleService.getAudioDownloadUrl(m.id);
+                    audio = audioRes.downloadUrl || '';
+                  } catch {
+                    // Ignore fallback error
+                  }
+                }
+              }
+            }
+            const modQuestions = qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : [];
+            return {
+              id: m.id,
+              skill: m.skill,
+              orderIndex: m.orderIndex,
+              instructions: inst,
+              audioUrl: audio,
+              questions: modQuestions,
+            };
+          })
+        ),
+        Promise.all(
+          classesList.map(async (cls) => {
+            try {
+              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+              const matched = assignList.data?.find((a) => a.id === assignmentIdNum);
+              return { cls, matched };
+            } catch {
+              return { cls, matched: undefined };
+            }
+          })
+        )
+      ]);
+
+      if (isMounted) {
+        setModulesList(detailedMods);
+        if (detailedMods.length > 0) {
+          setInstructions(detailedMods[0].instructions || '');
+          setSkillLabel(`${detailedMods[0].skill.charAt(0)}${detailedMods[0].skill.slice(1).toLowerCase()} Task`);
+          setQuestions(detailedMods[0].questions);
+        }
+      }
+
+      const foundMatch = classAssignmentsResults.find((r) => r.matched);
+      const matchedClass = foundMatch?.cls;
+      if (foundMatch?.matched?.closeAt) {
+        const d = new Date(foundMatch.matched.closeAt);
+        setCloseAtDate(d.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }));
+      }
+
+      if (isMounted) {
+        setCurrentClass(matchedClass || null);
+      }
+      setClassName(matchedClass ? matchedClass.name : (classesList[0]?.name || 'Lớp tiếng Anh'));
+
+      let classMembers: ClassMember[] = [];
+      if (matchedClass) {
+        try {
+          classMembers = await classService.listMembers(matchedClass.id);
+        } catch {
+          classMembers = [];
+        }
+      }
+
+      // 5. Combine class members with submissions
+      const bgColors = ['#EAF0E8', '#FEF3C7', '#FCE7F3', '#F3E8FF', '#ECFDF5', '#FAF3E5'];
+      const textColors = ['#1B4D3E', '#D97706', '#BE185D', '#7E22CE', '#059669', '#8C5E14'];
+
+      const studentRows: EnrolledStudentSubmissionRow[] = classMembers.map((member, index) => {
+        const studentSubs = submissionsList.filter((s) => s.studentId === member.studentId);
+        studentSubs.sort((a, b) => {
+          const aIsDone = a.status === 'SUBMITTED' || a.status === 'GRADED';
+          const bIsDone = b.status === 'SUBMITTED' || b.status === 'GRADED';
+          if (aIsDone && !bIsDone) return -1;
+          if (!aIsDone && bIsDone) return 1;
+          return (b.attemptNumber || b.id) - (a.attemptNumber || a.id);
+        });
+        const matchedSub = studentSubs[0];
+
+        const nameParts = member.fullName.trim().split(' ');
+        const initials = nameParts.length > 1 
+          ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase() 
+          : (member.fullName.slice(0, 2).toUpperCase() || 'HV');
+
+        const colorIndex = index % bgColors.length;
+
+        let status: 'submitted' | 'in_progress' | 'missing' = 'missing';
+        let gradingStatus: 'graded' | 'pending' | 'none' = 'none';
+        let finalScore: number | null = null;
+
+        if (matchedSub) {
+          if (matchedSub.status === 'IN_PROGRESS') {
+            status = assignDetail?.status === 'CLOSED' ? 'missing' : 'in_progress';
+            gradingStatus = 'none';
+          } else {
+            status = 'submitted';
+            if (isSubmissionGraded(matchedSub)) {
+              gradingStatus = 'graded';
+              finalScore = getSubmissionFinalScore(matchedSub);
+            } else {
+              gradingStatus = 'pending';
+            }
+          }
+        }
+
+        return {
+          studentId: member.studentId,
+          code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
+          name: member.fullName,
+          initials,
+          avatarBg: bgColors[colorIndex],
+          avatarColor: textColors[colorIndex],
+          status,
+          gradingStatus,
+          submissionId: matchedSub?.id,
+          finalScore
+        };
+      });
+
+        if (isMounted) {
+          setStudents(studentRows);
+        }
+      } catch (err) {
+        console.error('Failed to load assignment details:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải chi tiết bài tập. Vui lòng thử lại.' : 'Failed to load assignment details. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isVi, reloadKey]);
+
+  // Dynamic Metrics calculations
+  const metrics = useMemo(() => {
+    const totalStudents = Math.max(1, students.length);
+    const submittedCount = students.filter((s) => s.status === 'submitted').length;
+    const inProgressCount = students.filter((s) => s.status === 'in_progress').length;
+    const missingCount = students.filter((s) => s.status !== 'submitted').length;
+    const gradedCount = students.filter((s) => s.gradingStatus === 'graded').length;
+    const pendingCount = students.filter((s) => s.gradingStatus === 'pending').length;
+
+    const scores = students
+      .map((s) => s.finalScore)
+      .filter((sc): sc is number => sc !== null && sc !== undefined && sc > 0);
+
+    const avgBand = scores.length > 0 
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+      : '0.0';
+
+    const gradedPercentage = submittedCount > 0 
+      ? Math.round((gradedCount / submittedCount) * 100) 
+      : 0;
+
+    return {
+      totalStudents,
+      submittedCount,
+      inProgressCount,
+      missingCount,
+      gradedCount,
+      pendingCount,
+      avgBand,
+      gradedPercentage
+    };
+  }, [students]);
+
+  if (isLoading) {
+    return (
+      <div className="teacher-container py-6">
+        <LoadingState 
+          title={isVi ? 'Đang tải chi tiết đề bài...' : 'Loading assignment specifications...'}
+          description={isVi ? 'Đang lấy thông tin câu hỏi, tiêu chí chấm và hướng dẫn đề thi.' : 'Loading questions, answer keys, and exam instructions.'}
+        />
+      </div>
+    );
+  }
+
+  if (error || !assignment) {
+    return (
+      <div className="teacher-container py-6">
+        <div className="adm-alert-error max-w-xl mx-auto my-8">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertCircle size={24} className="text-danger flex-shrink-0" />
+            <h3 className="m-0 text-sm font-bold text-danger">
+              {error || (isVi ? 'Không tìm thấy bài tập này.' : 'Assignment not found.')}
+            </h3>
+          </div>
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            onClick={handleRetry}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ paddingBottom: '40px' }}>
-      {/* Back button */}
-      <button 
-        onClick={() => navigate('/teacher/assignments')}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          color: '#2563EB', 
-          background: 'none', 
-          border: 'none', 
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: 500,
-          marginBottom: '20px',
-          padding: 0
-        }}
-      >
-        <ArrowLeft size={16} /> {t('assignmentDetails.backToLibrary')}
-      </button>
+    <div className="teacher-container">
+      {/* Unified Hero Header Card */}
+      <section className="teacher-page-hero">
+        <div className="teacher-hero-content">
+          <div>
+            <button 
+              type="button"
+              onClick={() => navigate('/teacher/assignments')}
+              className="tad-back-btn"
+            >
+              <ArrowLeft size={14} />
+              <span>{t('assignmentDetails.backToLibrary')}</span>
+            </button>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ margin: '0 0 12px 0', fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-            HW-01: IELTS Writing Task 2: Renewable Energy Essay
-          </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ backgroundColor: '#DCFCE7', color: '#16A34A', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: 600 }}>
-              {t('assignmentDetails.statusOpen')}
-            </span>
-            <span style={{ backgroundColor: '#F3E8FF', color: '#9333EA', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
-              Writing Task 2
-            </span>
-            <span style={{ color: '#6B7280', fontSize: '14px' }}>•</span>
-            <span style={{ color: '#4B5563', fontSize: '14px', fontWeight: 500 }}>
-              {t('assignmentDetails.classPrefix')}ENG-IELTS-6.5A
-            </span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="teacher-hero-title">
+                {assignment.title}
+              </h1>
+              <span className={`tcd-status-badge ${assignment.status === 'PUBLISHED' ? 'active' : 'completed'}`}>
+                {assignment.status === 'PUBLISHED' 
+                  ? t('assignmentDetails.statusOpen') 
+                  : assignment.status === 'CLOSED'
+                    ? t('assignmentDetails.statusClosed')
+                    : assignment.status}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-muted">
+              <span className="font-semibold text-main">
+                {t('assignmentDetails.classPrefix')}{className || (isVi ? 'Tất cả các lớp' : 'All Classes')}
+              </span>
+              <span>•</span>
+              <span>{isVi ? 'Hạn nộp:' : 'Deadline:'} <strong className="text-main font-semibold">{closeAtDate || (isVi ? 'Không thời hạn' : 'No deadline')}</strong></span>
+              {modulesList.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="tad-skill-tag">{skillLabel}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="teacher-hero-actions">
+            <Button 
+              variant="primary"
+              size="sm"
+              icon={CheckCircle2}
+              onClick={() => navigate(`/teacher/assignments/${id}/submissions`)}
+            >
+              {isVi ? 'Quản lý bài nộp' : 'Manage Submissions'}
+              {metrics.pendingCount > 0 ? ` (${metrics.pendingCount} ${isVi ? 'chờ chấm' : 'pending'})` : ''}
+            </Button>
+
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              disabled={isLoading || isExporting || students.length === 0}
+              loading={isExporting}
+              onClick={handleExportSubmissions}
+              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
+            >
+              {t('assignmentDetails.btnExport')}
+            </Button>
+
+            {isOwner && assignment.status !== 'CLOSED' && (
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={Edit2}
+                onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+              >
+                {t('assignmentDetails.btnEdit')}
+              </Button>
+            )}
+
+            {isOwner && (
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={Lock}
+                disabled={assignment.status !== 'PUBLISHED' || isClosing}
+                loading={isClosing}
+                onClick={handleOpenCloseModal}
+                title={assignment.status === 'CLOSED' ? (isVi ? 'Bài tập này đã đóng' : 'Assignment is already closed') : undefined}
+              >
+                {t('assignmentDetails.btnClose')}
+              </Button>
+            )}
+
+            {isOwner && (
+              <Button 
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                disabled={isDeleting}
+                loading={isDeleting}
+                onClick={() => setShowDeleteModal(true)}
+              >
+                {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+              </Button>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            type="button"
-            onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', 
-              padding: '8px 16px', borderRadius: '8px', 
-              border: '1px solid #D1D5DB', backgroundColor: 'white', 
-              color: '#374151', fontWeight: 500, cursor: 'pointer' 
-            }}
-          >
-            <Edit2 size={16} /> {t('assignmentDetails.btnEdit')}
-          </button>
-          <button style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
-            padding: '8px 16px', borderRadius: '8px', 
-            border: '1px solid #D1D5DB', backgroundColor: 'white', 
-            color: '#374151', fontWeight: 500, cursor: 'pointer' 
-          }}>
-            <Download size={16} /> {t('assignmentDetails.btnExport')}
-          </button>
-        </div>
+      </section>
+
+      {/* Top Metric Cards - Specs Overview */}
+      <div className="teacher-stats-grid mb-6">
+        <MetricCard
+          title={isVi ? 'Kỹ năng đánh giá' : 'Target Skill'}
+          value={skillLabel.replace(' Task', '')}
+          icon={BookOpen}
+          iconBgColor="var(--primary-light, #eaf0e8)"
+          iconColor="var(--primary, #1b4d3e)"
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'Số câu hỏi / Phần thi' : 'Questions & Parts'}
+          value={questions.length > 0 ? `${questions.length} ${isVi ? 'câu hỏi' : 'questions'}` : (modulesList.length > 1 ? `${modulesList.length} ${isVi ? 'phần thi' : 'modules'}` : (isVi ? '1 bài tự luận' : '1 essay task'))}
+          icon={FileText}
+          iconBgColor="var(--secondary-container, #e7f3ec)"
+          iconColor="var(--secondary, #16a34a)"
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'Thời hạn nộp bài' : 'Deadline'}
+          value={closeAtDate ? closeAtDate.split(' ')[0] || closeAtDate : (isVi ? 'Không thời hạn' : 'No deadline')}
+          suffix={closeAtDate && closeAtDate.includes(' ') ? ` ${closeAtDate.split(' ')[1]}` : ''}
+          icon={Clock}
+          iconBgColor="var(--tertiary-container, #fbf4e6)"
+          iconColor="var(--tertiary, #8c5e14)"
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'Tiến độ nộp bài' : 'Turnout'}
+          value={`${metrics.submittedCount}/${metrics.totalStudents}`}
+          suffix={metrics.pendingCount > 0 ? ` (${metrics.pendingCount} ${isVi ? 'chờ chấm' : 'pending'})` : ''}
+          icon={Users}
+          iconBgColor="#f3eefa"
+          iconColor="#5b21b6"
+          className="h-full cursor-pointer"
+          onClick={() => navigate(`/teacher/assignments/${id}/submissions`)}
+        />
       </div>
 
-      {/* Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-        {/* Card 1 */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardTimeTitle')}</h3>
-            <div style={{ backgroundColor: '#EFF6FF', color: '#3B82F6', padding: '8px', borderRadius: '8px' }}>
-              <Calendar size={18} />
-            </div>
-          </div>
-          <div style={{ color: '#6B7280', fontSize: '14px', marginBottom: '8px' }}>
-            {t('assignmentDetails.assignedPrefix')}<span style={{ color: '#374151', fontWeight: 500 }}>10/09 (08:00)</span>
-          </div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: '#111827' }}>
-            15/09/2026 (23:59)
-          </div>
-        </div>
-
-        {/* Card 2 */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardProgressTitle')}</h3>
-            <div style={{ backgroundColor: '#ECFDF5', color: '#10B981', padding: '8px', borderRadius: '8px' }}>
-              <Shield size={18} />
-            </div>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#111827', marginBottom: '12px' }}>
-            22<span style={{ fontSize: '16px', color: '#9CA3AF', fontWeight: 500 }}>/24</span>
-          </div>
-          <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
-            <div style={{ width: '90%', backgroundColor: '#10B981' }}></div>
-            <div style={{ width: '10%', backgroundColor: '#EF4444' }}></div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: '#6B7280' }}>{t('assignmentDetails.submittedCount')}<span style={{ color: '#374151', fontWeight: 500 }}>22</span></span>
-            <span style={{ color: '#EF4444', fontWeight: 500 }}>{t('assignmentDetails.missingCount')}2</span>
-          </div>
-        </div>
-
-        {/* Card 3 */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardGradingTitle')}</h3>
-            <div style={{ backgroundColor: '#FFFBEB', color: '#D97706', padding: '8px', borderRadius: '8px' }}>
-              <PenTool size={18} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-              16<span style={{ fontSize: '16px', color: '#9CA3AF', fontWeight: 500 }}>/22</span>
-            </div>
-            <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 8px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}>
-              72.7%{t('assignmentDetails.gradedSuffix')}
+      {/* Multi-skill Module Tabs Switcher */}
+      {modulesList.length > 1 && (
+        <div className="teacher-filter-bar mb-6">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider">
+              {isVi ? 'Kỹ năng bài tập:' : 'Assignment Skills:'}
             </span>
-          </div>
-          <div style={{ color: '#D97706', fontSize: '13px', fontWeight: 600, backgroundColor: '#FEF3C7', display: 'inline-block', padding: '4px 12px', borderRadius: '12px' }}>
-            6{t('assignmentDetails.pendingSuffix')}
+            <div className="teacher-pills">
+              {modulesList.map((m, idx) => {
+                const isSelected = selectedModuleIndex === idx;
+                const skillNormalized = m.skill.toLowerCase();
+                return (
+                  <button
+                    key={m.id || idx}
+                    type="button"
+                    onClick={() => setSelectedModuleIndex(idx)}
+                    className={`teacher-pill ${isSelected ? 'active' : ''}`}
+                  >
+                    {skillNormalized === 'writing' && <PenTool size={13} />}
+                    {skillNormalized === 'speaking' && <Mic size={13} />}
+                    {skillNormalized === 'reading' && <BookOpen size={13} />}
+                    {skillNormalized === 'listening' && <Headphones size={13} />}
+                    <span>{m.skill === 'WRITING' ? 'Writing' : m.skill === 'SPEAKING' ? 'Speaking' : m.skill === 'READING' ? 'Reading' : 'Listening'}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Card 4 */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardAverageTitle')}</h3>
-            <div style={{ backgroundColor: '#F5F3FF', color: '#8B5CF6', padding: '8px', borderRadius: '8px' }}>
-              <Zap size={18} />
+      {/* Listening Audio Player if available */}
+      {(() => {
+        const activeMod = modulesList[selectedModuleIndex] || modulesList[0] || null;
+        if (!activeMod?.audioUrl) return null;
+        return (
+          <div className="eh-card p-5 mb-6">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="p-2 rounded-lg bg-primary-container text-primary flex items-center justify-center">
+                <Headphones size={18} />
+              </div>
+              <div>
+                <h3 className="m-0 text-sm font-bold text-main">{isVi ? 'Tệp âm thanh bài nghe' : 'Listening Audio'}</h3>
+                <span className="text-xs text-muted">{isVi ? 'Audio chuẩn phục vụ phần kiểm tra kỹ năng nghe' : 'Audio file for listening assessment'}</span>
+              </div>
             </div>
+            <audio controls className="w-full mt-1" src={activeMod.audioUrl}>
+              {isVi ? 'Trình duyệt không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+            </audio>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '8px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, color: '#2563EB' }}>
-              6.8
-            </div>
-            <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: 500 }}>
-              {t('assignmentDetails.bandSuffix')}
-            </span>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Prompt & Rubrics Box */}
-      <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-            <FileText size={20} color="#2563EB" /> {t('assignmentDetails.promptTitle')}
-          </h2>
-          <span style={{ border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '6px', fontSize: '13px', color: '#6B7280', backgroundColor: '#F9FAFB' }}>
-            IELTS Academic
-          </span>
-        </div>
-        <div style={{ color: '#374151', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
-          <strong>Topic:</strong> The burning of fossil fuels has caused substantial environmental damage over the last century. Some people believe that renewable energy resources should replace fossil fuels entirely, while others argue that doing so is impractical. Discuss both views and give your opinion.<br/>
-          <span style={{ color: '#2563EB' }}>{t('assignmentDetails.promptHint')}</span>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <span style={{ color: '#6B7280', fontSize: '14px' }}>{t('assignmentDetails.attachmentsLabel')}</span>
-          <button style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
-            padding: '8px 16px', borderRadius: '20px', 
-            border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', 
-            color: '#374151', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-          }}>
-            <FileText size={16} color="#EF4444" /> De_bai_Writing_Task_2.pdf <span style={{ color: '#9CA3AF' }}>(1.2 MB)</span>
-          </button>
-          <button style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
-            padding: '8px 16px', borderRadius: '20px', 
-            border: '1px solid #E5E7EB', backgroundColor: '#F9FAFB', 
-            color: '#374151', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-          }}>
-            <FileText size={16} color="#3B82F6" /> Rubric_IELTS_Writing_Band_Descriptors.pdf <span style={{ color: '#9CA3AF' }}>(450 KB)</span>
-          </button>
-        </div>
-      </div>
+      {(() => {
+        const activeMod = modulesList[selectedModuleIndex] || modulesList[0] || null;
+        const activeInst = activeMod?.instructions ?? instructions;
+        if (!activeInst) return null;
 
-      {/* Students List */}
-      <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden' }}>
-        {/* Tabs */}
-        <div style={{ borderBottom: '1px solid #E5E7EB', display: 'flex', padding: '0 16px', gap: '24px' }}>
-          {[
-            { id: 'all', label: t('assignmentDetails.tabAll'), count: 24 },
-            { id: 'submitted', label: t('assignmentDetails.tabSubmitted'), count: 22 },
-            { id: 'missing', label: t('assignmentDetails.tabMissing'), count: 2, isRed: true }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '16px 0',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #111827' : '2px solid transparent',
-                color: activeTab === tab.id ? '#111827' : (tab.isRed ? '#EF4444' : '#6B7280'),
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              {tab.label} {tab.count !== undefined && `(${tab.count})`}
-            </button>
-          ))}
-        </div>
+        const minWordsMatch = activeInst.match(/<!--\s*minWords:\s*(\d+)\s*-->/i);
+        const minWords = minWordsMatch ? Number(minWordsMatch[1]) : null;
+        const imgMatch = activeInst.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+        const diagramUrl = imgMatch ? imgMatch[1] : null;
+        const cleanInst = activeInst
+          .replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '')
+          .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
+          .trim();
 
-        {/* Toolbar */}
-        <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => setSubTab('graded')}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '20px', 
-                border: subTab === 'graded' ? '1px solid #D1D5DB' : '1px solid transparent', 
-                backgroundColor: subTab === 'graded' ? 'white' : 'transparent', 
-                color: subTab === 'graded' ? '#374151' : '#6B7280', 
-                fontSize: '13px', 
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              {t('assignmentDetails.subTabGraded')} (16)
-            </button>
-            <button 
-              onClick={() => setSubTab('pending')}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '20px', 
-                border: subTab === 'pending' ? '1px solid #FCD34D' : '1px solid transparent', 
-                backgroundColor: subTab === 'pending' ? '#FEF3C7' : 'transparent', 
-                color: '#D97706', 
-                fontSize: '13px', 
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              {t('assignmentDetails.subTabPending')} (6)
-            </button>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type="text" 
-                placeholder={t('assignmentDetails.searchPlaceholder')} 
-                style={{ 
-                  padding: '8px 16px 8px 36px', 
-                  borderRadius: '8px', 
-                  border: '1px solid #D1D5DB', 
-                  fontSize: '14px', 
-                  width: '240px',
-                  outline: 'none'
-                }} 
-              />
-              <Search size={16} color="#9CA3AF" style={{ position: 'absolute', left: '12px', top: '10px' }} />
+        // For Reading modules, separate passageTitle and passageBody if present
+        let readingTitle = '';
+        let readingBody = cleanInst || activeInst;
+        if (activeMod?.skill === 'READING' && readingBody.includes('\n\n')) {
+          const firstDoubleNewline = readingBody.indexOf('\n\n');
+          const candidateTitle = readingBody.slice(0, firstDoubleNewline).trim();
+          const isInstructionLike =
+            candidateTitle.toLowerCase().startsWith('hãy đọc') ||
+            candidateTitle.toLowerCase().startsWith('read the') ||
+            candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+            candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+          if (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 120) {
+            readingTitle = candidateTitle;
+            readingBody = readingBody.slice(firstDoubleNewline + 2).trim();
+          }
+        }
+
+        return (
+          <div className="eh-card p-6 mb-6">
+            <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+              <h2 className="flex items-center gap-2.5 m-0 text-base font-bold text-main">
+                <div className="p-1.5 rounded-md bg-primary-container text-primary flex items-center justify-center">
+                  <FileText size={18} />
+                </div>
+                <span>{t('assignmentDetails.promptTitle')}</span>
+              </h2>
+              {minWords && (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                  {isVi ? `Yêu cầu tối thiểu: ${minWords} từ` : `Min words: ${minWords}`}
+                </span>
+              )}
             </div>
-            <button 
-              className="btn btn-secondary btn-sm text-tertiary" 
-              style={{ backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }}
-            >
-              <Bell size={16} /> {t('assignmentDetails.btnRemind')} (2{t('assignmentDetails.unitFriends')})
-            </button>
+
+            {diagramUrl && (
+              <div className="mb-4 p-3 bg-white rounded-xl border border-border/50 max-w-xl">
+                <img 
+                  src={diagramUrl} 
+                  alt="Task 1 Diagram Preview" 
+                  className="w-full max-h-80 object-contain rounded-lg"
+                />
+              </div>
+            )}
+
+            <div className="bg-surface-variant/40 p-4 rounded-xl border border-border/50 max-h-96 overflow-y-auto">
+              {readingTitle && (
+                <div className="text-base font-bold text-main mb-2.5 pb-2 border-b border-border/60">
+                  {readingTitle}
+                </div>
+              )}
+              <div className="text-main/90 text-sm leading-relaxed whitespace-pre-line font-normal">
+                {readingBody}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Assignment Questions Preview Section */}
+      {(() => {
+        const activeMod = modulesList[selectedModuleIndex] || modulesList[0] || null;
+        const isQuiz = activeMod 
+          ? (activeMod.skill === 'READING' || activeMod.skill === 'LISTENING')
+          : (questions.length > 0 || skillLabel.toLowerCase().includes('reading') || skillLabel.toLowerCase().includes('listening'));
+        if (!isQuiz) return null;
+
+        const currentQuestionsList = activeMod?.questions ?? questions;
+
+        return (
+          <div className="eh-card p-6 mb-6">
+            <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary-container text-primary flex items-center justify-center">
+                  <HelpCircle size={20} />
+                </div>
+                <div>
+                  <h2 className="m-0 text-base font-bold text-main flex items-center gap-2">
+                    {isVi ? 'Danh sách câu hỏi đề bài' : 'Assignment Questions'}
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-variant text-muted">
+                      {currentQuestionsList.length} {isVi ? 'câu' : 'questions'}
+                    </span>
+                  </h2>
+                  <span className="text-xs text-muted">
+                    {isVi ? 'Bộ câu hỏi trắc nghiệm / tự luận học sinh phải hoàn thành' : 'Configured questions students must complete'}
+                  </span>
+                </div>
+              </div>
+
+              {isOwner && assignment.status !== 'CLOSED' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Edit2}
+                  onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+                >
+                  {isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}
+                </Button>
+              )}
+            </div>
+
+            {currentQuestionsList.length === 0 ? (
+              <div className="p-8 text-center bg-surface-variant/40 border border-dashed border-border rounded-xl">
+                <AlertCircle size={32} className="text-muted m-auto mb-2" />
+                <p className="m-0 mb-1 text-sm font-semibold text-main">
+                  {isVi ? 'Chưa có câu hỏi nào trong bài tập này' : 'No questions created yet'}
+                </p>
+                <span className="text-xs text-muted">
+                  {isVi ? 'Vui lòng nhấn Chỉnh sửa để thêm câu hỏi trắc nghiệm hoặc tự luận.' : 'Please edit the assignment to add questions.'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {currentQuestionsList.map((q, idx) => {
+                  const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+                  const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+                  const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+
+                  return (
+                    <div key={q.id || idx} className="tad-question-item">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="tad-q-badge-num">
+                            {q.orderIndex || idx + 1}
+                          </span>
+                          <span className={`tad-q-badge-type ${isMcq ? 'mcq' : 'short-ans'}`}>
+                            {isMcq ? (isVi ? 'Trắc nghiệm' : 'Multiple Choice') : (isVi ? 'Điền từ / Tự luận' : 'Short Answer')}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted font-medium">
+                          {q.score || 1} {isVi ? 'điểm' : 'pts'}
+                        </span>
+                      </div>
+
+                      <p className="m-0 mb-3 text-sm font-semibold text-main leading-relaxed">
+                        {q.content}
+                      </p>
+
+                      {isMcq && mcq && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {mcq.options.map((optText, optIdx) => {
+                            const optLetter = String.fromCharCode(65 + optIdx);
+                            const isCorrect = optIdx === mcq.correctOptionIndex;
+                            return (
+                              <div
+                                key={optIdx}
+                                className={`tad-opt-item ${isCorrect ? 'correct' : ''}`}
+                              >
+                                <span className={`tad-opt-letter ${isCorrect ? 'correct' : ''}`}>
+                                  {optLetter}
+                                </span>
+                                <span className="flex-1">{optText}</span>
+                                {isCorrect && (
+                                  <span className="text-xs font-bold text-success inline-flex items-center gap-1">
+                                    <CheckCircle2 size={13} />
+                                    <span>{isVi ? 'Đáp án đúng' : 'Correct'}</span>
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {!isMcq && (
+                        <div className="p-3 bg-surface-variant/60 rounded-lg text-xs text-main border border-border/50">
+                          <strong className="text-main">{isVi ? 'Đáp án chuẩn:' : 'Correct answer:'} </strong>
+                          <span className="text-success font-semibold">{shortAns || (isVi ? '(Chưa cấu hình)' : '(Not configured)')}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Quick Grading Access Banner */}
+      <div className="eh-card p-6 mb-6 flex items-center justify-between flex-wrap gap-4 border border-outline-variant bg-surface-container-low">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary-light text-primary flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={20} />
+          </div>
+          <div>
+            <h3 className="m-0 text-sm font-bold text-main font-serif">
+              {isVi ? 'Quản lý bài nộp & Chấm điểm học viên' : 'Student Submissions & Grading'}
+            </h3>
+            <p className="m-0 text-xs text-muted mt-1">
+              {isVi 
+                ? `Lớp hiện có ${metrics.submittedCount}/${metrics.totalStudents} học sinh đã nộp bài (${metrics.pendingCount} bài đang chờ chấm điểm).` 
+                : `${metrics.submittedCount}/${metrics.totalStudents} students submitted (${metrics.pendingCount} pending grading).`}
+            </p>
           </div>
         </div>
 
-        {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #E5E7EB', color: '#6B7280', fontSize: '12px', fontWeight: 600 }}>
-                <th style={{ padding: '16px', width: '40px' }}>
-                  <input type="checkbox" style={{ cursor: 'pointer' }} />
-                </th>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStudent')}</th>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStatus')}</th>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colGrading')}</th>
-                <th style={{ padding: '16px', textAlign: 'right' }}>{t('assignmentDetails.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((student, idx) => (
-                <tr key={student.id} style={{ borderBottom: idx === students.length - 1 ? 'none' : '1px solid #E5E7EB' }}>
-                  <td style={{ padding: '16px' }}>
-                    <input type="checkbox" style={{ cursor: 'pointer' }} />
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '36px', height: '36px', borderRadius: '50%', 
-                        backgroundColor: student.avatarBg, color: student.avatarColor, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        fontWeight: 600, fontSize: '14px' 
-                      }}>
-                        {student.initials}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#111827', fontSize: '14px' }}>{student.name}</div>
-                        <div style={{ color: '#6B7280', fontSize: '13px' }}>{student.email} • {student.id}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {student.status === 'submitted' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ECFDF5', color: '#10B981', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
-                        {t('assignmentDetails.statusSubmittedLabel')}
-                      </span>
-                    ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#FEF2F2', color: '#EF4444', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></div>
-                        {t('assignmentDetails.statusMissingLabel')}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: '16px' }}>
-                    {student.gradingStatus === 'graded' && (
-                      <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
-                        {t('assignmentDetails.gradingGraded')}
-                      </span>
-                    )}
-                    {student.gradingStatus === 'pending' && (
-                      <span style={{ border: '1px solid #FCD34D', color: '#D97706', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
-                        {t('assignmentDetails.gradingPending')}
-                      </span>
-                    )}
-                    {student.gradingStatus === 'none' && (
-                      <span style={{ color: '#9CA3AF', fontSize: '13px' }}>{t('assignmentDetails.gradingNone')}</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
-                    {student.gradingStatus === 'graded' && (
-                      <button 
-                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.id}`)}
-                        style={{ 
-                        border: '1px solid #D1D5DB', backgroundColor: 'white', color: '#374151', 
-                        padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-                      }}>
-                        {t('assignmentDetails.btnView')}
-                      </button>
-                    )}
-                    {student.gradingStatus === 'pending' && (
-                      <button 
-                        className="btn btn-primary btn-sm"
-                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.id}`)}
-                      >
-                        {t('assignmentDetails.btnGradeNow')}
-                      </button>
-                    )}
-                    {student.gradingStatus === 'none' && (
-                      <button style={{ 
-                        border: '1px solid #FCD34D', backgroundColor: 'white', color: '#D97706', 
-                        padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-                      }}>
-                        {t('assignmentDetails.btnSendReminder')}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Button
+          variant="primary"
+          size="sm"
+          icon={CheckCircle2}
+          onClick={() => navigate(`/teacher/assignments/${id}/submissions`)}
+        >
+          {isVi ? 'Mở trang Quản lý chấm & Bảng điểm' : 'Open Grading Hub'}
+        </Button>
       </div>
+
+      {/* Confirmation Modal for Closing Assignment */}
+      {showCloseModal && (
+        <div 
+          className="tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="close-modal-title"
+          onClick={() => !isClosing && setShowCloseModal(false)}
+        >
+          <div 
+            className="tad-modal-box" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="close-modal-title" className="tad-modal-title">
+              {isVi ? 'Đóng bài tập' : 'Close Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? 'Bạn có chắc chắn muốn đóng bài tập này không? Học viên sẽ không thể nộp bài sau khi đóng.'
+                : 'Are you sure you want to close this assignment? Students will not be able to submit after closing.'}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isClosing}
+                onClick={() => setShowCloseModal(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isClosing}
+                disabled={isClosing}
+                onClick={handleConfirmClose}
+              >
+                {isVi ? 'Đóng bài tập' : 'Close Assignment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Deleting Assignment */}
+      {showDeleteModal && (
+        <div 
+          className="tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="delete-modal-title"
+          onClick={() => !isDeleting && setShowDeleteModal(false)}
+        >
+          <div 
+            className="tad-modal-box tad-modal" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-modal-title" className="tad-modal-title">
+              {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? 'Bạn có chắc chắn muốn xóa bài tập này không? Bài tập này có thể đã có bài nộp của học viên. Xóa bài tập sẽ xóa mềm và ẩn toàn bộ dữ liệu bài tập và bài nộp liên quan.'
+                : 'Are you sure you want to delete this assignment? It may contain student submissions and associated data. Soft deleting will archive this assignment and its related submission data.'}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isDeleting}
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+              >
+                {isVi ? 'Xác nhận' : 'Confirm'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

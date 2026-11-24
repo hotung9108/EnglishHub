@@ -1,12 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Users, Bell
+  Eye, Save, Send, Plus, Minus, Trash2, ArrowUp, ArrowDown,
+  Layers, ChevronDown, AlertCircle, RefreshCw, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import type { 
-  AssignmentEditorData, AssignmentSkill 
+import { useToast } from '../components/common/ToastContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { 
+  assignmentService, 
+  type AssignmentDetail, 
+  type AssignmentStatus, 
+  type AssignmentSkill as ApiSkill 
+} from '../api/services/assignment.service';
+import { moduleService, type ModuleSummary } from '../api/services/module.service';
+import { submissionService } from '../api/services/submission.service';
+import { 
+  questionService, 
+  buildMcqPayload, 
+  buildShortAnswerPayload, 
+  extractMcqOptions, 
+  extractShortAnswerText,
+  type QuestionResponse 
+} from '../api/services/question.service';
+import { 
+  type AssignmentEditorData, 
+  type AssignmentSkill, 
+  type EditorModuleItem,
+  type WritingConfig,
+  type SpeakingConfig,
+  type ReadingConfig,
+  type ListeningConfig,
+  type ReadingQuestionItem, 
+  type ListeningQuestionItem,
+  createDefaultModuleItem,
+  createDefaultWritingConfig,
+  createDefaultSpeakingConfig,
+  createDefaultReadingConfig,
+  createDefaultListeningConfig
 } from '../types/assignment-editor.types';
 import { 
   SkillWritingEditor, 
@@ -15,7 +47,8 @@ import {
   SkillListeningEditor,
   AssignmentPreviewModal
 } from '../components/assignments/editor';
-import { StickyActionBar } from '../components/common';
+import { StickyActionBar, LoadingState } from '../components/common';
+import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
 
 export const TeacherEditAssignment: React.FC = () => {
@@ -23,444 +56,768 @@ export const TeacherEditAssignment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
 
   // Preview Modal state
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  // Toast state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<string>('20:25');
 
-  // Initial assignment data mapping based on ID
-  const getInitialAssignmentData = (assignmentId?: string): AssignmentEditorData => {
-    switch (assignmentId) {
-      case '2': // HW-02 Speaking
-        return {
-          id: '2',
-          code: 'HW-02',
-          title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-          skill: 'speaking',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-12T08:00',
-          dueDate: '2026-03-20T23:59',
-          durationMinutes: 15,
-          allowLate: true,
-          status: 'active',
-          targetAudience: 'all',
-          notifyStudents: true,
-          maxSubmissions: 3,
-          writing: {
-            taskType: 'task2',
-            promptText: 'Discuss environmental policies in developing countries...',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: 'Focus on cohesion and academic collocations.',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: 'Describe an environmental problem that has occurred in your city or country.',
-            cueCardBullets: [
-              'What the problem is and where it occurs',
-              'What causes this environmental hazard',
-              'What effect it has on residents and wildlife',
-              'And explain what measures should be taken to mitigate this issue.'
-            ],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 3,
-            examinerSampleAudioUrl: 'https://cdn.englishhub.edu.vn/audio/speaking/sample-hw02.mp3',
-            examinerTranscript: 'All right, you will have one minute to prepare your monologue. After that, you should speak for two minutes about the environmental issue.',
-            followUpQuestions: [
-              {
-                id: 'sq-1',
-                order: 1,
-                question: 'Do you think individuals or governments have more power to stop urban air pollution?',
-                hint: 'Mention regulations, public transport investment vs individual recycling habits.'
-              },
-              {
-                id: 'sq-2',
-                order: 2,
-                question: 'How might green architecture improve air quality in crowded megacities?',
-                hint: 'Discuss vertical gardens, rooftop solar panels and eco-friendly concrete.'
-              }
-            ],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3 Speech Diagnostic',
-            aiInstruction: 'Chú ý đánh giá phát âm âm đuôi /s/, /z/, /t/, /d/ và nhịp điệu ngắt nghỉ (intonation).'
-          },
-          reading: {
-            passageTitle: 'Biomimicry Innovation & Engineering',
-            passageSubtitle: 'Nature-Inspired Technologies in Clean Energy',
-            passageSource: 'Cambridge 19 Academic Reading',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Renewable Energy Seminar Discussion',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section3',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
-          }
+  // Class & Stats
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [turnoutStats, setTurnoutStats] = useState<{ total: number; submitted: number }>({ total: 0, submitted: 0 });
+  const [currentDbStatus, setCurrentDbStatus] = useState<AssignmentStatus>('DRAFT');
+
+  // Multi-module management state
+  const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
+  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
+  const [deletedModuleDbIds, setDeletedModuleDbIds] = useState<number[]>([]);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Assignment Editor state
+  const [savedCap, setSavedCap] = useState<{ assignmentId: number; value: number | undefined } | null>(null);
+  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
+    id: id || '1',
+    code: `HW-${(id || '1').padStart(2, '0')}`,
+    title: '',
+    skill: 'writing',
+    className: '',
+    startDate: formatToLocalDateTimeInput(),
+    dueDate: formatToLocalDateTimeInput(addDays(new Date(), 7)),
+    durationMinutes: 60,
+    allowLate: true,
+    status: 'active',
+    targetAudience: 'all',
+    notifyStudents: true,
+    modules: [createDefaultModuleItem('writing', 1)]
+  }));
+
+  // Close add menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const showToast = useCallback((msg: string, type: 'warning' | 'error' | 'success' = 'warning') => {
+    if (type === 'error') {
+      toastError(msg);
+    } else if (type === 'success') {
+      toastSuccess(msg);
+    } else {
+      toastWarning(msg);
+    }
+  }, [toastWarning, toastError, toastSuccess]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!id) return;
+
+    const loadAssignmentData = async () => {
+      try {
+        const assignmentIdNum = Number(id);
+
+        // 1. Fetch assignment details, classes, and modules in parallel
+        const [detailRes, classRes, modRes] = await Promise.allSettled([
+          assignmentService.getAssignment(assignmentIdNum),
+          classService.list({ limit: 100 }),
+          moduleService.listModules(assignmentIdNum)
+        ]);
+
+        if (!isMounted) return;
+
+        const detail: AssignmentDetail = detailRes.status === 'fulfilled' ? detailRes.value : {
+          id: assignmentIdNum,
+          title: '',
+          status: 'DRAFT',
+          modules: []
         };
+        setCurrentDbStatus(detail.status);
 
-      case '3': // HW-03 Reading
-        return {
-          id: '3',
-          code: 'HW-03',
-          title: 'Cambridge 19 - Academic Reading Passage: Biomimicry Innovation',
-          skill: 'reading',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-10T08:00',
-          dueDate: '2026-03-18T21:00',
-          durationMinutes: 20,
-          allowLate: false,
-          status: 'closed',
-          targetAudience: 'all',
-          notifyStudents: true,
-          writing: {
-            taskType: 'task2',
-            promptText: '',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: '',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: '',
-            cueCardBullets: [],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 1,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: 'The Origin and Enduring Legacy of Typesetting Standards',
-            passageSubtitle: 'Excerpts from Classical Typography & Publication Archival Studies',
-            passageSource: 'Cambridge Academic Reading Passage 1',
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: 'Giải thích chi tiết tại sao các phương án nhiễu (distractors) lại sai.',
-            paragraphs: [
-              {
-                id: 'p-1',
-                label: 'A',
-                title: 'What is Lorem Ipsum?',
-                content: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. Designers at Letraset and James Mosley, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset's Body Type sheets."
-              },
-              {
-                id: 'p-2',
-                label: 'B',
-                title: 'Why do we use it?',
-                content: "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text."
-              },
-              {
-                id: 'p-3',
-                label: 'C',
-                title: 'Where does it come from?',
-                content: 'Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, discovered the undoubtable source from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" by Cicero.'
-              },
-              {
-                id: 'p-4',
-                label: 'D',
-                title: 'The Transition to Digital Publishing',
-                content: 'With the advent of digital typesetting in the late 20th century, the role of dummy text became even more critical. Graphical user interfaces (GUI) required designers to map out visual hierarchy before final copy was approved. This led to Lorem Ipsum being hardcoded into early design software like Aldus PageMaker.'
+        if (detail.status === 'CLOSED') {
+          showToast(isVi ? 'Bài tập đã đóng, không thể chỉnh sửa.' : 'This assignment is closed and cannot be edited.');
+          navigate(`/teacher/assignments/${assignmentIdNum}`, { replace: true });
+          return;
+        }
+
+        const classList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
+        setClasses(classList);
+
+        // Find which class contains this assignment in parallel
+        const classCheckResults = await Promise.all(
+          classList.map(async (cls) => {
+            try {
+              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+              const hasMatch = assignList.data?.some((a) => a.id === assignmentIdNum);
+              return { cls, hasMatch };
+            } catch {
+              return { cls, hasMatch: false };
+            }
+          })
+        );
+        const matchedClass = classCheckResults.find((r) => r.hasMatch)?.cls;
+
+        if (matchedClass) {
+          setSelectedClassId(matchedClass.id);
+          try {
+            const [membersRes, subsRes] = await Promise.allSettled([
+              classService.listMembers(matchedClass.id),
+              submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+            ]);
+            const members = membersRes.status === 'fulfilled' ? membersRes.value : [];
+            const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data || []) : [];
+            setTurnoutStats({
+              total: members.length,
+              submitted: subs.filter((s) => s.status !== 'IN_PROGRESS').length
+            });
+          } catch {
+            // Fallback
+          }
+        }
+
+        let rawModules: ModuleSummary[] = [];
+        if (modRes.status === 'fulfilled') {
+          rawModules = modRes.value.modules || modRes.value.data || [];
+        }
+
+        if (rawModules.length === 0 && detail.modules && detail.modules.length > 0) {
+          rawModules = detail.modules.map((m, idx) => ({
+            id: m.id,
+            skill: m.skill,
+            taskType: 'QUIZ',
+            orderIndex: idx + 1,
+            maxScore: 10,
+            hasAudio: false,
+          }));
+        }
+
+        // Fetch details & questions for each module in parallel
+        const moduleDetailsResults = await Promise.all(
+          rawModules.map(async (mod, mIdx) => {
+            const modSkill = mod.skill?.toLowerCase() || '';
+            let sKey: AssignmentSkill;
+            if (modSkill.includes('speak')) sKey = 'speaking';
+            else if (modSkill.includes('read')) sKey = 'reading';
+            else if (modSkill.includes('listen')) sKey = 'listening';
+            else sKey = 'writing';
+
+            const needQuestions = sKey === 'reading' || sKey === 'listening';
+            const [mDetailRes, qRes] = await Promise.allSettled([
+              moduleService.getModule(mod.id),
+              needQuestions ? questionService.listQuestions(mod.id) : Promise.reject('No questions')
+            ]);
+
+            const modDetail = mDetailRes.status === 'fulfilled' ? mDetailRes.value : null;
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            let audioDownloadUrl = modDetail?.sourceAudioDownloadUrl || extraAudio || '';
+            if (sKey === 'listening' && !audioDownloadUrl && modDetail?.sourceAudioStorageKey) {
+              try {
+                const audioRes = await moduleService.getAudioDownloadUrl(mod.id);
+                audioDownloadUrl = audioRes.downloadUrl || '';
+              } catch {
+                // Ignore fallback error
               }
-            ],
-            questions: [
-              {
-                id: 'rq-1',
-                order: 1,
-                type: 'multiple_choice',
-                prompt: 'According to Paragraph A, what was the original purpose of scrambling the 1914 Cicero translation?',
-                options: [
-                  'To create dummy text for Letraset Body Type sheets',
-                  'To publish an academic translation of Latin literature',
-                  'To teach typography apprentices how to set type',
-                  'To hide confidential printing technology from competitors'
-                ],
-                correctAnswer: 'To create dummy text for Letraset Body Type sheets',
-                explanation: 'Đoạn A nói rõ: "scrambled it to make dummy text for Letraset\'s Body Type sheets".',
+            }
+
+            return {
+              mod,
+              mIdx,
+              sKey,
+              modDetail,
+              audioDownloadUrl,
+              questions: qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : []
+            };
+          })
+        );
+
+        // Convert into rich EditorModuleItem array
+        const loadedModules: EditorModuleItem[] = moduleDetailsResults.map((item, idx) => {
+          const { mod, sKey, modDetail, questions: fetchedQuestions } = item;
+          const inst = modDetail?.instructions || '';
+          const aiInst = modDetail?.aiInstruction || '';
+          const maxSc = modDetail?.maxScore ? Number(modDetail.maxScore) : 10;
+
+          let modConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+
+          if (sKey === 'writing') {
+            let pText = inst;
+            let chartUrl = '';
+            const imgMatch = pText.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+            if (imgMatch) {
+              chartUrl = imgMatch[1];
+              pText = pText.replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '').trim();
+            }
+            const isTask1 = mod.taskType === 'REWRITE' || chartUrl !== '' || /task\s*1/i.test(pText);
+            let minWords = isTask1 ? 150 : 250;
+            const minWordsMatch = pText.match(/<!--\s*minWords:\s*(\d+)\s*-->/i) || pText.match(/tối thiểu\s*(\d+)\s*từ/i);
+            if (minWordsMatch) {
+              minWords = Number(minWordsMatch[1]);
+              pText = pText.replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '').trim();
+            }
+            modConfig = {
+              ...createDefaultWritingConfig(isTask1 ? 'task1' : 'task2'),
+              promptText: pText,
+              chartImageUrl: chartUrl,
+              minWords,
+              aiInstruction: aiInst,
+            };
+          } else if (sKey === 'speaking') {
+            modConfig = {
+              ...createDefaultSpeakingConfig(),
+              promptText: inst,
+              cueCardTopic: inst,
+              aiInstruction: aiInst,
+            };
+          } else if (sKey === 'reading') {
+            const hasDoubleNewline = inst.includes('\n\n');
+            const candidateTitle = hasDoubleNewline ? inst.split('\n\n')[0].trim() : '';
+            const isInstructionLike =
+              candidateTitle.toLowerCase().startsWith('đọc bài') ||
+              candidateTitle.toLowerCase().startsWith('read the') ||
+              candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+              candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+            const readingTitle = (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 80)
+              ? candidateTitle
+              : '';
+            const readingContent = hasDoubleNewline && !isInstructionLike
+              ? inst.slice(inst.indexOf('\n\n') + 2).trim()
+              : inst.trim();
+            const qList: ReadingQuestionItem[] = fetchedQuestions.map((q: QuestionResponse, qIdx: number) => {
+              const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+              const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+              const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+              return {
+                id: String(q.id),
+                order: q.orderIndex || qIdx + 1,
+                type: isMcq ? 'multiple_choice' : 'gap_fill',
+                prompt: q.content,
+                options: mcq ? mcq.options : undefined,
+                correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
                 paragraphRef: 'A',
-                points: 1
-              },
-              {
-                id: 'rq-2',
-                order: 2,
-                type: 'true_false_not_given',
-                prompt: 'Lorem Ipsum was invented in the 21st century by modern digital web designers.',
-                correctAnswer: 'FALSE',
-                explanation: 'Đoạn A và C khẳng định Lorem Ipsum có nguồn gốc từ năm 1500 và văn học Latin năm 45 BC, nên phát biểu này là FALSE.',
-                paragraphRef: 'C',
-                points: 1
-              },
-              {
-                id: 'rq-3',
-                order: 3,
-                type: 'gap_fill',
-                prompt: 'Richard McClintock was a professor of [ _____ ] at Hampden-Sydney College.',
-                correctAnswer: 'Latin',
-                explanation: 'Đoạn C đề cập: "Richard McClintock, a Latin professor at Hampden-Sydney College".',
-                paragraphRef: 'C',
-                points: 1,
-                wordLimit: 1
-              }
-            ]
-          },
-          listening: {
-            audioTitle: '',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section1',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
+                points: Number(q.score) || 1,
+              };
+            });
+            modConfig = {
+              ...createDefaultReadingConfig(),
+              passageTitle: readingTitle,
+              passageContent: readingContent,
+              questions: qList,
+              aiInstruction: aiInst,
+            };
+          } else {
+            // listening
+            const qList: ListeningQuestionItem[] = fetchedQuestions.map((q: QuestionResponse, qIdx: number) => {
+              const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+              const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+              const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+              return {
+                id: String(q.id),
+                order: q.orderIndex || qIdx + 1,
+                section: 'section1',
+                type: isMcq ? 'multiple_choice' : 'short_answer',
+                prompt: q.content,
+                options: mcq ? mcq.options : undefined,
+                correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
+                points: Number(q.score) || 1,
+              };
+            });
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            const finalAudioUrl = item.audioDownloadUrl || modDetail?.sourceAudioDownloadUrl || extraAudio || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : '');
+            const storageFileName = modDetail?.sourceAudioStorageKey ? modDetail.sourceAudioStorageKey.split('/').pop() : '';
+            modConfig = {
+              ...createDefaultListeningConfig(),
+              transcript: inst,
+              audioTitle: storageFileName || '',
+              audioUrl: finalAudioUrl,
+              audioPreviewUrl: finalAudioUrl,
+              questions: qList,
+              aiInstruction: aiInst,
+            };
           }
-        };
 
-      case '4': // HW-04 Listening
-        return {
-          id: '4',
-          code: 'HW-04',
-          title: 'IELTS Listening Practice: Campus Life & Renewable Energy Seminar',
-          skill: 'listening',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-08T08:00',
-          dueDate: '2026-03-15T21:00',
-          durationMinutes: 30,
-          allowLate: true,
-          status: 'closed',
-          targetAudience: 'all',
-          notifyStudents: true,
-          writing: {
-            taskType: 'task2',
-            promptText: '',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: '',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: '',
-            cueCardBullets: [],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 1,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: '',
-            passageSubtitle: '',
-            passageSource: '',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Cambridge_15_Test1_Listening_Full.mp3',
-            audioUrl: 'https://cdn.englishhub.edu.vn/audio/listening/cam15-test1.mp3',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: `[00:15] Narrator: Section 1. You will hear a conversation between a student and a campus housing officer.
-[00:45] Officer: Good morning, welcome to the university housing administration. How can I assist you today?
-[01:05] Student: Hello, I would like to inquire about accommodation near Central Park campus.
-[01:25] Officer: Certainly. Could you please state your full name and intended duration of stay?
-[02:10] Student: My name is Alice Johnson, and I will be staying for 2 semesters starting September.`,
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section1',
-            enableAiDistractorCheck: true,
-            aiInstruction: 'Lưu ý người nói có sửa thông tin về thời gian thuê phòng từ 1 kỳ thành 2 kỳ.',
-            questions: [
-              {
-                id: 'lq-1',
-                order: 1,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Name of applicant: [ Alice Johnson ]',
-                correctAnswer: 'Alice Johnson',
-                acceptableAnswers: ['alice johnson', 'Johnson, Alice'],
-                timestampClue: '02:10',
-                points: 1
-              },
-              {
-                id: 'lq-2',
-                order: 2,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Preferred location near: [ _____ ] campus',
-                correctAnswer: 'Central Park',
-                acceptableAnswers: ['central park', 'The Central Park'],
-                timestampClue: '01:05',
-                points: 1
-              },
-              {
-                id: 'lq-3',
-                order: 3,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Duration of accommodation requested: [ _____ ] semesters',
-                correctAnswer: '2',
-                acceptableAnswers: ['two', '2 semesters'],
-                timestampClue: '02:10',
-                points: 1
-              }
-            ]
-          }
-        };
+          return {
+            id: `mod-existing-${mod.id}`,
+            dbId: mod.id,
+            skill: sKey,
+            title: sKey === 'reading' ? (modConfig as ReadingConfig).passageTitle : '',
+            orderIndex: mod.orderIndex || idx + 1,
+            maxScore: maxSc,
+            config: modConfig,
+          };
+        });
 
-      default: // Default: HW-01 or HW-05 Writing Task 2
-        return {
-          id: assignmentId || '1',
-          code: assignmentId === '5' ? 'HW-05' : 'HW-01',
-          title: assignmentId === '5' 
-            ? 'IELTS Writing Task 1: Comparative Bar Chart on Carbon Emissions'
-            : 'IELTS Writing Task 2: Artificial Intelligence & Workforce Evolution',
-          skill: 'writing',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-15T08:00',
-          dueDate: '2026-03-22T23:59',
+        if (loadedModules.length === 0) {
+          loadedModules.push(createDefaultModuleItem('writing', 1));
+        }
+
+        if (!isMounted) return;
+        const savedValue = detail.maxSubmissions ?? undefined;
+        setSavedCap({ assignmentId: assignmentIdNum, value: savedValue });
+        setAssignmentData({
+          id: String(detail.id),
+          code: `HW-${String(detail.id).padStart(2, '0')}`,
+          title: detail.title || '',
+          skill: loadedModules[0]?.skill || 'writing',
+          className: matchedClass?.name || '',
+          startDate: detail.openAt ? formatToLocalDateTimeInput(detail.openAt) : formatToLocalDateTimeInput(),
+          dueDate: detail.closeAt ? formatToLocalDateTimeInput(detail.closeAt) : formatToLocalDateTimeInput(addDays(new Date(), 7)),
           durationMinutes: 60,
           allowLate: true,
-          status: 'active',
+          status: detail.status === 'PUBLISHED' ? 'active' : 'draft',
           targetAudience: 'all',
           notifyStudents: true,
-          maxSubmissions: 3,
-          writing: {
-            taskType: assignmentId === '5' ? 'task1' : 'task2',
-            promptText: assignmentId === '5'
-              ? 'The chart below gives information about global carbon emissions in metric gigatons across six economic sectors between 2000 and 2025. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words).'
-              : 'The rapid development of artificial intelligence and machine automation is poised to transform the global workforce. Some argue that AI will eliminate millions of traditional jobs, while others believe it will create new employment opportunities. Discuss both views and give your own opinion. (Write at least 250 words).',
-            minWords: assignmentId === '5' ? 150 : 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: 'Khắt khe với các lỗi diễn đạt chung chung (vague generalisations); ưu tiên phát hiện câu phức và cấu trúc đảo ngữ (inversion).',
-            enablePlagiarismCheck: true,
-            modelAnswer: 'In contemporary society, the relentless advancement of artificial intelligence (AI) has sparked intense deliberation concerning the future landscape of the global labour market...',
-            chartImageUrl: assignmentId === '5' ? 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80' : undefined,
-            attachments: [
-              {
-                id: 'att-1',
-                name: 'IELTS_Writing_Task2_Topic_Sheet.pdf',
-                size: '1.2 MB',
-                extension: 'pdf'
-              },
-              {
-                id: 'att-2',
-                name: 'Official_IELTS_Band_Descriptors.pdf',
-                size: '450 KB',
-                extension: 'pdf'
-              }
-            ]
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: 'Describe an AI technology that you find particularly useful.',
-            cueCardBullets: ['What the technology is', 'How often you use it', 'Why it is helpful', 'And explain how it impacts your daily routine.'],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 3,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: 'The Future of Neural Networks and Computation',
-            passageSubtitle: 'Academic Reading Passage 2',
-            passageSource: 'Cambridge 18 Academic',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Campus Lecture on Robotics',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section4',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
-          }
-        };
+          maxSubmissions: savedValue,
+          modules: loadedModules
+        });
+      } catch (err) {
+        console.error('Failed to load assignment detail for edit:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải thông tin bài tập. Vui lòng thử lại.' : 'Failed to load assignment details. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadAssignmentData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isVi, reloadKey, navigate, showToast]);
+
+  // Add a new module
+  const handleAddModule = (skill: AssignmentSkill) => {
+    const nextOrder = assignmentData.modules.length + 1;
+    const newMod = createDefaultModuleItem(skill, nextOrder);
+    setAssignmentData((prev) => ({
+      ...prev,
+      modules: [...prev.modules, newMod]
+    }));
+    setActiveModuleIndex(assignmentData.modules.length);
+    setShowAddMenu(false);
+    showToast(isVi ? `Đã thêm phần thi ${getSkillName(skill)} mới.` : `Added new ${skill} module.`);
+  };
+
+  // Remove module
+  const handleRemoveModule = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (assignmentData.modules.length <= 1) {
+      showToast(isVi ? 'Bài tập phải có ít nhất 1 phần thi / module!' : 'Assignment must contain at least 1 module!');
+      return;
+    }
+
+    const targetMod = assignmentData.modules[index];
+    if (targetMod.dbId) {
+      setDeletedModuleDbIds((prev) => [...prev, targetMod.dbId!]);
+    }
+
+    const updated = assignmentData.modules.filter((_, idx) => idx !== index);
+    const reordered = updated.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+
+    if (activeModuleIndex >= reordered.length) {
+      setActiveModuleIndex(Math.max(0, reordered.length - 1));
+    } else if (activeModuleIndex === index) {
+      setActiveModuleIndex(Math.max(0, index - 1));
     }
   };
 
-  const [prevId, setPrevId] = useState(id);
-  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => getInitialAssignmentData(id));
+  // Move module up or down
+  const handleMoveModule = (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= assignmentData.modules.length) return;
 
-  if (id !== prevId) {
-    setPrevId(id);
-    setAssignmentData(getInitialAssignmentData(id));
+    const list = [...assignmentData.modules];
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    const reordered = list.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+    setActiveModuleIndex(targetIndex);
+  };
+
+  // Update active module config
+  const handleActiveModuleConfigChange = (updatedConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, config: updatedConfig };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  // Update active module meta
+  const handleActiveModuleMetaChange = (field: 'title' | 'maxScore', val: string | number) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, [field]: val };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  const getSkillName = (skill: AssignmentSkill): string => {
+    switch (skill) {
+      case 'writing': return isVi ? 'Viết (Writing)' : 'Writing';
+      case 'speaking': return isVi ? 'Nói (Speaking)' : 'Speaking';
+      case 'reading': return isVi ? 'Đọc (Reading)' : 'Reading';
+      case 'listening': return isVi ? 'Nghe (Listening)' : 'Listening';
+      default: return skill;
+    }
+  };
+
+  const getSkillIcon = (skill: AssignmentSkill, size = 16) => {
+    switch (skill) {
+      case 'writing': return <PenTool size={size} />;
+      case 'speaking': return <Mic size={size} />;
+      case 'reading': return <BookOpen size={size} />;
+      case 'listening': return <Headphones size={size} />;
+    }
+  };
+
+  const getInstructionsForModule = (mod: EditorModuleItem): string => {
+    switch (mod.skill) {
+      case 'writing': {
+        const c = mod.config as WritingConfig;
+        const basePrompt = c.promptText.trim();
+        const defaultMin = c.taskType === 'task1' ? 150 : 250;
+        const minWordsHeader = (c.minWords && c.minWords !== defaultMin) ? `<!-- minWords: ${c.minWords} -->\n` : '';
+        const chartMarkdown = c.chartImageUrl?.trim() ? `\n\n![Diagram](${c.chartImageUrl.trim()})` : '';
+        return `${minWordsHeader}${basePrompt}${chartMarkdown}`.trim();
+      }
+      case 'speaking': {
+        const c = mod.config as SpeakingConfig;
+        return (c.promptText || c.cueCardTopic || '').trim();
+      }
+      case 'reading': {
+        const c = mod.config as ReadingConfig;
+        const pTitle = c.passageTitle.trim();
+        const pContent = (c.passageContent 
+          || c.paragraphs?.map(p => p.content).join('\n\n') 
+          || '').trim();
+        return pTitle ? `${pTitle}\n\n${pContent}` : pContent;
+      }
+      case 'listening': {
+        const c = mod.config as ListeningConfig;
+        return (c.transcript || c.audioTitle || '').trim();
+      }
+      default:
+        return '';
+    }
+  };
+
+  const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
+    if (!id) return;
+
+    // Validation for all modules
+    for (let i = 0; i < assignmentData.modules.length; i++) {
+      const mod = assignmentData.modules[i];
+      const modNum = i + 1;
+      const modLabel = mod.title ? `"${mod.title}" (Phần ${modNum})` : `Phần ${modNum}: ${getSkillName(mod.skill)}`;
+
+      if (mod.skill === 'writing') {
+        const c = mod.config as WritingConfig;
+        if (!c.promptText.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Writing không được để trống!` : `${modLabel}: Writing prompt cannot be empty!`);
+          return;
+        }
+      } else if (mod.skill === 'speaking') {
+        const c = mod.config as SpeakingConfig;
+        const prompt = (c.promptText || c.cueCardTopic || '').trim();
+        if (!prompt) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Speaking không được để trống!` : `${modLabel}: Speaking prompt cannot be empty!`);
+          return;
+        }
+      } else if (mod.skill === 'reading') {
+        const c = mod.config as ReadingConfig;
+        if (!c.passageTitle.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Tiêu đề bài đọc không được để trống!` : `${modLabel}: Passage title cannot be empty!`);
+          return;
+        }
+        const pContent = (c.passageContent || c.paragraphs?.map(p => p.content).join('\n\n') || '').trim();
+        if (!pContent) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung văn bản bài đọc không được để trống!` : `${modLabel}: Passage content cannot be empty!`);
+          return;
+        }
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!` : `${modLabel}: Please add at least 1 question!`);
+          return;
+        }
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
+            return;
+          }
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
+            return;
+          }
+        }
+      } else if (mod.skill === 'listening') {
+        const c = mod.config as ListeningConfig;
+        if (!c.audioFile && !c.audioUrl?.trim() && !c.audioPreviewUrl?.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng chọn tệp âm thanh cho bài nghe!` : `${modLabel}: Please select an audio file!`);
+          return;
+        }
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!` : `${modLabel}: Please add at least 1 question!`);
+          return;
+        }
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
+            return;
+          }
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
+            return;
+          }
+        }
+      }
+    }
+
+    setIsSaving(true);
+    try {
+      const assignmentIdNum = Number(id);
+
+      const openDate = assignmentData.startDate 
+        ? new Date(assignmentData.startDate).toISOString() 
+        : new Date().toISOString();
+      const closeDate = assignmentData.dueDate 
+        ? new Date(assignmentData.dueDate).toISOString() 
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const mainDescription = assignmentData.modules
+        .map((m, idx) => `[Phần ${idx + 1} - ${m.skill.toUpperCase()}${m.title ? `: ${m.title}` : ''}]: ${getInstructionsForModule(m)}`)
+        .join('\n\n');
+
+      // 1. Update assignment basics
+      const draftCap = assignmentData.maxSubmissions;
+      const capChanged = savedCap?.assignmentId === assignmentIdNum
+        && draftCap !== undefined && draftCap !== savedCap.value;
+      await assignmentService.updateAssignment(assignmentIdNum, {
+        title: assignmentData.title,
+        description: mainDescription,
+        openAt: openDate,
+        closeAt: closeDate,
+        ...(capChanged ? { maxSubmissions: draftCap } : {}),
+      });
+      if (capChanged) {
+        setSavedCap((current) => current === savedCap ? { assignmentId: assignmentIdNum, value: draftCap } : current);
+      }
+
+      // 2. Update status if changed
+      if (publishStatus && publishStatus !== currentDbStatus) {
+        const isValidTransition =
+          (currentDbStatus === 'DRAFT' && publishStatus === 'PUBLISHED') ||
+          (currentDbStatus === 'PUBLISHED' && publishStatus === 'CLOSED');
+
+        if (isValidTransition) {
+          try {
+            await assignmentService.updateAssignmentStatus(assignmentIdNum, publishStatus);
+            setCurrentDbStatus(publishStatus);
+          } catch (statusErr) {
+            console.warn('Status transition failed:', statusErr);
+          }
+        } else if (currentDbStatus === 'PUBLISHED' && publishStatus === 'DRAFT') {
+          showToast(isVi ? 'Bài tập đã xuất bản không thể chuyển về bản nháp!' : 'Published assignment cannot be reverted to draft!');
+        }
+      }
+
+      // 3. Delete removed modules
+      for (const delId of deletedModuleDbIds) {
+        try {
+          await moduleService.deleteModule(delId);
+        } catch (delErr) {
+          console.warn(`Failed to delete removed module #${delId}:`, delErr);
+        }
+      }
+      setDeletedModuleDbIds([]);
+
+      // 4. Update existing or create newly added modules
+      const apiSkillMap: Record<AssignmentSkill, ApiSkill> = {
+        writing: 'WRITING', speaking: 'SPEAKING', reading: 'READING', listening: 'LISTENING'
+      };
+      const taskTypeMap: Record<AssignmentSkill, 'ESSAY' | 'RECORDING' | 'QUIZ'> = {
+        writing: 'ESSAY', speaking: 'RECORDING', reading: 'QUIZ', listening: 'QUIZ'
+      };
+
+      const updatedModulesList = [...assignmentData.modules];
+
+      for (let sIdx = 0; sIdx < updatedModulesList.length; sIdx++) {
+        const mod = updatedModulesList[sIdx];
+        const orderIndex = sIdx + 1;
+        const instructions = getInstructionsForModule(mod);
+        let aiInstruction: string | undefined = undefined;
+        if (mod.skill === 'writing') {
+          aiInstruction = (mod.config as WritingConfig).aiInstruction || undefined;
+        } else if (mod.skill === 'speaking') {
+          aiInstruction = (mod.config as SpeakingConfig).aiInstruction || undefined;
+        }
+
+        let targetModuleId = mod.dbId;
+
+        if (targetModuleId) {
+          // Existing module -> update
+          try {
+            await moduleService.updateModule(targetModuleId, {
+              instructions,
+              aiInstruction,
+              maxScore: mod.maxScore || 10,
+              orderIndex
+            });
+          } catch (modErr) {
+            console.warn(`Failed to update module #${targetModuleId}:`, modErr);
+          }
+        } else {
+          // New module added in edit view -> create
+          try {
+            const newMod = await moduleService.createModule(assignmentIdNum, {
+              skill: apiSkillMap[mod.skill],
+              taskType: taskTypeMap[mod.skill],
+              orderIndex,
+              instructions,
+              aiInstruction,
+              maxScore: mod.maxScore || 10
+            });
+            targetModuleId = newMod.id;
+            updatedModulesList[sIdx] = { ...mod, dbId: newMod.id };
+          } catch (createErr) {
+            console.warn(`Failed to create new module for ${mod.skill}:`, createErr);
+          }
+        }
+
+        // Upload audio if listening and has new file
+        if (targetModuleId && mod.skill === 'listening') {
+          const lConfig = mod.config as ListeningConfig;
+          if (lConfig.audioFile) {
+            try {
+              await moduleService.uploadAudio(targetModuleId, lConfig.audioFile);
+            } catch (audioErr) {
+              console.error('Failed to upload audio file:', audioErr);
+              showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe mới. Vui lòng thử lại!' : 'Failed to upload new listening audio file!');
+              throw audioErr;
+            }
+          }
+        }
+
+        // Create / sync questions for reading / listening
+        if (targetModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
+          const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
+          const moduleTotalScore = mod.maxScore || 10;
+          const scorePerQ = qList.length > 0 ? moduleTotalScore / qList.length : 1;
+          for (let i = 0; i < qList.length; i++) {
+            const q = qList[i];
+            const isExistingQuestion = q.id && !q.id.startsWith('new-') && !q.id.startsWith('mod-') && Number.isFinite(Number(q.id));
+            if (!isExistingQuestion) {
+              const payload = q.type === 'multiple_choice'
+                ? buildMcqPayload({
+                    content: q.prompt,
+                    options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
+                      ? ((q as { options?: string[] }).options || [])
+                      : [],
+                    correctOptionIndexOrText: q.correctAnswer,
+                    score: scorePerQ,
+                    orderIndex: i + 1,
+                  })
+                : buildShortAnswerPayload({
+                    content: q.prompt,
+                    answerText: q.correctAnswer,
+                    score: scorePerQ,
+                    orderIndex: i + 1,
+                  });
+              try {
+                await questionService.createQuestion(targetModuleId, payload);
+              } catch (qErr) {
+                console.warn('Failed to create question:', qErr);
+              }
+            }
+          }
+        }
+      }
+
+      setAssignmentData((prev) => ({ ...prev, modules: updatedModulesList }));
+      const successMsg = isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!';
+      toastSuccess(successMsg);
+    } catch (err) {
+      console.error('Failed to save assignment changes:', err);
+      const errorMsg = isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!';
+      toastError(errorMsg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const activeModule = assignmentData.modules[activeModuleIndex] || assignmentData.modules[0];
+
+  if (isLoading) {
+    return (
+      <div className="teacher-container">
+        <LoadingState 
+          title={isVi ? 'Đang nạp chi tiết bài tập' : 'Loading Assignment Details'}
+          description={isVi ? 'Vui lòng chờ trong giây lát...' : 'Please wait a moment...'}
+        />
+      </div>
+    );
   }
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  const handleSaveDraft = () => {
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    setLastSavedTime(timeStr);
-    showToast(isVi ? 'Đã lưu bản nháp bài tập thành công!' : 'Assignment draft saved successfully!');
-  };
-
-  const handleSaveAndPublish = () => {
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    setLastSavedTime(timeStr);
-    showToast(isVi ? 'Cập nhật và xuất bản bài tập thành công!' : 'Assignment updated and published successfully!');
-    setTimeout(() => {
-      navigate('/teacher/assignments');
-    }, 1200);
-  };
-
-  const handleSkillChange = (newSkill: AssignmentSkill) => {
-    setAssignmentData(prev => ({ ...prev, skill: newSkill }));
-  };
+  if (error) {
+    return (
+      <div className="teacher-container">
+        <div className="eh-card p-8 text-center my-8">
+          <AlertCircle size={32} className="text-danger mx-auto mb-3" />
+          <h3 className="font-serif text-lg font-bold text-main mb-2">
+            {isVi ? 'Không thể tải thông tin bài tập' : 'Failed to load assignment'}
+          </h3>
+          <p className="text-sm text-muted mb-4">{error}</p>
+          <button type="button" onClick={handleRetry} className="btn btn-secondary">
+            {isVi ? 'Thử lại' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="assignment-edit-container">
@@ -475,50 +832,40 @@ export const TeacherEditAssignment: React.FC = () => {
           <span>{isVi ? 'Quản lý bài tập' : 'Assignments Library'}</span>
         </button>
         <span>/</span>
-        <span>{assignmentData.className}</span>
+        <span>{assignmentData.className || (isVi ? 'Lớp học' : 'Class')}</span>
         <span>/</span>
-        <span style={{ fontWeight: 700, color: 'var(--on-surface, #111827)' }}>
-          {isVi ? 'Chỉnh sửa bài tập: ' : 'Edit Assignment: '} {assignmentData.code}
+        <span style={{ fontWeight: 700, color: 'var(--eh-text-primary, #161B19)' }}>
+          {isVi ? 'Chỉnh sửa bài tập' : 'Edit Assignment'}
         </span>
       </div>
 
-      {/* Main Header Row */}
+      {/* Header */}
       <div className="assignment-edit-header">
-        <div className="assignment-edit-title-wrap">
-          <div className="assignment-edit-title-row">
-            <span className="assignment-edit-code-badge">{assignmentData.code}</span>
-            <input 
-              type="text" 
-              className="assignment-edit-title-input"
-              value={assignmentData.title}
-              onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
-              placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
-            />
-          </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-            {isVi 
-              ? 'Tùy chỉnh nội dung đề thi, tài liệu đính kèm, rubric chấm điểm AI và thiết lập hạn nộp cho lớp học.'
-              : 'Customize assignment instructions, attachments, AI rubrics, and scheduling constraints.'}
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          <label htmlFor="assignment-title" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--eh-text-secondary, #736B63)' }}>
+            {isVi ? 'Tiêu đề bài tập' : 'Assignment Title'} <span className="text-error" style={{ color: '#DC2626' }}>*</span>
+          </label>
+          <input 
+            id="assignment-title"
+            type="text" 
+            className="assignment-edit-title-input"
+            value={assignmentData.title}
+            onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
+            placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
+          />
         </div>
 
-        {/* Status indicator & class badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select 
-            value={assignmentData.className}
-            onChange={(e) => setAssignmentData({ ...assignmentData, className: e.target.value })}
-            style={{ 
-              padding: '8px 14px', 
-              fontSize: '13px', 
-              borderRadius: '8px', 
-              border: '1px solid #cbd5e1', 
-              backgroundColor: '#ffffff',
-              fontWeight: 600
-            }}
+            value={selectedClassId ? String(selectedClassId) : ''}
+            onChange={(e) => setSelectedClassId(Number(e.target.value))}
+            className="select-input font-semibold text-sm"
           >
-            <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A</option>
-            <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV</option>
-            <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
 
           <div style={{ 
@@ -527,8 +874,8 @@ export const TeacherEditAssignment: React.FC = () => {
             gap: '6px', 
             padding: '6px 14px', 
             borderRadius: '20px', 
-            backgroundColor: assignmentData.status === 'active' ? '#dcfce7' : assignmentData.status === 'draft' ? '#f1f5f9' : '#fee2e2',
-            color: assignmentData.status === 'active' ? '#15803d' : assignmentData.status === 'draft' ? '#475569' : '#b91c1c',
+            backgroundColor: currentDbStatus === 'PUBLISHED' ? '#dcfce7' : currentDbStatus === 'DRAFT' ? '#f1f5f9' : '#fee2e2',
+            color: currentDbStatus === 'PUBLISHED' ? '#15803d' : currentDbStatus === 'DRAFT' ? '#475569' : '#b91c1c',
             fontWeight: 700,
             fontSize: '12.5px'
           }}>
@@ -536,81 +883,211 @@ export const TeacherEditAssignment: React.FC = () => {
               width: '8px', 
               height: '8px', 
               borderRadius: '50%', 
-              backgroundColor: assignmentData.status === 'active' ? '#16a34a' : assignmentData.status === 'draft' ? '#64748b' : '#ef4444' 
+              backgroundColor: currentDbStatus === 'PUBLISHED' ? '#16a34a' : currentDbStatus === 'DRAFT' ? '#64748b' : '#ef4444' 
             }}></span>
-            {assignmentData.status === 'active' ? (isVi ? 'Đang mở (Active)' : 'Active') : assignmentData.status === 'draft' ? (isVi ? 'Bản nháp (Draft)' : 'Draft') : (isVi ? 'Đã đóng (Closed)' : 'Closed')}
+            {currentDbStatus === 'PUBLISHED' ? (isVi ? 'Đang mở (Active)' : 'Active') : currentDbStatus === 'DRAFT' ? (isVi ? 'Bản nháp (Draft)' : 'Draft') : (isVi ? 'Đã đóng (Closed)' : 'Closed')}
           </div>
         </div>
       </div>
 
-      {/* 4 Skills Navigation Tabs */}
-      <div className="skill-tabs-nav">
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'writing' ? 'active-writing' : ''}`}
-          onClick={() => handleSkillChange('writing')}
-        >
-          <PenTool size={16} />
-          <span>Writing (Kỹ năng Viết)</span>
-        </button>
+      {/* DYNAMIC MULTI-MODULE MANAGEMENT BAR */}
+      <div className="tae-module-bar-wrap">
+        <div className="tae-module-bar-header">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-forest" />
+            <span className="tae-module-bar-title">
+              {isVi ? 'Các phần thi / Modules của bài tập' : 'Assignment Modules & Exam Parts'}
+            </span>
+            <span className="tae-module-count-badge">
+              {assignmentData.modules.length} {isVi ? 'phần thi' : 'parts'}
+            </span>
+          </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'speaking' ? 'active-speaking' : ''}`}
-          onClick={() => handleSkillChange('speaking')}
-        >
-          <Mic size={16} />
-          <span>Speaking (Kỹ năng Nói)</span>
-        </button>
+          {/* Add Module Dropdown */}
+          <div className="relative" ref={addMenuRef}>
+            <button
+              type="button"
+              className="tae-btn-add-module"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              <Plus size={15} />
+              <span>{isVi ? 'Thêm module' : 'Add Module'}</span>
+              <ChevronDown size={14} />
+            </button>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'reading' ? 'active-reading' : ''}`}
-          onClick={() => handleSkillChange('reading')}
-        >
-          <BookOpen size={16} />
-          <span>Reading (Kỹ năng Đọc)</span>
-        </button>
+            {showAddMenu && (
+              <div className="tae-add-module-menu">
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('writing')}
+                >
+                  <PenTool size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Viết (Writing)' : 'Add Writing Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('speaking')}
+                >
+                  <Mic size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nói (Speaking)' : 'Add Speaking Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('reading')}
+                >
+                  <BookOpen size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Đọc (Reading)' : 'Add Reading Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('listening')}
+                >
+                  <Headphones size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nghe (Listening)' : 'Add Listening Module'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'listening' ? 'active-listening' : ''}`}
-          onClick={() => handleSkillChange('listening')}
-        >
-          <Headphones size={16} />
-          <span>Listening (Kỹ năng Nghe)</span>
-        </button>
+        {/* Module Chips Row */}
+        <div className="tae-module-chips-list">
+          {assignmentData.modules.map((mod, idx) => {
+            const isSelected = idx === activeModuleIndex;
+            const skillCode = mod.skill;
+            return (
+              <div
+                key={mod.id || idx}
+                className={`tae-module-chip ${isSelected ? 'active' : ''} skill-${skillCode}`}
+                onClick={() => setActiveModuleIndex(idx)}
+              >
+                <div className="tae-chip-badge">{idx + 1}</div>
+                <div className="tae-chip-icon">{getSkillIcon(mod.skill, 14)}</div>
+                <div className="tae-chip-text">
+                  <span className="tae-chip-skill">{getSkillName(mod.skill)}</span>
+                  {mod.title && <span className="tae-chip-sub">• {mod.title}</span>}
+                </div>
+
+                {/* Move & Delete controls */}
+                <div className="tae-chip-actions" onClick={(e) => e.stopPropagation()}>
+                  {idx > 0 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang trái' : 'Move left'}
+                      onClick={(e) => handleMoveModule(idx, 'up', e)}
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                  )}
+                  {idx < assignmentData.modules.length - 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang phải' : 'Move right'}
+                      onClick={(e) => handleMoveModule(idx, 'down', e)}
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  )}
+                  {assignmentData.modules.length > 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn delete"
+                      title={isVi ? 'Xóa phần thi này' : 'Remove module'}
+                      onClick={(e) => handleRemoveModule(idx, e)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Grid: Skill Workspace (Left) + Settings Sidebar (Right) */}
+      {/* Grid: Active Module Workspace (Left) + Settings Sidebar (Right) */}
       <div className="assignment-edit-grid">
-        {/* LEFT COLUMN: Skill Workspace */}
+        {/* LEFT COLUMN: Active Module Workspace */}
         <div>
-          {assignmentData.skill === 'writing' && (
+          {/* Active Module Meta Row */}
+          {activeModule && (
+            <div className="tae-active-mod-meta-card">
+              <div className="flex items-center gap-4 flex-1 min-w-[280px]">
+                <label htmlFor="active-module-title" className="tae-meta-tag cursor-pointer">
+                  {isVi ? `Phần ${activeModuleIndex + 1}` : `Part ${activeModuleIndex + 1}`}
+                </label>
+                <input
+                  id="active-module-title"
+                  type="text"
+                  className="tae-meta-title-input flex-1"
+                  value={activeModule.title || ''}
+                  onChange={(e) => handleActiveModuleMetaChange('title', e.target.value)}
+                  placeholder={isVi ? 'Tên gợi nhớ (VD: Passage 1, Task 1...)' : 'Module custom title (optional)...'}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 tae-score-badge-wrap">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {isVi ? 'Thang điểm' : 'Score'}
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="tae-meta-score-input"
+                  value={activeModule.maxScore === 0 ? '' : (activeModule.maxScore || 10)}
+                  placeholder="10"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const clean = raw.replace(/^0+/, '');
+                    handleActiveModuleMetaChange('maxScore', clean === '' ? (raw === '0' ? 0 : 10) : Number(clean));
+                  }}
+                  onBlur={() => {
+                    if (!activeModule.maxScore || activeModule.maxScore <= 0) {
+                      handleActiveModuleMetaChange('maxScore', 10);
+                    }
+                  }}
+                />
+                <span className="text-xs text-muted font-medium">
+                  {isVi ? 'điểm' : 'pts'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {activeModule?.skill === 'writing' && (
             <SkillWritingEditor 
-              config={assignmentData.writing}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, writing: updated })}
+              config={activeModule.config as WritingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'speaking' && (
+          {activeModule?.skill === 'speaking' && (
             <SkillSpeakingEditor 
-              config={assignmentData.speaking}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, speaking: updated })}
+              config={activeModule.config as SpeakingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'reading' && (
+          {activeModule?.skill === 'reading' && (
             <SkillReadingEditor 
-              config={assignmentData.reading}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, reading: updated })}
+              config={activeModule.config as ReadingConfig}
+              onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
 
-          {assignmentData.skill === 'listening' && (
+          {activeModule?.skill === 'listening' && (
             <SkillListeningEditor 
-              config={assignmentData.listening}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, listening: updated })}
+              config={activeModule.config as ListeningConfig}
+              onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
         </div>
@@ -618,269 +1095,198 @@ export const TeacherEditAssignment: React.FC = () => {
         {/* RIGHT COLUMN: Settings Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Schedule & Due Date */}
-          <section className="edit-card">
-            <div className="edit-card-header">
-              <div className="edit-card-header-left">
-                <div className="edit-card-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Thời gian mở và hạn chót' : 'Open & Close dates'}</p>
-                </div>
+          <section className="edit-card tae-schedule-card">
+            <div className="edit-card-header pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="edit-card-title flex items-center gap-2 text-sm font-semibold">
+                <Calendar size={15} className="text-primary" />
+                {isVi ? 'Lịch trình bài tập' : 'Assignment Schedule'}
+              </h3>
+            </div>
+
+            <div className="edit-card-body flex flex-col gap-4">
+              <div>
+                <label className="tae-field-label">
+                  {isVi ? 'Thời gian mở đề' : 'Open Date'}
+                </label>
+                <input 
+                  type="datetime-local" 
+                  className="tae-schedule-input" 
+                  value={assignmentData.startDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
+                />
               </div>
-            </div>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Thời gian mở đề (Open at)' : 'Open Time'}</label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.startDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
-              />
-            </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">
-                {isVi ? 'Hạn chót nộp bài (Close at)' : 'Due Date'} <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.dueDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
-                style={{ fontWeight: 600 }}
-              />
-            </div>
-
-            <div className="edit-form-group">
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+              <div>
+                <label className="tae-field-label">
+                  {isVi ? 'Hạn chót nộp bài' : 'Due Date'} <span className="text-danger">*</span>
+                </label>
                 <input 
-                  type="checkbox" 
-                  checked={assignmentData.allowLate}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, allowLate: e.target.checked })}
-                  style={{ marginTop: '3px', accentColor: '#2563eb' }}
+                  type="datetime-local" 
+                  className="tae-schedule-input font-medium" 
+                  value={assignmentData.dueDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
                 />
-                <span style={{ fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
-                  <strong style={{ display: 'block', color: '#0f172a' }}>{isVi ? 'Cho phép nộp muộn' : 'Allow late submissions'}</strong>
-                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    {isVi ? 'Tối đa trễ 24 giờ sau deadline (tự động gắn cờ Nộp muộn).' : 'Max 24h grace period.'}
-                  </span>
-                </span>
-              </label>
-            </div>
+              </div>
 
-            <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <label className="edit-form-label">{isVi ? 'Thời lượng làm bài có bấm giờ' : 'Duration Limit'}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="number" 
-                  className="edit-form-input" 
-                  value={assignmentData.durationMinutes || 60}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, durationMinutes: parseInt(e.target.value) || 0 })}
-                  style={{ width: '90px' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                  {isVi ? 'phút (để trống nếu không giới hạn)' : 'minutes'}
-                </span>
+              <div>
+                <label className="tae-field-label">
+                  {isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}
+                </label>
+                <div className="tae-stepper-control">
+                  <button
+                    type="button"
+                    className="tae-stepper-btn"
+                    disabled={(assignmentData.maxSubmissions ?? 1) <= 1}
+                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.max(1, (assignmentData.maxSubmissions || 1) - 1) })}
+                    title={isVi ? 'Giảm số lần nộp' : 'Decrease max submissions'}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="tae-stepper-input"
+                    aria-label={isVi ? 'Số lần nộp tối đa' : 'Maximum submissions'}
+                    value={assignmentData.maxSubmissions ?? ''}
+                    placeholder={isVi ? 'Không giới hạn' : 'Unlimited'}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const value = raw === '' ? undefined : Math.max(1, Number(raw));
+                      setAssignmentData({ ...assignmentData, maxSubmissions: value });
+                    }}
+                    onBlur={() => {
+                      if (assignmentData.maxSubmissions === undefined) {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: savedCap?.value });
+                      }
+                    }}
+                  />
+                  <span className="tae-stepper-unit">{isVi ? 'lần' : 'times'}</span>
+                  <button
+                    type="button"
+                    className="tae-stepper-btn"
+                    disabled={(assignmentData.maxSubmissions ?? 1) >= 10}
+                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.min(10, (assignmentData.maxSubmissions ?? 0) + 1) })}
+                    title={isVi ? 'Tăng số lần nộp' : 'Increase max submissions'}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Visibility & Status */}
+          {/* Turnout Stats Card */}
           <section className="edit-card">
             <div className="edit-card-header">
-              <div className="edit-card-header-left">
-                <div className="edit-card-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-                  <Eye size={18} />
-                </div>
-                <div>
-                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái & Đối Tượng' : 'Publish & Audience'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Quyền truy cập của học viên' : 'Student access'}</p>
-                </div>
-              </div>
+              <h3 className="edit-card-title">
+                {isVi ? 'Thống kê nộp bài lớp' : 'Class Turnout'}
+              </h3>
             </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Trạng thái phát hành' : 'Publish Status'}</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  type="button"
-                  style={{ 
-                    padding: '8px 10px', 
-                    borderRadius: '8px', 
-                    border: assignmentData.status === 'active' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'active' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'active' ? '#1d4ed8' : '#64748b',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setAssignmentData({ ...assignmentData, status: 'active' })}
-                >
-                  {isVi ? 'Công khai' : 'Published'}
-                </button>
-                <button
-                  type="button"
-                  style={{ 
-                    padding: '8px 10px', 
-                    borderRadius: '8px', 
-                    border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setAssignmentData({ ...assignmentData, status: 'draft' })}
-                >
-                  {isVi ? 'Bản nháp' : 'Draft'}
-                </button>
-              </div>
-            </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Phạm vi giao bài' : 'Audience Target'}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'all'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? 'Toàn bộ học viên trong lớp (24 học viên)' : 'All class students (24)'}
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'specific'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'specific' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? 'Chỉ định nhóm học viên cần luyện thêm' : 'Specific student group'}
-                </label>
-              </div>
-            </div>
-
-            <div style={{ paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={assignmentData.notifyStudents}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, notifyStudents: e.target.checked })}
-                  style={{ accentColor: '#2563eb' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 600 }}>
-                  <Bell size={13} style={{ display: 'inline', marginRight: 4 }} />
-                  {isVi ? 'Gửi thông báo & email đến học sinh' : 'Send app & email alerts'}
+            <div className="edit-card-body">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-muted">{isVi ? 'Đã nộp bài:' : 'Submitted:'}</span>
+                <span className="font-bold text-main">
+                  {turnoutStats.submitted} / {turnoutStats.total} {isVi ? 'học viên' : 'students'}
                 </span>
-              </label>
+              </div>
+              <div className="w-full bg-light h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-forest h-full transition-all duration-300"
+                  style={{ width: `${turnoutStats.total > 0 ? (turnoutStats.submitted / turnoutStats.total) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           </section>
 
-          {/* Quick Stats Summary Card */}
-          <section className="edit-card" style={{ backgroundColor: '#f8fafc' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <Users size={18} color="#2563eb" />
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                {isVi ? 'Thống Kê Lớp Học' : 'Turnout Metrics'}
-              </h4>
+          {/* Modules Overview Summary Card */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <h3 className="edit-card-title">
+                {isVi ? 'Tổng quan đề thi' : 'Exam Structure'}
+              </h3>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Sĩ số lớp:' : 'Class size:'}</span>
-              <strong style={{ color: '#0f172a' }}>24 học viên</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Số bài đã nộp:' : 'Submitted:'}</span>
-              <strong style={{ color: '#16a34a' }}>22 bài (91.6%)</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Điểm trung bình:' : 'Avg Band:'}</span>
-              <strong style={{ color: '#2563eb' }}>6.8 IELTS</strong>
+            <div className="edit-card-body">
+              <div className="flex flex-col gap-2">
+                {assignmentData.modules.map((m, i) => {
+                  const displayName = m.title?.trim() || getSkillName(m.skill);
+                  return (
+                    <div key={m.id || i} className="flex items-center justify-between py-2 border-b border-light text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-forest flex-shrink-0">#{i + 1}</span>
+                        <span className="font-semibold text-main truncate" title={displayName}>
+                          {displayName}
+                        </span>
+                      </div>
+                      <span className="font-semibold text-muted flex-shrink-0 ml-2">
+                        {m.maxScore || 10} {isVi ? 'điểm' : 'pts'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </section>
         </div>
       </div>
 
       {/* Sticky Action Bar */}
-      <StickyActionBar 
+      <StickyActionBar
         leftActions={
-          <button 
+          <button
             type="button"
-            onClick={() => navigate('/teacher/assignments')}
-            style={{ 
-              padding: '8px 16px', 
-              fontSize: '13px', 
-              fontWeight: 600, 
-              color: '#475569', 
-              background: 'none', 
-              border: 'none', 
-              cursor: 'pointer', 
-              borderRadius: '8px' 
-            }}
+            className="btn btn-secondary bg-white btn-sm"
+            onClick={() => setShowPreviewModal(true)}
           >
-            {isVi ? 'Hủy bỏ' : 'Cancel'}
+            <Eye size={16} />
+            <span>{isVi ? 'Xem trước đề thi' : 'Preview Exam'}</span>
           </button>
         }
         rightActions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
-              {isVi ? `Đã lưu tự động lúc ${lastSavedTime}` : `Auto-saved at ${lastSavedTime}`}
-            </span>
-
-            <button 
+          <div className="flex items-center gap-3">
+            <button
               type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              onClick={() => setShowPreviewModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              className="btn btn-primary btn-sm flex items-center gap-2"
+              onClick={() => saveAssignmentChanges()}
+              disabled={isSaving}
             >
-              <Eye size={14} />
-              <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
+              {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              <span>{isSaving ? (isVi ? 'Đang lưu thay đổi...' : 'Saving...') : (isVi ? 'Lưu thay đổi bài tập' : 'Save Changes')}</span>
             </button>
-
-            <button 
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              onClick={handleSaveDraft}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Save size={14} />
-              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
-            </button>
-
-            <button 
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={handleSaveAndPublish}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
-            >
-              <Send size={14} />
-              <span>{isVi ? 'Cập nhật & Xuất bản' : 'Save & Publish'}</span>
-            </button>
+            {currentDbStatus === 'DRAFT' ? (
+              <button
+                type="button"
+                className="btn btn-secondary bg-white btn-sm text-forest"
+                onClick={() => saveAssignmentChanges('PUBLISHED')}
+                disabled={isSaving}
+              >
+                <Send size={16} />
+                <span>{isVi ? 'Xuất bản bài tập' : 'Publish'}</span>
+              </button>
+            ) : currentDbStatus === 'PUBLISHED' ? (
+              <button
+                type="button"
+                className="btn btn-secondary bg-white btn-sm text-danger"
+                onClick={() => saveAssignmentChanges('CLOSED')}
+                disabled={isSaving}
+              >
+                <AlertCircle size={16} />
+                <span>{isVi ? 'Đóng nộp bài' : 'Close Assignment'}</span>
+              </button>
+            ) : null}
           </div>
         }
       />
 
-      {/* Student View Interactive Preview Modal */}
+      {/* Preview Modal */}
       {showPreviewModal && (
         <AssignmentPreviewModal 
-          data={assignmentData} 
-          onClose={() => setShowPreviewModal(false)} 
+          onClose={() => setShowPreviewModal(false)}
+          data={assignmentData}
         />
       )}
 
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="edit-toast">
-          <CheckCircle2 size={18} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+
     </div>
   );
 };

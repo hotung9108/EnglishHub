@@ -1,11 +1,10 @@
-name: Backend CI
+name: CI-Backend
 
 on:
   push:
     branches:
       - main
       - staging
-      - develop
     paths:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
@@ -74,6 +73,7 @@ jobs:
         run: |
           docker pull localstack/localstack:3
           docker pull postgres:16-alpine
+          docker pull cgr.dev/chainguard/minio:latest
 
       - name: Validate Flyway Migrations & Run Tests
         env:

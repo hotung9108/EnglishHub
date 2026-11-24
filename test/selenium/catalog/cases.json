@@ -1,0 +1,3666 @@
+{
+  "sources": {
+    "srs": {
+      "name": "01. SRS - Đặc tả yêu cầu - Group-04.pdf",
+      "sha256": "959de04b0ccdfbe89e946c1909dea8d5bab0ee5e346464dd2ec193de2a98b7ff"
+    },
+    "workbook": {
+      "name": "TestCases_EnglishHub_Selenium (1).xlsx",
+      "sha256": "6ccc7325ba842e30164c3124ffc15dfd8ed67ea9ee348614578faad7badd3a40"
+    }
+  },
+  "total": 170,
+  "specs": {
+    "UC001": {
+      "pdfPage": 19,
+      "printedPage": 17,
+      "text": "Mã Use case\nUC001\nTên Use case\nĐăng nhập\nTác nhân\nQuản lý, Giáo viên, Học viên.\nMục tiêu\nXác thực danh tính người dùng và điều hướng vào không gian làm việc tương\nứng với vai trò.\nMô tảtổng quan\nNgười dùng cung cấp thông tin đăng nhập (tên tài khoản/email và mật khẩu)\nđểtruy cập hệthống.\nYêu cầu tham\nkhảo\nQuy định vềbảo mật xác thực và phân quyền tài khoản người dùng.\nTiền điều kiện\nNgười dùng có tài khoản đang ởtrạng thái hoạt động trên hệthống.\nDòng sựkiện\nchính\n1. Người dùng truy cập trang đăng nhập và nhập thông tin tài khoản, mật\nkhẩu.\n2. Người dùng nhấn nút xác nhận đăng nhập.\n3. Hệthống kiểm tra tính hợp lệcủa định dạng dữliệu đầu vào.\n4. Hệthống xác thực thông tin tài khoản và kiểm tra trạng thái kích hoạt của\ntài khoản.\n5. Hệthống khởi tạo phiên làm việc, cấp quyền truy cập theo vai trò (Quản\nlý, Giáo viên, hoặc Học viên).\n6. Hệthống chuyển hướng người dùng đến trang chủ/bảng điều khiển tương\nứng với vai trò.\nCác dòng sựkiện\nphụ\n- Dữliệu không hợp lệhoặc sai thông tin: Hệthống hiển thịthông báo lỗi tài\nkhoản hoặc mật khẩu không chính xác và yêu cầu người dùng nhập lại.\n- Tài khoản bịkhóa: Hệthống thông báo tài khoản đang bịtạm khóa và từ\nchối cấp quyền truy cập.\nHậu điều kiện\nPhiên đăng nhập được thiết lập thành công, người dùng ởtrạng thái đã xác\nthực.\nBảng 4: Đặc tảca sửdụng UC001: Đăng nhập\n17"
+    },
+    "UC002": {
+      "pdfPage": 22,
+      "printedPage": 20,
+      "text": "Mã Use case\nUC002\nTên Use case\nĐăng xuất\nTác nhân\nQuản lý, Giáo viên, Học viên.\nMục tiêu\nKết thúc phiên làm việc an toàn của người dùng hiện tại trên hệthống.\nMô tảtổng quan\nNgười dùng yêu cầu hủy phiên đăng nhập, hệthống thu hồi quyền truy cập và\nđưa người dùng vềtrang đăng nhập.\nYêu cầu tham\nkhảo\nQuy chuẩn an toàn phiên làm việc.\nTiền điều kiện\nNgười dùng đang trong trạng thái đăng nhập hợp lệ.\nDòng sựkiện\nchính\n1. Người dùng chọn chức năng Đăng xuất trên giao diện cá nhân.\n2. Hệthống tiếp nhận yêu cầu và tiến hành hủy phiên làm việc hiện tại.\n3. Hệthống xóa thông tin xác thực lưu trữtrên trình duyệt của người dùng.\n4. Hệthống điều hướng người dùng vềtrang đăng nhập và hiển thịthông báo\nđăng xuất thành công.\nCác dòng sựkiện\nphụ\n- Phiên làm việc đã hết hạn trước đó: Hệthống tựđộng chuyển hướng người\ndùng vềtrang đăng nhập.\nHậu điều kiện\nPhiên làm việc bịvô hiệu hóa hoàn toàn, người dùng không thểthực hiện các\nthao tác yêu cầu xác thực.\nBảng 5: Đặc tảca sửdụng UC002: Đăng xuất\nHình 5: UI đăng xuất\n20"
+    },
+    "UC003": {
+      "pdfPage": 24,
+      "printedPage": 22,
+      "text": "Mã Use case\nUC003\nTên Use case\nQuản lý tài khoản cá nhân\nTác nhân\nQuản lý, Giáo viên, Học viên.\nMục tiêu\nXem thông tin tài khoản và cập nhật hồsơ cá nhân, đổi mật khẩu.\nMô tảtổng quan\nCho phép người dùng theo dõi thông tin cá nhân và cập nhật họtên, liên hệ\nhoặc thay đổi mật khẩu.\nYêu cầu tham\nkhảo\nQuy định vềbảo mật thông tin tài khoản người dùng.\nTiền điều kiện\nNgười dùng đã đăng nhập vào hệthống.\nDòng sựkiện\nchính\n1. Người dùng điều hướng đến mục Tài khoản cá nhân / Hồsơ.\n2. Hệthống tải và hiển thịthông tin chi tiết hiện tại của người dùng.\n3. Người dùng chọn chỉnh sửa thông tin (họtên, liên hệ) hoặc đổi mật khẩu.\n4. Người dùng nhập dữliệu mới và nhấn Lưu thay đổi.\n5. Hệthống kiểm tra tính hợp lệcủa dữliệu (và kiểm tra mật khẩu cũ nếu\nthực hiện đổi mật khẩu).\n6. Hệthống cập nhật thông tin tài khoản và thông báo kết quảthành công cho\nngười dùng.\nCác dòng sựkiện\nphụ\n- Mật khẩu cũ không chính xác hoặc mật khẩu mới không đạt chuẩn: Hệ\nthống báo lỗi và giữnguyên form nhập.\nHậu điều kiện\nThông tin hồsơ cá nhân hoặc mật khẩu mới được cập nhật thành công.\nBảng 6: Đặc tảca sửdụng UC003: Quản lý tài khoản cá nhân\n22"
+    },
+    "UC004": {
+      "pdfPage": 27,
+      "printedPage": 25,
+      "text": "Mã Use case\nUC004\nTên Use case\nQuản lý tài khoản người dùng\nTác nhân\nQuản lý.\nMục tiêu\nQuản lý tập trung danh sách tài khoản toàn hệthống (tạo mới, cập nhật,\nkhóa/mởkhóa).\nMô tảtổng quan\nQuản lý thực hiện tra cứu danh sách người dùng, thêm tài khoản mới, chỉnh\nsửa thông tin cơ bản hoặc mở/khóa tài khoản.\nYêu cầu tham\nkhảo\nChính sách quản trịngười dùng trung tâm.\nTiền điều kiện\nQuản lý đã đăng nhập với vai trò Quản lý.\nDòng sựkiện\nchính\n1. Quản lý truy cập trang Quản lý tài khoản người dùng.\n2. Hệthống hiển thịdanh sách người dùng kèm bộlọc và ô tìm kiếm.\n3. Quản lý thực hiện một trong các thao tác:\n4. - Tạo tài khoản mới: Nhập thông tin tài khoản, vai trò ban đầu, xác nhận\ntạo.\n5. - Sửa tài khoản: Chọn tài khoản, chỉnh sửa thông tin, xác nhận lưu.\n6. - Khóa/Mởkhóa: Chọn tài khoản và thay đổi trạng thái kích hoạt.\n7. Hệthống kiểm tra dữliệu và cập nhật trạng thái tài khoản vào cơ sởdữ\nliệu.\n8. Hệthống thông báo thao tác thành công và làm mới danh sách hiển thị.\nCác dòng sựkiện\nphụ\n- Thông tin tài khoản bịtrùng lặp (email/username): Hệthống báo lỗi trùng\nlặp và yêu cầu đổi thông tin.\n- Quản lý hủy thao tác: Hệthống đóng biểu mẫu và giữnguyên trạng thái ban\nđầu.\nHậu điều kiện\nDanh sách tài khoản người dùng được cập nhật tương ứng với thao tác của\nQuản lý.\nBảng 7: Đặc tảca sửdụng UC004: Quản lý tài khoản người dùng\n25"
+    },
+    "UC005": {
+      "pdfPage": 30,
+      "printedPage": 28,
+      "text": "Mã Use case\nUC005\nTên Use case\nPhân quyền người dùng\nTác nhân\nQuản lý.\nMục tiêu\nGán hoặc điều chỉnh vai trò cho các tài khoản trong hệthống.\nMô tảtổng quan\nQuản lý lựa chọn tài khoản và phân quyền tương ứng (Quản lý, Giáo viên,\nHọc viên) đểkiểm soát quyền truy cập tài nguyên.\nYêu cầu tham\nkhảo\nMô hình kiểm soát truy cập dựa trên vai trò (RBAC).\nTiền điều kiện\nQuản lý đã đăng nhập và tài khoản cần phân quyền đang tồn tại trên hệthống.\nDòng sựkiện\nchính\n1. Quản lý truy cập khu vực Phân quyền / Quản lý vai trò người dùng.\n2. Quản lý tìm kiếm và chọn người dùng cần thay đổi quyền.\n3. Hệthống hiển thịthông tin vai trò hiện tại của người dùng.\n4. Quản lý chọn vai trò mới cho tài khoản.\n5. Quản lý xác nhận thay đổi vai trò.\n6. Hệthống ghi nhận thay đổi và áp dụng vai trò mới cho tài khoản.\n7. Hệthống thông báo kết quảphân quyền thành công.\nCác dòng sựkiện\nphụ\n- Quản lý tựtước quyền quản trịtối cao của chính mình: Hệthống đưa ra\ncảnh báo ngăn chặn và từchối thao tác nếu không hợp lệ.\nHậu điều kiện\nQuyền hạn của tài khoản được cập nhật và có hiệu lực ngay trong các phiên\nlàm việc tiếp theo.\nBảng 8: Đặc tảca sửdụng UC005: Phân quyền người dùng\n28"
+    },
+    "UC006": {
+      "pdfPage": 33,
+      "printedPage": 31,
+      "text": "Mã Use case\nUC006\nTên Use case\nQuản lý giáo viên\nTác nhân\nQuản lý.\nMục tiêu\nQuản lý hồsơ, chuyên môn và thông tin hoạt động của đội ngũ giáo viên.\nMô tảtổng quan\nQuản lý xem danh sách giáo viên, thêm mới hồsơ giáo viên, chỉnh sửa thông\ntin chuyên môn.\nYêu cầu tham\nkhảo\nQuy trình quản lý nhân sựgiảng dạy.\nTiền điều kiện\nQuản lý đã đăng nhập vào hệthống.\nDòng sựkiện\nchính\n1. Quản lý chọn chức năng Quản lý giáo viên.\n2. Hệthống hiển thịdanh sách giáo viên kèm thông tin tóm tắt và bộlọc tìm\nkiếm.\n3. Quản lý thực hiện thao tác (Thêm giáo viên mới, Cập nhật thông tin giảng\ndạy, hoặc Khóa/Mởkhóa trạng thái hoạt động).\n4. Hệthống kiểm tra tính hợp lệcủa dữliệu nhập.\n5. Hệthống lưu trữthông tin giáo viên và thông báo kết quảxửlý thành công.\n6. Danh sách giáo viên được đồng bộhiển thịmới.\nCác dòng sựkiện\nphụ\n- Thiếu dữliệu bắt buộc hoặc trùng thông tin liên lạc: Hệthống đánh dấu\ntrường lỗi và yêu cầu bổsung.\nHậu điều kiện\nThông tin hồsơ giáo viên được tạo mới hoặc cập nhật chính xác.\nBảng 9: Đặc tảca sửdụng UC006: Quản lý giáo viên\n31"
+    },
+    "UC007": {
+      "pdfPage": 36,
+      "printedPage": 34,
+      "text": "Mã Use case\nUC007\nTên Use case\nQuản lý học viên\nTác nhân\nQuản lý.\nMục tiêu\nQuản lý hồsơ, thông tin học tập và trạng thái tài khoản của học viên.\nMô tảtổng quan\nCho phép Quản lý tìm kiếm học viên, xem chi tiết lý lịch học tập, tạo mới học\nviên hoặc cập nhật thông tin cá nhân.\nYêu cầu tham\nkhảo\nQuy trình quản trịhọc viên của trung tâm.\nTiền điều kiện\nQuản lý đã đăng nhập với vai trò Quản lý.\nDòng sựkiện\nchính\n1. Quản lý truy cập giao diện Quản lý học viên.\n2. Hệthống hiển thịdanh sách học viên cùng các tùy chọn tìm kiếm và lọc.\n3. Quản lý chọn thêm mới học viên hoặc chọn một học viên đểsửa thông tin.\n4. Quản lý nhập/sửa các thông tin cần thiết và xác nhận lưu.\n5. Hệthống xác thực tính hợp lệcủa dữliệu và ghi nhận vào hệthống.\n6. Hệthống hiển thịthông báo hoàn thành và làm mới danh sách học viên.\nCác dòng sựkiện\nphụ\n- Dữliệu mã học viên hoặc email đã tồn tại: Hệthống báo lỗi trùng lặp và\nkhông lưu thay đổi.\nHậu điều kiện\nHồsơ học viên được cập nhật hoặc khởi tạo thành công trong hệthống.\nBảng 10: Đặc tảca sửdụng UC007: Quản lý học viên\nHình 15: UI quản lý học viên\n34"
+    },
+    "UC008": {
+      "pdfPage": 38,
+      "printedPage": 36,
+      "text": "Mã Use case\nUC008\nTên Use case\nQuản lý lớp học\nTác nhân\nQuản lý.\nMục tiêu\nTạo mới, chỉnh sửa, đóng/mởlớp học và phân công giáo viên phụtrách.\nMô tảtổng quan\nQuản lý thiết lập các lớp học mới, gán giáo viên đứng lớp, cấu hình thời gian\nđào tạo và thay đổi trạng thái hoạt động của lớp.\nYêu cầu tham\nkhảo\nQuy chếtổchức và vận hành lớp học.\nTiền điều kiện\nQuản lý đã đăng nhập vào hệthống.\nDòng sựkiện\nchính\n1. Quản lý mởtrang Quản lý lớp học.\n2. Hệthống hiển thịdanh sách lớp học hiện có kèm trạng thái (Đang mở, Đã\nkết thúc).\n3. Quản lý thực hiện hành động: Tạo lớp mới, Sửa thông tin lớp, Phân công\ngiáo viên phụtrách, hoặc Đóng/Mởlớp.\n4. Hệthống kiểm tra thông tin lớp học và giáo viên phụtrách được chỉđịnh.\n5. Hệthống lưu thông tin lớp học và cập nhật trạng thái hoạt động.\n6. Hệthống phản hồi kết quảthành công và hiển thịlớp học trên danh sách.\nCác dòng sựkiện\nphụ\n- Giáo viên được phân công không hợp lệhoặc không khảdụng: Hệthống\nđưa ra cảnh báo đểQuản lý chọn giáo viên khác.\nHậu điều kiện\nLớp học được tạo hoặc cập nhật trạng thái thành công, thông tin liên kết giáo\nviên được ghi nhận.\nBảng 11: Đặc tảca sửdụng UC008: Quản lý lớp học\n36"
+    },
+    "UC009": {
+      "pdfPage": 41,
+      "printedPage": 39,
+      "text": "Mã Use case\nUC009\nTên Use case\nQuản lý thành viên lớp học\nTác nhân\nQuản lý, Giáo viên.\nMục tiêu\nThêm, xóa học viên trong danh sách của một lớp học cụthể.\nMô tảtổng quan\nCho phép người phụtrách lớp hoặc Quản lý quản lý danh sách học viên thuộc\nlớp, phục vụgiao bài tập.\nYêu cầu tham\nkhảo\nQuy định biên chếlớp học.\nTiền điều kiện\nLớp học đã được tạo và tác nhân có quyền quản lý lớp học đó.\nDòng sựkiện\nchính\n1. Tác nhân truy cập vào chi tiết một lớp học và chọn mục Thành viên lớp.\n2. Hệthống hiển thịdanh sách học viên hiện đang tham gia lớp.\n3. Tác nhân thực hiện thao tác thêm học viên mới vào lớp hoặc xóa học viên\nkhỏi lớp.\n4. Tác nhân xác nhận hành động thay đổi danh sách thành viên.\n5. Hệthống kiểm tra sĩ số, tính hợp lệcủa tài khoản học viên và cập nhật\ndanh sách.\n6. Hệthống thông báo kết quảcập nhật thành viên thành công.\nCác dòng sựkiện\nphụ\n- Học viên đã có sẵn trong lớp: Hệthống thông báo học viên đã tham gia và\nbỏqua lượt thêm.\n- Xóa thành viên khỏi lớp: Hệthống yêu cầu xác nhận trước khi xóa nhằm\ntránh thao tác nhầm lẫn.\nHậu điều kiện\nDanh sách thành viên của lớp học được cập nhật chính xác.\nBảng 12: Đặc tảca sửdụng UC009: Quản lý thành viên lớp học\n39"
+    },
+    "UC010": {
+      "pdfPage": 44,
+      "printedPage": 42,
+      "text": "Mã Use case\nUC010\nTên Use case\nXem danh sách lớp học\nTác nhân\nGiáo viên, Học viên.\nMục tiêu\nTra cứu và truy cập nhanh vào các lớp học mà người dùng đang tham gia hoặc\nphụtrách.\nMô tảtổng quan\nGiáo viên theo dõi các lớp mình phụtrách giảng dạy; Học viên theo dõi các\nlớp mình đang theo học kèm thông tin cơ bản của lớp.\nYêu cầu tham\nkhảo\nGiao diện điều hướng khóa học và lớp học.\nTiền điều kiện\nNgười dùng đã đăng nhập vào hệthống.\nDòng sựkiện\nchính\n1. Người dùng chọn mục Danh sách lớp học trên thanh điều hướng.\n2. Hệthống truy vấn các lớp học có gắn với tài khoản của người dùng.\n3. Hệthống hiển thịdanh sách các lớp học kèm tên lớp, giáo viên phụtrách,\nsĩ sốvà trạng thái.\n4. Người dùng có thểlọc hoặc chọn một lớp học đểchuyển vào trang chi tiết\nlớp học đó.\nCác dòng sựkiện\nphụ\n- Người dùng chưa thuộc lớp học nào: Hệthống hiển thịthông báo chưa có\nlớp học và gợi ý liên hệngười phụtrách.\nHậu điều kiện\nNgười dùng nắm bắt được danh sách lớp học và có thểtiếp tục chọn lớp để\nxem và thao tác chi tiết.\nBảng 13: Đặc tảca sửdụng UC010: Xem danh sách lớp học\n42"
+    },
+    "UC011": {
+      "pdfPage": 47,
+      "printedPage": 45,
+      "text": "Mã Use case\nUC011\nTên Use case\nQuản lý bài tập\nTác nhân\nGiáo viên.\nMục tiêu\nTheo dõi, tìm kiếm, phân loại và quản lý toàn bộbài tập của lớp học theo các\nkỹnăn.\nMô tảtổng quan\nGiáo viên xem danh sách các bài tập đã tạo, lọc theo kỹnăng (Nghe, Nói,\nĐọc, Viết) hoặc trạng thái bài tập, thực hiện sửa/khóa/xóa bài tập.\nYêu cầu tham\nkhảo\nQuy trình quản lý học liệu và bài kiểm tra.\nTiền điều kiện\nGiáo viên đã đăng nhập và được phân công phụtrách lớp học.\nDòng sựkiện\nchính\n1. Giáo viên mởtrang Quản lý bài tập trong lớp học phụtrách.\n2. Hệthống tải danh sách các bài tập hiện có cùng thông tin tổng quan (tiêu\nđề, kỹnăng, hạn nộp, trạng thái).\n3. Giáo viên áp dụng bộlọc (kỹnăng, trạng thái mở/đóng) hoặc từkhóa tìm\nkiếm.\n4. Hệthống lọc và hiển thịkết quảtương ứng.\n5. Giáo viên có thểchọn thao tác quản trịcụthể.\nCác dòng sựkiện\nphụ\n- Xóa bài tập đã có học viên nộp: Hệthống cảnh báo vềviệc ảnh hưởng đến\ndữliệu bài làm của học viên và yêu cầu xác nhận kỹ.\nHậu điều kiện\nTrạng thái và danh mục bài tập trong lớp được quản lý đồng bộ.\nBảng 14: Đặc tảca sửdụng UC011: Quản lý bài tập\n45"
+    },
+    "UC012": {
+      "pdfPage": 50,
+      "printedPage": 48,
+      "text": "Mã Use case\nUC012\nTên Use case\nTạo bài tập\nTác nhân\nGiáo viên.\nMục tiêu\nKhởi tạo bài tập mới với đầy đủđềbài, câu hỏi, tài liệu đính kèm, thang điểm\nvà sốlần làm bài.\nMô tảtổng quan\nGiáo viên thiết lập bài tập cho một hoặc nhiều kỹnăng tiếng Anh, cài đặt thời\nhạn nộp, sốlần làm bài tối đa và nội dung câu hỏi/đáp án.\nYêu cầu tham\nkhảo\nTiêu chuẩn cấu trúc bài kiểm tra đánh giá năng lực ngôn ngữ.\nTiền điều kiện\nGiáo viên có quyền tạo nội dung trong lớp học.\nDòng sựkiện\nchính\n1. Giáo viên nhấn nút Tạo bài tập mới tại giao diện quản lý bài tập.\n2. Giáo viên nhập thông tin chung: tiêu đề, mô tả, lớp học áp dụng, thời hạn\nhoàn thành, sốlần làm bài.\n3. Giáo viên cấu hình nội dung theo kỹnăng (soạn câu hỏi, tải tệp âm thanh,\nđoạn văn đọc, hoặc đềbài viết/nói).\n4. Giáo viên thiết lập thang điểm, câu hỏi, đáp án (nếu có trắc nghiệm/điền\ntừ).\n5. Giáo viên nhấn Lưu bài tập (ởdạng bản nháp hoặc xuất bản).\n6. Hệthống xác thực tính hợp lệcủa nội dung đềbài và lưu vào cơ sởdữliệu.\n7. Hệthống thông báo tạo bài tập thành công và quay lại danh sách bài tập.\nCác dòng sựkiện\nphụ\n- Thiếu các trường thông tin bắt buộc hoặc file đính kèm quá dung lượng: Hệ\nthống hiển thịcảnh báo lỗi cụthểđểgiáo viên khắc phục.\nHậu điều kiện\nBài tập mới được ghi nhận vào hệthống và sẵn sàng đểhọc viên tiếp cận theo\nthiết lập.\nBảng 15: Đặc tảca sửdụng UC012: Tạo bài tập\n48"
+    },
+    "UC013": {
+      "pdfPage": 53,
+      "printedPage": 51,
+      "text": "Mã Use case\nUC013\nTên Use case\nMởbài tập\nTác nhân\nGiáo viên.\nMục tiêu\nChuyển trạng thái bài tập sang Mởđểhọc viên có thểnhìn thấy và bắt đầu\nlàm bài.\nMô tảtổng quan\nCho phép giáo viên phát hành bài tập tới học viên trong lớp.\nYêu cầu tham\nkhảo\nQuy chếgiao nhận bài tập.\nTiền điều kiện\nBài tập đã được tạo thành công và đang ởtrạng thái Nháp hoặc Đang đóng.\nDòng sựkiện\nchính\n1. Giáo viên tìm bài tập cần mởtrong danh sách bài tập của lớp.\n2. Giáo viên chọn chức năng Mởbài tập (hoặc Xuất bản).\n3. Hệthống hiển thịhộp thoại xác nhận.\n4. Giáo viên xác nhận mởbài tập.\n5. Hệthống cập nhật trạng thái bài tập sang trạng thái Mở/Hoạt động.\n6. Hệthống hiển thịthông báo đã mởbài tập thành công.\nCác dòng sựkiện\nphụ\n- Hạn nộp bài đã qua so với thời điểm hiện tại: Hệthống yêu cầu cập nhật lại\nhạn nộp mới trước khi cho phép mở.\nHậu điều kiện\nHọc viên trong lớp có thểxem đềvà tham gia làm bài tập này.\nBảng 16: Đặc tảca sửdụng UC013: Mởbài tập\nHình 27: UI mởbài tập\n51"
+    },
+    "UC014": {
+      "pdfPage": 55,
+      "printedPage": 53,
+      "text": "Mã Use case\nUC014\nTên Use case\nKhóa bài tập\nTác nhân\nGiáo viên.\nMục tiêu\nTạm dừng hoặc khóa bài tập đểngăn chặn học viên tiếp tục nộp mới.\nMô tảtổng quan\nGiáo viên chủđộng đóng bài tập khi hết hạn hoặc khi cần tạm khóa.\nYêu cầu tham\nkhảo\nQuy tắc kết thúc thời gian nộp bài.\nTiền điều kiện\nBài tập đang ởtrạng thái Mở.\nDòng sựkiện\nchính\n1. Giáo viên chọn bài tập đang mởcần khóa.\n2. Giáo viên kích hoạt thao tác Khóa bài tập.\n3. Hệthống yêu cầu giáo viên xác nhận hành động khóa.\n4. Giáo viên bấm xác nhận khóa.\n5. Hệthống chuyển đổi trạng thái bài tập thành Đã khóa / Đã đóng.\n6. Hệthống cập nhật trạng thái trên giao diện và ngừng tiếp nhận bài nộp mới\ntừhọc viên.\nCác dòng sựkiện\nphụ\n- Giáo viên hủy xác nhận: Hệthống giữnguyên trạng thái mởcủa bài tập.\nHậu điều kiện\nBài tập bịkhóa, học viên không thểtiếp tục gửi bài làm mới.\nBảng 17: Đặc tảca sửdụng UC014: Khóa bài tập\nHình 29: UI khóa bài tập\n53"
+    },
+    "UC015": {
+      "pdfPage": 57,
+      "printedPage": 55,
+      "text": "Mã Use case\nUC015\nTên Use case\nXem bài tập\nTác nhân\nHọc viên.\nMục tiêu\nNắm bắt thông tin chi tiết, yêu cầu, thời hạn và nội dung bài tập được giao.\nMô tảtổng quan\nHọc viên duyệt danh sách bài tập của lớp, xem đềbài, thang điểm, thời gian\nlàm bài và sốlần làm bài còn lại.\nYêu cầu tham\nkhảo\nQuy định làm bài kiểm tra trực tuyến.\nTiền điều kiện\nHọc viên đã tham gia lớp học và bài tập đang ởtrạng thái cho phép truy cập.\nDòng sựkiện\nchính\n1. Học viên mởdanh sách bài tập của lớp học.\n2. Học viên chọn bài tập cần theo dõi.\n3. Hệthống kiểm tra quyền truy cập và trạng thái của bài tập.\n4. Hệthống hiển thịthông tin chi tiết: tên bài, hạn nộp, các kỹnăng cần thực\nhiện và lịch sửnộp bài trước đó (nếu có).\n5. Học viên nắm thông tin và sẵn sàng chọn bắt đầu làm bài.\nCác dòng sựkiện\nphụ\n- Bài tập đã bịkhóa hoặc chưa được mở: Hệthống chỉhiển thịthông tin tổng\nquan và thông báo không cho phép làm bài.\nHậu điều kiện\nHọc viên nắm rõ yêu cầu bài tập và có thểchuyển tiếp sang thao tác làm bài.\nBảng 18: Đặc tảca sửdụng UC015: Xem bài tập\nHình 31: UI xem bài tập\n55"
+    },
+    "UC016": {
+      "pdfPage": 59,
+      "printedPage": 57,
+      "text": "Mã Use case\nUC016\nTên Use case\nLàm bài tập viết\nTác nhân\nHọc viên.\nMục tiêu\nĐọc yêu cầu bài viết và thực hiện nội dung câu trảlời kỹnăng Viết.\nMô tảtổng quan\nHọc viên nhập nội dung đoạn văn/bài luận theo chủđềyêu cầu hoặc đính kèm\ntài liệu văn bản theo quy định.\nYêu cầu tham\nkhảo\nTiêu chuẩn kiểm tra kỹnăng Writing.\nTiền điều kiện\nHọc viên đã mởbài tập có phần kỹnăng Viết và bài tập còn hạn nộp.\nDòng sựkiện\nchính\n1. Học viên truy cập vào phần bài tập Viết.\n2. Hệthống hiển thịđềbài, sốtừyêu cầu (word count limit) và khung soạn\nthảo.\n3. Học viên nhập nội dung bài viết vào khung văn bản hoặc tải lên tệp tài liệu\nbài viết.\n4. Học viên rà soát nội dung và nhấn Lưu câu trảlời kỹnăng Viết.\n5. Hệthống lưu trữdữliệu văn bản làm bài và xác nhận lưu thành công.\nCác dòng sựkiện\nphụ\n- Nội dung bài viết vượt quá dung lượng quy định hoặc tệp tải lên sai định\ndạng: Hệthống hiển thịthông báo lỗi đểhọc viên chỉnh sửa.\nHậu điều kiện\nNội dung bài viết được lưu trữtrong bài làm của học viên.\nBảng 19: Đặc tảca sửdụng UC016: Làm bài tập viết\n57"
+    },
+    "UC017": {
+      "pdfPage": 62,
+      "printedPage": 60,
+      "text": "Mã Use case\nUC017\nTên Use case\nLàm bài tập nói\nTác nhân\nHọc viên.\nMục tiêu\nThực hiện phần thi kỹnăng Nói thông qua ghi âm trực tiếp hoặc tải tệp âm\nthanh.\nMô tảtổng quan\nHọc viên đọc đềbài nói, thực hiện thu âm câu trảlời, nghe lại kiểm tra chất\nlượng và lưu phần trảlời kỹnăng Nói.\nYêu cầu tham\nkhảo\nTiêu chuẩn kiểm tra kỹnăng Speaking.\nTiền điều kiện\nThiết bịcủa học viên có micro hoạt động và được cấp quyền truy cập trình\nduyệt.\nDòng sựkiện\nchính\n1. Học viên mởphần bài tập kỹnăng Nói.\n2. Hệthống hiển thịđềbài, công cụghi âm.\n3. Học viên ghi âm trực tiếp trên trình duyệt.\n4. Học viên nghe lại bản ghi âm đểđánh giá độrõ ràng của âm thanh.\n5. Học viên xác nhận lưu bản ghi âm cho câu hỏi.\n6. Hệthống tải tệp âm thanh lên hệthống lưu trữvà liên kết vào bài làm của\nhọc viên.\nCác dòng sựkiện\nphụ\n- Học viên chưa hài lòng với bản thu: Chọn hủy bản ghi tạm và thực hiện ghi\nâm lại từbước 3.\n- Trình duyệt chưa cấp quyền micro: Hệthống nhắc nhởcấp quyền truy cập\nmicro cho trang web.\nHậu điều kiện\nTệp ghi âm bài nói được lưu trữthành công và liên kết vào bài nộp.\nBảng 20: Đặc tảca sửdụng UC017: Làm bài tập nói\n60"
+    },
+    "UC018": {
+      "pdfPage": 65,
+      "printedPage": 63,
+      "text": "Mã Use case\nUC018\nTên Use case\nLàm bài tập đọc\nTác nhân\nHọc viên.\nMục tiêu\nĐọc hiểu đoạn văn bản và chọn/nhập đáp án cho các câu hỏi kỹnăng Đọc.\nMô tảtổng quan\nHọc viên đọc văn bản ngữliệu và thao tác với các dạng bài trắc nghiệm, điền\nkhuyết.\nYêu cầu tham\nkhảo\nTiêu chuẩn bài kiểm tra kỹnăng Reading.\nTiền điều kiện\nBài tập Đọc đang mởvà học viên đang trong phiên làm bài.\nDòng sựkiện\nchính\n1. Học viên mởbài tập kỹnăng Đọc.\n2. Hệthống hiển thịvăn bản đọc cùng danh sách các câu hỏi liên quan.\n3. Học viên đọc tài liệu và thao tác chọn/nhập đáp án cho từng câu hỏi.\n4. Học viên hoàn thành tất cảcâu hỏi và nhấn Lưu câu trảlời phần Đọc.\n5. Hệthống xác nhận toàn bộcâu trảlời đã được ghi nhận.\nCác dòng sựkiện\nphụ\n- Học viên chưa trảlời hết câu hỏi: Hệthống hiển thịcảnh báo sốlượng câu\ncòn trống đểhọc viên kiểm tra lại.\nHậu điều kiện\nĐáp án bài đọc được lưu vào trạng thái bài làm của học viên.\nBảng 21: Đặc tảca sửdụng UC018: Làm bài tập đọc\nHình 37: UI làm bài tập đọc\n63"
+    },
+    "UC019": {
+      "pdfPage": 67,
+      "printedPage": 65,
+      "text": "Mã Use case\nUC019\nTên Use case\nLàm bài tập nghe\nTác nhân\nHọc viên.\nMục tiêu\nNghe ngữliệu âm thanh và hoàn thành các câu hỏi kiểm tra kỹnăng Nghe.\nMô tảtổng quan\nHọc viên nghe file audio do bài tập cung cấp và chọn đáp án tương ứng.\nYêu cầu tham\nkhảo\nTiêu chuẩn bài kiểm tra kỹnăng Listening.\nTiền điều kiện\nThiết bịhọc viên có thiết bịphát âm thanh hoạt động bình thường.\nDòng sựkiện\nchính\n1. Học viên chọn phần bài tập kỹnăng Nghe.\n2. Hệthống hiển thịtrình phát âm thanh và các câu hỏi.\n3. Học viên bấm phát audio và tập trung nghe nội dung.\n4. Học viên chọn đáp án trắc nghiệm hoặc nhập từcòn thiếu vào ô trảlời.\n5. Học viên hoàn thành phần nghe và chọn Lưu câu trảlời bài Nghe.\n6. Hệthống kiểm tra và lưu trữđáp án của học viên.\nCác dòng sựkiện\nphụ\n- Học viên chưa trảlời hết câu hỏi: Hệthống hiển thịcảnh báo sốlượng câu\ncòn trống đểhọc viên kiểm tra lại.\nHậu điều kiện\nDanh sách câu trảlời của bài Nghe được ghi nhận vào hệthống.\nBảng 22: Đặc tảca sửdụng UC019: Làm bài tập nghe\nHình 39: UI làm bài tập nghe\n65"
+    },
+    "UC020": {
+      "pdfPage": 69,
+      "printedPage": 67,
+      "text": "Mã Use case\nUC020\nTên Use case\nXem lại bài làm\nTác nhân\nHọc viên.\nMục tiêu\nRà soát lại toàn bộcâu trảlời của các kỹnăng sau khi nộp bài.\nMô tảtổng quan\nCung cấp màn hình tổng hợp đểhọc viên xem lại bài làm.\nYêu cầu tham\nkhảo\nTrải nghiệm học viên khi xem lại bài làm.\nTiền điều kiện\nHọc viên đã nộp bài làm.\nDòng sựkiện\nchính\n1. Học viên chọn Xem lại bài làm.\n2. Hệthống tổng hợp các câu hỏi, bài làm thuộc tất cảkỹnăng trong bài tập.\n3. Hệthống đánh dấu trạng thái của kỹnăng (Đã chấm, Chờchấm). Nếu bài\nđã được chấm sẽhiển thịbài làm đúng/sai, nhận xét của giáo viên.\n4. Học viên kiểm tra tổng thểdanh sách câu trảlời.\nCác dòng sựkiện\nphụ\n- Phát hiện còn câu hỏi chưa điền: Hệthống cảnh báo rõ ràng các câu hỏi\nđang bịbỏtrống.\nHậu điều kiện\nHọc viên xem được lại bài làm.\nBảng 23: Đặc tảca sửdụng UC020: Xem lại bài làm\nHình 41: UI xem lại bài làm\n67"
+    },
+    "UC021": {
+      "pdfPage": 71,
+      "printedPage": 69,
+      "text": "Mã Use case\nUC021\nTên Use case\nNộp bài tập\nTác nhân\nHọc viên.\nMục tiêu\nGửi toàn bộnội dung bài làm hoàn chỉnh lên hệthống đểchờchấm điểm.\nMô tảtổng quan\nHọc viên thực hiện thao tác xác nhận nộp bài cuối cùng, hệthống chốt bài\nlàm, ghi nhận thời gian nộp và bắt đầu quy trình đánh giá.\nYêu cầu tham\nkhảo\nQuy chếnộp bài kiểm tra.\nTiền điều kiện\nHọc viên đang có bài làm dởdang trong phiên hợp lệvà chưa vượt quá sốlần\nnộp.\nDòng sựkiện\nchính\n1. Học viên nhấn nút Nộp bài tập trên màn hình làm bài.\n2. Hệthống hiển thịhộp thoại xác nhận nộp bài (thông báo không thểsửa đổi\nsau khi nộp).\n3. Học viên chọn Xác nhận nộp bài.\n4. Hệthống tiến hành đóng gói toàn bộcâu trảlời, lưu trạng thái bài làm\nthành ”Đã nộp”, ghi nhận thời điểm nộp.\n5. Hệthống kích hoạt quy trình tựđộng chấm điểm sơ bộ(với các kỹnăng\ntrắc nghiệm) và đưa bài làm vào hàng đợi chấm.\n6. Hệthống hiển thịthông báo nộp bài thành công và chuyển học viên về\ntrang kết quảnộp bài.\nCác dòng sựkiện\nphụ\n- Mất kết nối mạng khi đang gửi dữliệu: Hệthống thông báo lỗi đường\ntruyền và cho phép học viên thửgửi lại bài mà không mất nội dung đã làm.\n- Hết giờlàm bài trong lúc đang làm: Hệthống tựđộng thu bài và hoàn tất\nnộp bài tựđộng.\nHậu điều kiện\nBài làm chuyển sang trạng thái Đã nộp; sốlần làm bài của học viên tăng thêm\n1.\nBảng 24: Đặc tảca sửdụng UC021: Nộp bài tập\n69"
+    },
+    "UC022": {
+      "pdfPage": 74,
+      "printedPage": 72,
+      "text": "Mã Use case\nUC022\nTên Use case\nQuản lý lần làm và làm lại bài\nTác nhân\nHọc viên.\nMục tiêu\nTheo dõi sốlần làm bài đã sửdụng, lịch sửcác lần nộp và tiến hành làm lại\nbài tập nếu còn lượt cho phép.\nMô tảtổng quan\nHệthống kiểm tra sốlần làm bài tối đa do giáo viên quy định; cho phép học\nviên bắt đầu lượt làm mới khi đủđiều kiện.\nYêu cầu tham\nkhảo\nChính sách làm lại bài tập đểnâng cao năng lực học tập.\nTiền điều kiện\nHọc viên được phép truy cập bài tập.\nDòng sựkiện\nchính\n1. Học viên mởchi tiết bài tập đã từng làm.\n2. Hệthống hiển thịlịch sửcác lần nộp (thời gian nộp, điểm sốlần đó nếu đã\nchấm) và sốlượt làm bài còn lại.\n3. Học viên chọn Làm lại bài tập.\n4. Hệthống kiểm tra điều kiện: sốlần đã làm nhỏhơn sốlần tối đa và bài tập\nvẫn đang mở.\n5. Hệthống khởi tạo một phiên làm bài mới cho học viên.\n6. Học viên bắt đầu thực hiện bài tập ởlượt mới.\nCác dòng sựkiện\nphụ\n- Đã hết lượt làm bài tối đa: Hệthống vô hiệu hóa nút làm lại và thông báo\nđã đạt giới hạn sốlần làm.\n- Bài tập đã bịgiáo viên khóa: Hệthống thông báo bài tập không còn mởđể\nlàm lại.\nHậu điều kiện\nPhiên làm bài mới được khởi tạo và ghi nhận độc lập với các lần làm trước.\nBảng 25: Đặc tảca sửdụng UC022: Quản lý lần làm và làm lại bài\n72"
+    },
+    "UC023": {
+      "pdfPage": 77,
+      "printedPage": 75,
+      "text": "Mã Use case\nUC023\nTên Use case\nXem trạng thái bài làm\nTác nhân\nHọc viên.\nMục tiêu\nTheo dõi tiến trình xửlý bài làm của bản thân theo từng mốc trạng thái.\nMô tảtổng quan\nHọc viên nắm được bài làm của mình đang ởgiai đoạn nào: Chưa làm, Đang\nlàm dở, Đã nộp, Đang chấm, hay Đã hoàn thành chấm điểm.\nYêu cầu tham\nkhảo\nBảng theo dõi tiến độcá nhân.\nTiền điều kiện\nHọc viên đã đăng nhập và truy cập vào môn học/lớp học.\nDòng sựkiện\nchính\n1. Học viên vào trang danh sách bài tập hoặc lịch sửnộp bài.\n2. Hệthống tải danh mục bài tập và hiển thịnhãn trạng thái cụthểcho từng\nbài.\n3. Học viên có thểxem nhanh trạng thái hiện thời của từng bài làm.\n4. Nếu bài tập đã chấm xong, hệthống hiển thịđiểm sốtóm tắt và nút xem\nchi tiết bài chữa.\nCác dòng sựkiện\nphụ\n- Không có dữliệu bài làm: Hệthống hiển thịtrạng thái mặc định là ”Chưa\nlàm”.\nHậu điều kiện\nHọc viên nắm được chính xác tiến độvà trạng thái bài làm của mình.\nBảng 26: Đặc tảca sửdụng UC023: Xem trạng thái bài làm\nHình 47: UI xem trạng thái bài làm\n75"
+    },
+    "UC024": {
+      "pdfPage": 79,
+      "printedPage": 77,
+      "text": "Mã Use case\nUC024\nTên Use case\nChấm bài thủcông\nTác nhân\nGiáo viên.\nMục tiêu\nXem xét bài làm của học viên, nhập điểm sốvà ghi chú nhận xét chi tiết theo\nnăng lực.\nMô tảtổng quan\nGiáo viên đánh giá các phần tựluận (như bài viết, bài nói), đưa ra điểm số\ntừng tiêu chí và lời khuyên phát triển kỹnăng cho học viên.\nYêu cầu tham\nkhảo\nTiêu chí đánh giá và bảng rubric chấm điểm ngoại ngữ.\nTiền điều kiện\nHọc viên đã nộp bài và bài làm đang ởtrạng thái chờchấm hoặc cần giáo viên\nxác nhận.\nDòng sựkiện\nchính\n1. Giáo viên mởdanh sách bài nộp của lớp và chọn một bài nộp cần chấm.\n2. Hệthống hiển thịnội dung bài làm của học viên (văn bản viết, file ghi âm\nnói) kèm đềbài và khung chấm điểm.\n3. Giáo viên nghe/đọc nội dung làm bài của học viên.\n4. Giáo viên nhập điểm sốcho từng phần/tiêu chí và điền nhận xét, góp ý.\n5. Giáo viên nhấn Hoàn thành chấm bài.\n6. Hệthống kiểm tra điểm hợp lệ, tính điểm tổng kết và lưu kết quảchấm vào\nhệthống.\n7. Hệthống cập nhật trạng thái bài làm thành ”Đã chấm”.\nCác dòng sựkiện\nphụ\n- Điểm nhập vượt quá thang điểm tối đa: Hệthống hiển thịcảnh báo lỗi và\nyêu cầu nhập lại điểm hợp lệ.\nHậu điều kiện\nĐiểm sốvà nhận xét của giáo viên được ghi nhận chính thức trong hệthống.\nBảng 27: Đặc tảca sửdụng UC024: Chấm bài thủcông\n77"
+    },
+    "UC025": {
+      "pdfPage": 82,
+      "printedPage": 80,
+      "text": "Mã Use case\nUC025\nTên Use case\nHỗtrợchấm chữa bài viết bằng AI\nTác nhân\nGiáo viên.\nMục tiêu\nSửdụng trợlý AI đểphân tích bài làm và đềxuất điểm sốcho bài viết của\nhọc viên.\nMô tảtổng quan\nGiáo viên kích hoạt trợlý AI nhằm phát hiện lỗi sai, đưa ra gợi ý sửa lỗi và\ngợi ý điểm, giúp giáo viên tiết kiệm thời gian chấm bài.\nYêu cầu tham\nkhảo\nTiêu chuẩn hỗtrợchấm Writing ứng dụng AI.\nTiền điều kiện\nBài làm kỹnăng Viết của học viên đã được nộp và giáo viên đang mởbài để\nchấm.\nDòng sựkiện\nchính\n1. Tại màn hình chấm bài viết, giáo viên bấm nút ”Yêu cầu AI phân tích /\nChấm chữa”.\n2. Hệthống gửi nội dung bài viết và yêu cầu chấm đến mô-đun AI xửlý.\n3. Trợlý AI tiến hành phân tích văn bản: tìm kiếm lỗi ngữpháp, chính tả,\ncách dùng từ, tính mạch lạc và ước lượng điểm theo tiêu chí.\n4. Hệthống hiển thịkết quảphân tích của AI trên giao diện cho giáo viên\n(đoạn highlight lỗi, giải thích lỗi và điểm đềxuất).\n5. Giáo viên xem xét các gợi ý của AI, có thểchấp nhận, điều chỉnh hoặc bác\nbỏgợi ý.\n6. Giáo viên hoàn thiện nhận xét và xác nhận điểm cuối cùng.\nCác dòng sựkiện\nphụ\n- Dịch vụAI phản hồi chậm hoặc gián đoạn: Hệthống hiển thịthông báo lỗi\ntạm thời và cho phép giáo viên chấm thủcông thông thường hoặc gửi lại\nyêu cầu.\nHậu điều kiện\nKết quảphân tích của AI hỗtrợgiáo viên đưa ra điểm sốvà nhận xét nhanh\nchóng, chính xác.\nBảng 28: Đặc tảca sửdụng UC025: Hỗtrợchấm chữa bài viết bằng AI\n80"
+    },
+    "UC026": {
+      "pdfPage": 85,
+      "printedPage": 83,
+      "text": "Mã Use case\nUC026\nTên Use case\nHỗtrợchấm chữa bài nói bằng AI\nTác nhân\nGiáo viên.\nMục tiêu\nSửdụng AI đểchuyển ngữâm thanh thành văn bản, đánh giá bài nói.\nMô tảtổng quan\nTrợlý AI phân tích tệp âm thanh bài nói của học viên, phát hiện từphát âm\nsai theo chuẩn phiên âm IPA và đềxuất điểm nói sơ bộ.\nYêu cầu tham\nkhảo\nTiêu chuẩn kiểm tra và đánh giá phát âm tựđộng Speaking.\nTiền điều kiện\nBản ghi âm bài nói của học viên đã được tải lên hoàn tất và giáo viên đang ở\ntrang chấm bài nói.\nDòng sựkiện\nchính\n1. Giáo viên mởbài nói của học viên và nhấn ”AI hỗtrợđánh giá phát âm”.\n2. Hệthống tiếp nhận tệp âm thanh và kích hoạt mô-đun AI phân tích tiếng\nnói.\n3. AI chuyển đổi âm thanh thành văn bản (transcript), phân tích các lỗi phát\nâm, ngữđiệu, độtrôi chảy và đưa ra nhận xét chi tiết.\n4. Hệthống trình bày kết quảphân tích: bản gỡbăng lời nói, các từbịsai\nkèm phiên âm IPA chuẩn và điểm sốđềxuất.\n5. Giáo viên nghe lại bản ghi, kiểm tra kết quảAI gợi ý và điều chỉnh điểm\nsố/nhận xét theo đánh giá sư phạm của mình.\n6. Giáo viên lưu kết quảđánh giá cuối cùng.\nCác dòng sựkiện\nphụ\n- Tệp âm thanh chất lượng quá kém hoặc lẫn nhiều tạp âm: Hệthống đưa ra\ncảnh báo độchính xác của AI bịsuy giảm đểgiáo viên tựlắng nghe kỹhơn.\nHậu điều kiện\nNhận xét phát âm chi tiết và điểm bài nói được hoàn tất trên bài làm của học\nviên.\nBảng 29: Đặc tảca sửdụng UC026: Hỗtrợchấm chữa bài nói bằng AI\n83"
+    },
+    "UC027": {
+      "pdfPage": 88,
+      "printedPage": 86,
+      "text": "Mã Use case\nUC027\nTên Use case\nChấm bài đọc\nTác nhân\nGiáo viên.\nMục tiêu\nTựđộng đối chiếu câu trảlời trắc nghiệm của kỹnăng Đọc với đáp án đúng\nđểtính điểm ngay sau khi nộp bài.\nMô tảtổng quan\nHệthống tựđộng so khớp đáp án bài Đọc, tính điểm sốtương ứng và cho\nphép giáo viên theo dõi hoặc điều chỉnh nếu có khiếu nại.\nYêu cầu tham\nkhảo\nCơ chếchấm trắc nghiệm tựđộng khách quan.\nTiền điều kiện\nHọc viên nộp bài làm có chứa phần kỹnăng Đọc và bài tập có sẵn bộđáp án\nchuẩn.\nDòng sựkiện\nchính\n1. Khi học viên nộp bài, hệthống kích hoạt tiến trình chấm bài Đọc.\n2. Hệthống đối chiếu từng câu trảlời của học viên với bảng đáp án chuẩn\nđược cấu hình.\n3. Hệthống xác định các câu đúng/sai, áp dụng thang điểm đểtính tổng điểm\nkỹnăng Đọc.\n4. Hệthống lưu kết quảchấm vào cơ sởdữliệu.\n5. Giáo viên có thểmởxem kết quảchấm tựđộng của bài đọc.\nCác dòng sựkiện\nphụ\nHậu điều kiện\nĐiểm bài đọc được ghi nhận tựđộng vào bảng điểm của bài làm.\nBảng 30: Đặc tảca sửdụng UC027: Chấm bài đọc\n86"
+    },
+    "UC028": {
+      "pdfPage": 91,
+      "printedPage": 89,
+      "text": "Mã Use case\nUC028\nTên Use case\nChấm bài nghe\nTác nhân\nGiáo viên.\nMục tiêu\nTựđộng so sánh kết quảlàm bài kỹnăng Nghe của học viên với đáp án mẫu\nđểcho ra điểm sốchuẩn xác.\nMô tảtổng quan\nHệthống tựđộng kiểm tra đáp án các câu hỏi trắc nghiệm/điền từngắn của\nbài Nghe và tính điểm tựđộng.\nYêu cầu tham\nkhảo\nCơ chếchấm điểm tựđộng cho kỹnăng Listening.\nTiền điều kiện\nHọc viên hoàn tất nộp bài thi kỹnăng Nghe.\nDòng sựkiện\nchính\n1. Ngay khi bài tập được nộp, hệthống lấy danh sách đáp án kỹnăng Nghe\ncủa học viên.\n2. Hệthống tựđộng so khớp các câu trảlời với bộđáp án đúng của bài nghe.\n3. Hệthống tính toán sốlượng câu đúng và quy đổi ra điểm sốtheo cấu hình\nthang điểm.\n4. Hệthống ghi nhận kết quảđiểm sốvào hồsơ bài làm.\n5. Giáo viên kiểm tra lại kết quảchấm tựđộng của bài nghe.\nCác dòng sựkiện\nphụ\nHậu điều kiện\nĐiểm sốphần thi kỹnăng Nghe được lưu trữđầy đủtrong hệthống.\nBảng 31: Đặc tảca sửdụng UC028: Chấm bài nghe\n89"
+    },
+    "UC029": {
+      "pdfPage": 94,
+      "printedPage": 92,
+      "text": "Mã Use case\nUC029\nTên Use case\nXem điểm số\nTác nhân\nGiáo viên, Học viên.\nMục tiêu\nXem điểm chi tiết của các bài tập đã hoàn thành theo từng kỹnăng và điểm\ntrung bình chung.\nMô tảtổng quan\nGiáo viên theo dõi điểm của học sinh trong lớp; Học viên tra cứu điểm các bài\nthi và xem phân bốđiểm theo 4 kỹnăng.\nYêu cầu tham\nkhảo\nBảng tra cứu điểm sốvà xếp hạng học tập.\nTiền điều kiện\nBài tập đã được chấm điểm và công bốkết quả.\nDòng sựkiện\nchính\n1. Người dùng chọn mục Điểm sốtrên menu quản lý hoặc màn hình học tập.\n2. Hệthống tải dữliệu điểm sốtương ứng với quyền của tài khoản (Giáo viên\nxem cảlớp, Học viên chỉxem của cá nhân).\n3. Hệthống hiển thịdanh sách các bài tập kèm theo điểm sốtừng kỹnăng\n(Nghe, Nói, Đọc, Viết) và điểm tổng kết.\n4. Người dùng có thểlọc theo lớp, theo bài tập hoặc theo khoảng thời gian.\nCác dòng sựkiện\nphụ\n- Bài tập chưa được chấm xong: Hệthống hiển thịtrạng thái ”Đang chấm”\nthay cho điểm số.\nHậu điều kiện\nNgười dùng nắm bắt được thông tin điểm sốchính xác và minh bạch.\nBảng 32: Đặc tảca sửdụng UC029: Xem điểm số\n92"
+    },
+    "UC030": {
+      "pdfPage": 97,
+      "printedPage": 95,
+      "text": "Mã Use case\nUC030\nTên Use case\nQuản lý điểm số\nTác nhân\nGiáo viên.\nMục tiêu\nTheo dõi toàn bộsổđiểm của lớp học, chỉnh sửa hoặc phúc khảo điểm sốkhi\ncần thiết.\nMô tảtổng quan\nGiáo viên quản lý bảng điểm chung của lớp học, thực hiện điều chỉnh điểm\ntheo quy định và ghi nhận lịch sửthay đổi điểm.\nYêu cầu tham\nkhảo\nQuy chếquản lý sổđiểm và đánh giá người học.\nTiền điều kiện\nGiáo viên có quyền phụtrách lớp học tương ứng.\nDòng sựkiện\nchính\n1. Giáo viên mởtrang Quản lý sổđiểm của lớp học.\n2. Hệthống hiển thịbảng điểm tổng hợp gồm danh sách học viên và cột điểm\ncủa từng bài tập.\n3. Giáo viên chọn học viên và bài tập cần xem xét lại điểm.\n4. Giáo viên nhập điểm sốđiều chỉnh kèm theo lý do thay đổi điểm.\n5. Giáo viên bấm Lưu thay đổi bảng điểm.\n6. Hệthống kiểm tra tính hợp lệcủa điểm mới, lưu lịch sửsửa đổi và cập\nnhật lại điểm tổng kết.\n7. Hệthống thông báo cập nhật điểm thành công.\nCác dòng sựkiện\nphụ\n- Điểm mới nhập sai khoảng giá trịquy định: Hệthống báo lỗi và không cho\nphép cập nhật.\nHậu điều kiện\nBảng điểm của lớp được cập nhật lại, lịch sửchỉnh sửa điểm được lưu vết đầy\nđủ.\nBảng 33: Đặc tảca sửdụng UC030: Quản lý điểm số\n95"
+    },
+    "UC031": {
+      "pdfPage": 100,
+      "printedPage": 98,
+      "text": "Mã Use case\nUC031\nTên Use case\nXem kết quảhọc tập\nTác nhân\nHọc viên.\nMục tiêu\nTheo dõi quá trình tiến bộcủa bản thân qua các bài tập và mức độhoàn thiện\ncác kỹnăng ngôn ngữ.\nMô tảtổng quan\nHọc viên theo dõi tổng quan năng lực cá nhân, điểm trung bình các kỹnăng\nvà mức độchuyên cần trong suốt quá trình theo học.\nYêu cầu tham\nkhảo\nBảng tổng kết năng lực người học.\nTiền điều kiện\nHọc viên đã tham gia lớp học và đã hoàn thành ít nhất một bài kiểm tra.\nDòng sựkiện\nchính\n1. Học viên vào mục Kết quảhọc tập cá nhân.\n2. Hệthống tổng hợp toàn bộkết quảlàm bài của học viên trong lớp hoặc\nkhóa học.\n3. Hệthống hiển thịbiểu đồ/bảng chỉsốtổng quan: điểm trung bình từng kỹ\nnăng, tỷlệhoàn thành bài tập, các điểm mạnh/điểm yếu cần khắc phục.\n4. Học viên theo dõi các chỉsốvà định hướng kếhoạch ôn tập.\nCác dòng sựkiện\nphụ\n- Chưa có bài tập nào được chấm: Hệthống hiển thịthông báo chưa đủdữ\nliệu đểthống kê kết quảhọc tập.\nHậu điều kiện\nHọc viên nắm rõ bức tranh học tập của chính mình đểcải thiện kết quả.\nBảng 34: Đặc tảca sửdụng UC031: Xem kết quảhọc tập\n98"
+    },
+    "UC032": {
+      "pdfPage": 103,
+      "printedPage": 101,
+      "text": "Mã Use case\nUC032\nTên Use case\nXem bài chữa\nTác nhân\nHọc viên.\nMục tiêu\nXem lại chi tiết từng câu hỏi, bài làm đã gửi, lời giải đáp án, nhận xét của\ngiáo viên và góp ý từAI.\nMô tảtổng quan\nGiúp học viên học hỏi từcác lỗi sai, xem rõ đoạn văn viết được sửa như thế\nnào hoặc phát âm từnào chưa chuẩn đểtựhoàn thiện.\nYêu cầu tham\nkhảo\nTính năng chữa bài và phản hồi học tập (Feedback & Correction).\nTiền điều kiện\nBài làm của học viên đã có kết quảchấm chính thức từgiáo viên hoặc hệ\nthống.\nDòng sựkiện\nchính\n1. Học viên mởbài tập đã hoàn thành và nhấn nút ”Xem bài chữa / Chi tiết\nkết quả”.\n2. Hệthống hiển thịtoàn diện bài làm của học viên song song với đáp án\nđúng.\n3. Học viên xem nhận xét cụthểcủa giáo viên trên từng câu hỏi/đoạn văn.\n4. Học viên xem các lỗi sai vềtừvựng, ngữpháp (đối với bài Viết) hoặc phát\nâm (đối với bài Nói) đã được phân tích.\n5. Học viên ghi nhận các lưu ý đểrút kinh nghiệm cho các bài làm tiếp theo.\nCác dòng sựkiện\nphụ\nHậu điều kiện\nHọc viên tiếp thu đầy đủnhận xét và hướng dẫn khắc phục sai sót.\nBảng 35: Đặc tảca sửdụng UC032: Xem bài chữa\n101"
+    },
+    "UC033": {
+      "pdfPage": 106,
+      "printedPage": 104,
+      "text": "Mã Use case\nUC033\nTên Use case\nXem và đánh giá kết quảhọc viên\nTác nhân\nGiáo viên.\nMục tiêu\nĐánh giá tổng quan năng lực của từng học viên dựa trên điểm số, mức độtích\ncực và sựtiến bộqua các bài làm.\nMô tảtổng quan\nGiáo viên xem hồsơ học tập của học viên, đánh giá sựchuyển biến vềnăng\nlực tiếng Anh và ghi chú nhận xét định kỳ.\nYêu cầu tham\nkhảo\nQuy trình đánh giá kết quảđào tạo định kỳ.\nTiền điều kiện\nGiáo viên đã đăng nhập và đang quản lý lớp học.\nDòng sựkiện\nchính\n1. Giáo viên truy cập danh sách học viên trong lớp và chọn một học viên cụ\nthể.\n2. Hệthống trình bày biểu đồphát triển kỹnăng và lịch sửđiểm sốcủa học\nviên.\n3. Giáo viên xem xét các chỉsốnăng lực theo từng kỹnăng và nhận diện các\nphần học viên còn yếu.\n4. Giáo viên nhập nhận xét đánh giá tổng kết năng lực học viên.\n5. Giáo viên xác nhận lưu đánh giá.\n6. Hệthống ghi nhận đánh giá vào hồsơ học tập của học viên.\nCác dòng sựkiện\nphụ\n- Học viên mới chưa có đủdữliệu bài nộp: Hệthống hiển thịnhắc nhởdữ\nliệu đánh giá còn hạn chế.\nHậu điều kiện\nNhận xét đánh giá năng lực của giáo viên được lưu trữtrong hồsơ của học\nviên.\nBảng 36: Đặc tảca sửdụng UC033: Xem và đánh giá kết quảhọc viên\n104"
+    },
+    "UC034": {
+      "pdfPage": 109,
+      "printedPage": 107,
+      "text": "Mã Use case\nUC034\nTên Use case\nTheo dõi tiến độhọc tập\nTác nhân\nGiáo viên.\nMục tiêu\nTheo dõi tình trạng làm bài, tỷlệnộp bài đúng hạn và tiến độhoàn thành\nchương trình của học viên trong lớp.\nMô tảtổng quan\nCung cấp bức tranh tổng thểcho giáo viên biết bao nhiêu học viên đã nộp,\nbao nhiêu học viên chưa nộp bài, giúp giáo viên kịp thời đôn đốc học tập.\nYêu cầu tham\nkhảo\nBảng quản lý tiến độhọc tập.\nTiền điều kiện\nGiáo viên phụtrách ít nhất một lớp học đang hoạt động.\nDòng sựkiện\nchính\n1. Giáo viên mởtrang Theo dõi tiến độcủa lớp học.\n2. Hệthống tổng hợp dữliệu làm bài của toàn bộhọc viên theo các bài tập đã\ngiao.\n3. Hệthống hiển thịtỷlệphần trăm hoàn thành, danh sách học viên chưa làm\nbài, học viên nộp muộn và phân bốđiểm số.\n4. Giáo viên xem chi tiết từng nhóm học viên đểcó phương án nhắc nhởhoặc\nhỗtrợhọc tập.\nCác dòng sựkiện\nphụ\n- Bộlọc tìm kiếm theo bài tập cụthể: Hệthống lọc dữliệu tức thì theo bài tập\nmà giáo viên lựa chọn.\nHậu điều kiện\nGiáo viên nắm vững tình hình học tập thực tếcủa lớp đểcó biện pháp giảng\ndạy phù hợp.\nBảng 37: Đặc tảca sửdụng UC034: Theo dõi tiến độhọc tập\n107"
+    },
+    "UC035": {
+      "pdfPage": 112,
+      "printedPage": 110,
+      "text": "Mã Use case\nUC035\nTên Use case\nXem báo cáo và thống kê học tập\nTác nhân\nQuản lý.\nMục tiêu\nXem báo cáo sốliệu tổng quan toàn hệthống vềlớp học, bài tập, chất lượng\nđào tạo và phổđiểm học viên.\nMô tảtổng quan\nQuản lý truy cập bảng điều khiển thống kê (Dashboard) đểquan sát các chỉsố\nvận hành tổng thể: sốlớp đang mở, sốbài tập nộp trong kỳ, tỷlệhoàn thành\nvà chất lượng điểm sốcủa các lớp.\nYêu cầu tham\nkhảo\nBáo cáo thống kê hiệu quảđào tạo dành cho cấp quản trị.\nTiền điều kiện\nQuản lý đã đăng nhập với vai trò Quản lý hệthống.\nDòng sựkiện\nchính\n1. Quản lý điều hướng tới mục Báo cáo & Thống kê trên bảng điều khiển\nquản trị.\n2. Hệthống truy vấn cơ sởdữliệu và hiển thịcác sốliệu thống kê tổng thể\n(tổng sốngười dùng, sốlớp đang học, tổng sốbài nộp, biểu đồphổđiểm).\n3. Quản lý lựa chọn bộlọc thời gian, khóa học, giáo viên hoặc lớp học cần\nphân tích.\n4. Hệthống cập nhật các biểu đồvà bảng chỉsốtương ứng theo tiêu chí đã\nchọn.\n5. Quản lý có thểxuất báo cáo thống kê phục vụcông tác báo cáo trung tâm.\nCác dòng sựkiện\nphụ\n- Không có dữliệu trong khoảng thời gian được chọn: Hệthống hiển thị\nthông báo chưa có dữliệu ghi nhận và hướng dẫn mởrộng phạm vi lọc.\nHậu điều kiện\nBáo cáo tổng thểđược hiển thịphục vụcho công tác ra quyết định của Quản\nlý.\nBảng 38: Đặc tảca sửdụng UC035: Xem báo cáo và thống kê học tập\n110"
+    },
+    "USA01": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    },
+    "USA02": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    },
+    "USA03": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    },
+    "USA04": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    },
+    "USA05": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    },
+    "USA06": {
+      "pdfPages": [
+        114,
+        115
+      ],
+      "section": "4.1 Usability"
+    }
+  },
+  "cases": [
+    {
+      "row": 2,
+      "id": "LOGIN_001",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Bảng quyết định",
+      "title": "Đăng nhập thành công (email đúng, mật khẩu đúng, tài khoản hoạt động)",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "1. Nhập email 2. Nhập mật khẩu 3. Nhấn Đăng nhập",
+      "testData": "hoang.thanh.ngan@hotung9108.me / [WORKBOOK_PASSWORD]",
+      "expected": "Chuyển hướng tới dashboard đúng vai trò; URL rời khỏi /login; có token/phiên",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 3,
+      "id": "LOGIN_002",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Bảng quyết định",
+      "title": "Email đúng, mật khẩu sai",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email hợp lệ + mật khẩu sai, đăng nhập",
+      "testData": "[WORKBOOK_PASSWORD]",
+      "expected": "Báo lỗi tài khoản/mật khẩu không chính xác; ở lại /login; không lộ trường nào sai",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 4,
+      "id": "LOGIN_003",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Bảng quyết định",
+      "title": "Email chưa đăng ký",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email không tồn tại + mật khẩu bất kỳ",
+      "testData": "nouser_9999@hotung9108.me / [WORKBOOK_PASSWORD]",
+      "expected": "Cùng thông báo lỗi như trường hợp sai mật khẩu (không lộ email có tồn tại hay không)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 5,
+      "id": "LOGIN_004",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Bảng quyết định",
+      "title": "Tài khoản bị khóa",
+      "precondition": "Mở /login, chưa đăng nhập; có tài khoản đã khóa",
+      "steps": "Đăng nhập bằng tài khoản bị khóa",
+      "testData": "Tài khoản locked / mật khẩu đúng",
+      "expected": "Thông báo tài khoản đang bị tạm khóa; không cấp quyền truy cập",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 6,
+      "id": "LOGIN_005",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Phân vùng tương đương",
+      "title": "Để trống cả hai trường",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Bấm Đăng nhập khi chưa nhập gì",
+      "testData": "(trống)",
+      "expected": "Không gửi đăng nhập; báo lỗi bắt buộc gắn đúng trường (USA01)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 7,
+      "id": "LOGIN_006",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Phân vùng tương đương",
+      "title": "Chỉ trống email",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập mật khẩu, để trống email",
+      "testData": "(trống) / [WORKBOOK_PASSWORD]",
+      "expected": "Báo lỗi bắt buộc ở trường email",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 8,
+      "id": "LOGIN_007",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Phân vùng tương đương",
+      "title": "Chỉ trống mật khẩu",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email, để trống mật khẩu",
+      "testData": "hoang.thanh.ngan@hotung9108.me / (trống)",
+      "expected": "Báo lỗi bắt buộc ở trường mật khẩu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 9,
+      "id": "LOGIN_008",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Phân vùng tương đương",
+      "title": "Email sai định dạng - thiếu @",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email không có @",
+      "testData": "hoang.thanh.ngan.hotung9108.me",
+      "expected": "Báo lỗi định dạng email, không gọi API (hoặc API trả lỗi rõ ràng)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 10,
+      "id": "LOGIN_009",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Phân vùng tương đương",
+      "title": "Email sai định dạng - thiếu tên miền",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email 'abc@'",
+      "testData": "abc@",
+      "expected": "Báo lỗi định dạng email",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 11,
+      "id": "LOGIN_010",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Đoán lỗi",
+      "title": "Email có khoảng trắng đầu/cuối",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập ' email ' (có space) + mật khẩu đúng",
+      "testData": "' hoang.thanh.ngan@hotung9108.me '",
+      "expected": "Hệ thống trim và đăng nhập thành công HOẶC báo lỗi rõ ràng; ghi nhận hành vi thực tế",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 12,
+      "id": "LOGIN_011",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Đoán lỗi",
+      "title": "Email viết hoa/thường khác nhau",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập email đổi chữ hoa/thường + mật khẩu đúng",
+      "testData": "HOANG.THANH.NGAN@hotung9108.me",
+      "expected": "Email phân biệt hoa/thường: email đổi hoa/thường với mật khẩu đúng bị từ chối, thông báo tài khoản hoặc mật khẩu không chính xác; ở lại /login và không cấp phiên đăng nhập.",
+      "priority": "Trung bình",
+      "originalExpected": "Hành vi nhất quán theo quy ước (email thường không phân biệt hoa thường)",
+      "requirementClarification": {
+        "source": "User confirmation in conversation",
+        "date": "2026-11-16",
+        "rule": "Email is case-sensitive"
+      },
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 13,
+      "id": "LOGIN_012",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Đoán lỗi",
+      "title": "Mật khẩu phân biệt hoa/thường",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập mật khẩu đổi hoa thường",
+      "testData": "password123!",
+      "expected": "Đăng nhập thất bại, báo lỗi",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 14,
+      "id": "LOGIN_013",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Giá trị biên",
+      "title": "Mật khẩu rất dài (256 ký tự)",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập mật khẩu 256 ký tự",
+      "testData": "'A'*256",
+      "expected": "Không crash/500; báo lỗi đăng nhập hoặc giới hạn độ dài",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 15,
+      "id": "LOGIN_014",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Giá trị biên",
+      "title": "Mật khẩu 1 ký tự",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập mật khẩu 1 ký tự",
+      "testData": "a",
+      "expected": "Đăng nhập thất bại, báo lỗi, không crash",
+      "priority": "Thấp",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 16,
+      "id": "LOGIN_015",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "SQL Injection tại trường email",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập payload SQLi + mật khẩu bất kỳ",
+      "testData": "' OR '1'='1' --",
+      "expected": "Không đăng nhập được; không lỗi 500; không lộ thông tin DB",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 17,
+      "id": "LOGIN_016",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "XSS tại trường email",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập payload script",
+      "testData": "<script>alert(1)</script>@a.com",
+      "expected": "Script không thực thi; hiển thị lỗi định dạng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 18,
+      "id": "LOGIN_017",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Nhấn Enter để đăng nhập",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập thông tin hợp lệ, nhấn phím Enter",
+      "testData": "Tài khoản hợp lệ",
+      "expected": "Đăng nhập như bấm nút",
+      "priority": "Thấp",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 19,
+      "id": "LOGIN_018",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Mật khẩu được che; nút hiện/ẩn mật khẩu (nếu có)",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Kiểm tra type của ô mật khẩu; bấm icon mắt",
+      "testData": "-",
+      "expected": "Mặc định type=password; icon đổi hiển thị đúng",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 20,
+      "id": "LOGIN_019",
+      "group": "Xác thực",
+      "requirement": "UC001/USA02",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Nút đăng nhập bị vô hiệu hóa khi đang xử lý",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Nhập hợp lệ, bấm Đăng nhập, quan sát nút ngay lập tức; bấm lặp nhanh 2 lần",
+      "testData": "Tài khoản hợp lệ",
+      "expected": "Có chỉ báo đang xử lý, nút disabled, chỉ gửi 1 request",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        },
+        "USA02": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 21,
+      "id": "LOGIN_020",
+      "group": "Xác thực",
+      "requirement": "UC001/USA01",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Trường nhập có nhãn hiển thị, placeholder không thay nhãn",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Kiểm tra label email/mật khẩu",
+      "testData": "-",
+      "expected": "Mỗi trường có label nhìn thấy được; trường bắt buộc có dấu hiệu",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        },
+        "USA01": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 22,
+      "id": "LOGIN_021",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Truy cập trang yêu cầu đăng nhập khi chưa xác thực",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Mở trực tiếp URL dashboard/lớp học",
+      "testData": "URL nội bộ",
+      "expected": "Chuyển hướng về /login",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 23,
+      "id": "LOGIN_022",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Duy trì phiên sau khi tải lại trang",
+      "precondition": "Đã đăng nhập",
+      "steps": "Nhấn F5",
+      "testData": "-",
+      "expected": "Vẫn ở trạng thái đăng nhập, không bị đá ra /login",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 24,
+      "id": "LOGIN_023",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Đăng nhập Giáo viên điều hướng đúng không gian",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Đăng nhập tài khoản Giáo viên",
+      "testData": "Tài khoản GV",
+      "expected": "Vào giao diện giảng dạy; menu của GV",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 25,
+      "id": "LOGIN_024",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Đăng nhập Học viên điều hướng đúng không gian",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Đăng nhập tài khoản Học viên",
+      "testData": "Tài khoản HV",
+      "expected": "Vào giao diện học tập; menu của HV",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 26,
+      "id": "LOGIN_025",
+      "group": "Xác thực",
+      "requirement": "UC001",
+      "technique": "Use case testing",
+      "title": "Đăng nhập Quản lý điều hướng đúng không gian",
+      "precondition": "Mở /login, chưa đăng nhập",
+      "steps": "Đăng nhập tài khoản Quản lý",
+      "testData": "Tài khoản Admin",
+      "expected": "Vào giao diện quản trị; menu của Quản lý",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC001": {
+          "pdfPage": 19,
+          "printedPage": 17
+        }
+      }
+    },
+    {
+      "row": 27,
+      "id": "LOGOUT_001",
+      "group": "Xác thực",
+      "requirement": "UC002",
+      "technique": "Use case testing",
+      "title": "Đăng xuất thành công",
+      "precondition": "Đã đăng nhập",
+      "steps": "Đăng xuất; kiểm màn đăng nhập và thử truy cập dashboard cần xác thực.",
+      "testData": "-",
+      "expected": "Về /login, kết thúc quyền truy cập; không bắt buộc thông báo đăng xuất thành công.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC002": {
+          "pdfPage": 22,
+          "printedPage": 20
+        }
+      },
+      "originalExpected": "Về /login, hiển thị thông báo đăng xuất thành công",
+      "originalSteps": "Mở menu cá nhân, chọn Đăng xuất",
+      "requirementClarification": "Theo file đặc tả đã chốt: đăng xuất được là được, không cần thông báo.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "Theo file đặc tả đã chốt: đăng xuất được là được, không cần thông báo."
+      }
+    },
+    {
+      "row": 28,
+      "id": "LOGOUT_002",
+      "group": "Xác thực",
+      "requirement": "UC002",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Xóa thông tin xác thực trên trình duyệt sau đăng xuất",
+      "precondition": "Đã đăng nhập",
+      "steps": "Đăng xuất; kiểm tra localStorage/cookie",
+      "testData": "-",
+      "expected": "Token/phiên bị xóa hoàn toàn",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC002": {
+          "pdfPage": 22,
+          "printedPage": 20
+        }
+      }
+    },
+    {
+      "row": 29,
+      "id": "LOGOUT_003",
+      "group": "Xác thực",
+      "requirement": "UC002",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Nút Back sau đăng xuất không vào lại được trang nội bộ",
+      "precondition": "Đã đăng nhập",
+      "steps": "Đăng xuất; bấm Back của trình duyệt",
+      "testData": "-",
+      "expected": "Không xem được dữ liệu; chuyển về /login",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC002": {
+          "pdfPage": 22,
+          "printedPage": 20
+        }
+      }
+    },
+    {
+      "row": 30,
+      "id": "LOGOUT_004",
+      "group": "Xác thực",
+      "requirement": "UC002",
+      "technique": "Chuyển trạng thái",
+      "title": "Phiên hết hạn tự chuyển về đăng nhập",
+      "precondition": "Đã đăng nhập",
+      "steps": "Xóa/làm hết hạn token; thao tác bất kỳ",
+      "testData": "Token hết hạn",
+      "expected": "Chuyển tự động về /login",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC002": {
+          "pdfPage": 22,
+          "printedPage": 20
+        }
+      }
+    },
+    {
+      "row": 31,
+      "id": "LOGOUT_005",
+      "group": "Xác thực",
+      "requirement": "UC002",
+      "technique": "Đoán lỗi",
+      "title": "Đăng xuất ở tab này, tab kia gọi API",
+      "precondition": "Đã đăng nhập",
+      "steps": "Mở 2 tab; đăng xuất tab 1; thao tác tab 2",
+      "testData": "-",
+      "expected": "Tab 2 bị từ chối và chuyển /login",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC002": {
+          "pdfPage": 22,
+          "printedPage": 20
+        }
+      }
+    },
+    {
+      "row": 32,
+      "id": "PROF_001",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Use case testing",
+      "title": "Hiển thị thông tin cá nhân hiện tại",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Mở trang Hồ sơ",
+      "testData": "-",
+      "expected": "Hiển thị đúng họ tên, email, liên hệ của người dùng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 33,
+      "id": "PROF_002",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Cập nhật họ tên hợp lệ",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Sửa họ tên, Lưu thay đổi",
+      "testData": "Nguyễn Thị Ngân",
+      "expected": "Thông báo thành công; tải lại vẫn thấy tên mới",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 34,
+      "id": "PROF_003",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Họ tên để trống",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Xóa họ tên, Lưu",
+      "testData": "(trống)",
+      "expected": "Báo lỗi bắt buộc, không lưu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 35,
+      "id": "PROF_004",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Giá trị biên",
+      "title": "Họ tên tại biên độ dài tối đa (giả định 100: 99/100/101 ký tự)",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập tên 99, 100, 101 ký tự",
+      "testData": "(sinh ngẫu nhiên)",
+      "expected": "99,100: lưu được; 101: bị từ chối với thông báo rõ",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      },
+      "pendingOracleOrFixture": "Name max 100 is an Excel assumption"
+    },
+    {
+      "row": 36,
+      "id": "PROF_005",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Số điện thoại sai định dạng",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập SĐT chứa chữ",
+      "testData": "abc123",
+      "expected": "Báo lỗi định dạng liên hệ",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 37,
+      "id": "PROF_006",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "XSS trong họ tên",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập payload script, lưu, tải lại",
+      "testData": "<img src=x onerror=alert(1)>",
+      "expected": "Chuỗi được escape, không thực thi script",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 38,
+      "id": "PROF_007",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Đổi mật khẩu hợp lệ",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập mật khẩu cũ đúng, mật khẩu mới hợp lệ + xác nhận, Lưu",
+      "testData": "Cũ: [WORKBOOK_PASSWORD] / Mới: NewPass456!",
+      "expected": "Thành công; đăng nhập lại bằng mật khẩu mới được (nhớ khôi phục dữ liệu test)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 39,
+      "id": "PROF_008",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Mật khẩu cũ sai",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập mật khẩu cũ sai khi đổi mật khẩu",
+      "testData": "Cũ: wrong",
+      "expected": "Báo lỗi, giữ nguyên form",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 40,
+      "id": "PROF_009",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Giá trị biên",
+      "title": "Mật khẩu mới 7 ký tự (biên tối thiểu 8 - giả định)",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "1. Chọn Đổi mật khẩu\n2. Nhập mật khẩu cũ đúng: [WORKBOOK_PASSWORD]\n3. Nhập mật khẩu mới = [WORKBOOK_PASSWORD]\n4. Nhập xác nhận mật khẩu = [WORKBOOK_PASSWORD]\n5. Bấm Lưu thay đổi\n6. Quan sát thông báo",
+      "testData": "Cũ: [WORKBOOK_PASSWORD]; Mới: [WORKBOOK_PASSWORD]",
+      "expected": "Không lưu; báo lỗi tại ô mật khẩu mới nêu tối thiểu 8 ký tự; mật khẩu cũ vẫn dùng được",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      },
+      "pendingOracleOrFixture": "Minimum password length/strength assumption"
+    },
+    {
+      "row": 41,
+      "id": "PROF_010",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Giá trị biên",
+      "title": "Mật khẩu mới 8 ký tự (biên tối thiểu 8 - giả định)",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "1. Chọn Đổi mật khẩu\n2. Nhập mật khẩu cũ đúng: [WORKBOOK_PASSWORD]\n3. Nhập mật khẩu mới = [WORKBOOK_PASSWORD]\n4. Nhập xác nhận mật khẩu = [WORKBOOK_PASSWORD]\n5. Bấm Lưu thay đổi\n6. Quan sát thông báo",
+      "testData": "Cũ: [WORKBOOK_PASSWORD]; Mới: [WORKBOOK_PASSWORD]",
+      "expected": "Đổi thành công; đăng nhập lại bằng mật khẩu mới được (nhớ khôi phục mật khẩu về [WORKBOOK_PASSWORD] sau khi test)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      },
+      "pendingOracleOrFixture": "Minimum password length/strength assumption"
+    },
+    {
+      "row": 42,
+      "id": "PROF_011",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Phân vùng tương đương",
+      "title": "Mật khẩu mới không khớp xác nhận",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập mới ≠ xác nhận",
+      "testData": "NewPass456! / NewPass789!",
+      "expected": "Báo lỗi không khớp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      }
+    },
+    {
+      "row": 43,
+      "id": "PROF_012",
+      "group": "Tài khoản",
+      "requirement": "UC003",
+      "technique": "Đoán lỗi",
+      "title": "Mật khẩu mới trùng mật khẩu cũ",
+      "precondition": "Đã đăng nhập, mở Hồ sơ cá nhân",
+      "steps": "Nhập mới = cũ",
+      "testData": "[WORKBOOK_PASSWORD]",
+      "expected": "Hệ thống từ chối hoặc ghi nhận hành vi",
+      "priority": "Thấp",
+      "sourceReferences": {
+        "UC003": {
+          "pdfPage": 24,
+          "printedPage": 22
+        }
+      },
+      "pendingOracleOrFixture": "Password reuse convention unspecified"
+    },
+    {
+      "row": 44,
+      "id": "USER_001",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Use case testing",
+      "title": "Hiển thị danh sách tài khoản + ô tìm kiếm + bộ lọc",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Mở trang",
+      "testData": "-",
+      "expected": "Có danh sách, tìm kiếm, bộ lọc",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 45,
+      "id": "USER_002",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Tìm kiếm theo email có kết quả",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Nhập email có tồn tại",
+      "testData": "hoang.thanh.ngan",
+      "expected": "Chỉ hiển thị tài khoản khớp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 46,
+      "id": "USER_003",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Tìm kiếm không có kết quả → thông báo + xóa điều kiện",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Tìm không có kết quả; xóa từ khóa bằng bàn phím; tìm lại fixture để đối chiếu.",
+      "testData": "zzzzz",
+      "expected": "Thông báo không có kết quả; xóa điều kiện tìm kiếm được và khôi phục danh sách.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      },
+      "originalExpected": "Thông báo rỗng rõ ràng; xóa bộ lọc tải lại toàn bộ (USA06)",
+      "originalSteps": "Tìm 'zzzzz'; bấm Xóa bộ lọc",
+      "requirementClarification": "USA06 không bắt buộc nút có tên nguyên văn Xóa bộ lọc.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "USA06 không bắt buộc nút có tên nguyên văn Xóa bộ lọc."
+      }
+    },
+    {
+      "row": 47,
+      "id": "USER_004",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Lọc theo vai trò",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Lọc Học viên/Giáo viên/Quản lý",
+      "testData": "-",
+      "expected": "Chỉ hiện đúng vai trò",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 48,
+      "id": "USER_005",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo tài khoản hợp lệ",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Tạo mới: email, họ tên, vai trò, mật khẩu; Xác nhận",
+      "testData": "email mới duy nhất",
+      "expected": "Tạo thành công; xuất hiện trong danh sách",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 49,
+      "id": "USER_006",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo tài khoản trùng email",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Nhập email đã tồn tại",
+      "testData": "Email của tài khoản có sẵn",
+      "expected": "Báo lỗi trùng lặp, không tạo",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 50,
+      "id": "USER_007",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo tài khoản thiếu trường bắt buộc",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Bỏ trống email/họ tên/vai trò lần lượt",
+      "testData": "-",
+      "expected": "Báo lỗi từng trường bắt buộc",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 51,
+      "id": "USER_008",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Phân vùng tương đương",
+      "title": "Email sai định dạng khi tạo",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Nhập 'abc'",
+      "testData": "abc",
+      "expected": "Báo lỗi định dạng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 52,
+      "id": "USER_009",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Use case testing",
+      "title": "Sửa thông tin tài khoản",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Chọn tài khoản, sửa họ tên, Lưu",
+      "testData": "-",
+      "expected": "Cập nhật thành công, danh sách làm mới",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 53,
+      "id": "USER_010",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Use case testing",
+      "title": "Hủy thao tác tạo/sửa",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Mở form, nhập dữ liệu, bấm Hủy",
+      "testData": "-",
+      "expected": "Form đóng, dữ liệu không đổi",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 54,
+      "id": "USER_011",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Chuyển trạng thái",
+      "title": "Khóa tài khoản rồi đăng nhập bằng tài khoản đó",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Khóa TK; đăng nhập bằng TK bị khóa",
+      "testData": "TK test",
+      "expected": "Trạng thái Khóa hiển thị; đăng nhập bị từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 55,
+      "id": "USER_012",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Chuyển trạng thái",
+      "title": "Mở khóa tài khoản rồi đăng nhập lại",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Mở khóa TK; đăng nhập",
+      "testData": "TK test",
+      "expected": "Đăng nhập thành công",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 56,
+      "id": "USER_013",
+      "group": "Quản trị",
+      "requirement": "UC004",
+      "technique": "Đoán lỗi",
+      "title": "Phân trang / dữ liệu lớn",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý tài khoản",
+      "steps": "Chuyển trang, đổi số dòng",
+      "testData": "-",
+      "expected": "Dữ liệu đúng, không trùng/mất dòng",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC004": {
+          "pdfPage": 27,
+          "printedPage": 25
+        }
+      }
+    },
+    {
+      "row": 57,
+      "id": "RBAC_001",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Use case testing",
+      "title": "Đổi vai trò Học viên → Giáo viên",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Chọn người dùng, đổi vai trò, xác nhận",
+      "testData": "TK test",
+      "expected": "Thành công; đăng nhập lại thấy menu Giáo viên",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 58,
+      "id": "RBAC_002",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Đoán lỗi",
+      "title": "Quản lý tự tước quyền quản trị của chính mình",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Đổi vai trò tài khoản Admin đang đăng nhập",
+      "testData": "TK Admin hiện tại",
+      "expected": "Hệ thống cảnh báo và từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 59,
+      "id": "RBAC_003",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Giáo viên truy cập URL quản trị",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Mở thẳng URL trang Admin",
+      "testData": "URL /admin/...",
+      "expected": "403 hoặc chuyển hướng; không thấy dữ liệu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 60,
+      "id": "RBAC_004",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Học viên truy cập URL giảng dạy (tạo bài tập)",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở thẳng URL tạo bài tập",
+      "testData": "URL của GV",
+      "expected": "Bị từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 61,
+      "id": "RBAC_005",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "IDOR: Học viên A xem bài làm của Học viên B qua URL/ID",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Sửa ID trong URL kết quả/bài làm",
+      "testData": "ID của HV khác",
+      "expected": "403/404; không lộ dữ liệu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 62,
+      "id": "RBAC_006",
+      "group": "Quản trị",
+      "requirement": "UC005",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "API từ chối khi thiếu/giả token",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Gọi API với token sai",
+      "testData": "Token giả",
+      "expected": "401/403",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC005": {
+          "pdfPage": 30,
+          "printedPage": 28
+        }
+      }
+    },
+    {
+      "row": 63,
+      "id": "TCHR_001",
+      "group": "Quản trị",
+      "requirement": "UC006",
+      "technique": "Use case testing",
+      "title": "Xem danh sách giáo viên + tìm kiếm/lọc",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Mở Quản lý giáo viên; tìm kiếm",
+      "testData": "-",
+      "expected": "Danh sách đúng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC006": {
+          "pdfPage": 33,
+          "printedPage": 31
+        }
+      }
+    },
+    {
+      "row": 64,
+      "id": "TCHR_002",
+      "group": "Quản trị",
+      "requirement": "UC006",
+      "technique": "Phân vùng tương đương",
+      "title": "Thêm giáo viên hợp lệ",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Nhập đủ thông tin, lưu",
+      "testData": "Dữ liệu hợp lệ",
+      "expected": "Thành công, xuất hiện trong danh sách",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC006": {
+          "pdfPage": 33,
+          "printedPage": 31
+        }
+      }
+    },
+    {
+      "row": 65,
+      "id": "TCHR_003",
+      "group": "Quản trị",
+      "requirement": "UC006",
+      "technique": "Phân vùng tương đương",
+      "title": "Thêm giáo viên thiếu dữ liệu bắt buộc / trùng liên lạc",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Bỏ trống hoặc dùng email trùng",
+      "testData": "-",
+      "expected": "Đánh dấu trường lỗi, yêu cầu bổ sung",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC006": {
+          "pdfPage": 33,
+          "printedPage": 31
+        }
+      }
+    },
+    {
+      "row": 66,
+      "id": "TCHR_004",
+      "group": "Quản trị",
+      "requirement": "UC006",
+      "technique": "Chuyển trạng thái",
+      "title": "Khóa/Mở khóa giáo viên",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Khóa GV rồi mở khóa",
+      "testData": "-",
+      "expected": "Trạng thái đổi đúng; GV bị khóa không đăng nhập được",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC006": {
+          "pdfPage": 33,
+          "printedPage": 31
+        }
+      }
+    },
+    {
+      "row": 67,
+      "id": "STDT_001",
+      "group": "Quản trị",
+      "requirement": "UC007",
+      "technique": "Phân vùng tương đương",
+      "title": "Thêm học viên hợp lệ",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Nhập mã HV, họ tên, email; lưu",
+      "testData": "Dữ liệu hợp lệ",
+      "expected": "Tạo thành công",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC007": {
+          "pdfPage": 36,
+          "printedPage": 34
+        }
+      }
+    },
+    {
+      "row": 68,
+      "id": "STDT_002",
+      "group": "Quản trị",
+      "requirement": "UC007",
+      "technique": "Phân vùng tương đương",
+      "title": "Trùng mã học viên hoặc email",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Nhập mã/email đã tồn tại",
+      "testData": "Mã HV có sẵn",
+      "expected": "Báo lỗi trùng, không lưu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC007": {
+          "pdfPage": 36,
+          "printedPage": 34
+        }
+      }
+    },
+    {
+      "row": 69,
+      "id": "STDT_003",
+      "group": "Quản trị",
+      "requirement": "UC007",
+      "technique": "Use case testing",
+      "title": "Sửa thông tin học viên",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Chọn HV, sửa, lưu",
+      "testData": "-",
+      "expected": "Cập nhật thành công",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC007": {
+          "pdfPage": 36,
+          "printedPage": 34
+        }
+      }
+    },
+    {
+      "row": 70,
+      "id": "STDT_004",
+      "group": "Quản trị",
+      "requirement": "UC007",
+      "technique": "Phân vùng tương đương",
+      "title": "Tìm kiếm học viên không có kết quả",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Tìm chuỗi không tồn tại",
+      "testData": "zzzz",
+      "expected": "Thông báo rỗng (USA06)",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC007": {
+          "pdfPage": 36,
+          "printedPage": 34
+        }
+      }
+    },
+    {
+      "row": 71,
+      "id": "CLS_001",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Use case testing",
+      "title": "Tạo lớp mới hợp lệ và gán giáo viên phụ trách",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "1. Vào menu Quản lý lớp học\n2. Bấm 'Tạo lớp mới'\n3. Nhập Tên lớp\n4. Chọn Ngày bắt đầu và Ngày kết thúc hợp lệ\n5. Chọn một giáo viên đang hoạt động ở ô Giáo viên phụ trách\n6. Bấm Lưu\n7. Quan sát thông báo và danh sách lớp\n8. Tải lại trang (F5)",
+      "testData": "Tên lớp: TOEIC-K1-AUTO-001; Bắt đầu: hôm nay; Kết thúc: hôm nay + 90 ngày; GV: giáo viên test đang hoạt động",
+      "expected": "Hiện thông báo tạo lớp thành công; form đóng; danh sách có dòng TOEIC-K1-AUTO-001 đúng GV, đúng thời gian, trạng thái 'Đang mở'; sau F5 dòng này vẫn còn",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 72,
+      "id": "CLS_002",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo lớp thiếu tên",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "Để trống tên lớp",
+      "testData": "(trống)",
+      "expected": "Báo lỗi bắt buộc (USA01)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 73,
+      "id": "CLS_003",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Giá trị biên",
+      "title": "Ngày kết thúc TRƯỚC ngày bắt đầu (ngoài biên) bị từ chối",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "1. Bấm 'Tạo lớp mới'\n2. Nhập Tên lớp hợp lệ và chọn GV hợp lệ\n3. Nhập Ngày bắt đầu = hôm nay + 10 ngày, Ngày kết thúc = hôm nay\n4. Bấm Lưu\n5. Quan sát thông báo, form và danh sách lớp",
+      "testData": "Tên lớp: AUTO-DATE-01; Bắt đầu: hôm nay + 10; Kết thúc: hôm nay",
+      "expected": "Không lưu; hiện thông báo ngay tại trường Ngày kết thúc nêu rõ ngày kết thúc phải sau hoặc bằng ngày bắt đầu; form giữ nguyên dữ liệu đã nhập; lớp AUTO-DATE-01 không xuất hiện trong danh sách (giả định quy tắc: kết thúc ≥ bắt đầu - cần xác nhận)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      },
+      "pendingOracleOrFixture": "Workbook explicitly marks date ordering as unconfirmed. UC008 PDF38 and agreed supplement do not specify the exact comparison rule."
+    },
+    {
+      "row": 74,
+      "id": "CLS_004",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Giá trị biên",
+      "title": "Ngày kết thúc BẰNG ngày bắt đầu (đúng biên)",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "1. Bấm 'Tạo lớp mới'\n2. Nhập Tên lớp hợp lệ và chọn GV hợp lệ\n3. Nhập Ngày bắt đầu = hôm nay, Ngày kết thúc = hôm nay\n4. Bấm Lưu\n5. Quan sát thông báo, form và danh sách lớp",
+      "testData": "Tên lớp: AUTO-DATE-02; Bắt đầu = Kết thúc = hôm nay",
+      "expected": "Lưu thành công, lớp AUTO-DATE-02 có mặt trong danh sách (nếu nhóm quy định kết thúc phải > bắt đầu thì đổi thành: bị từ chối với thông báo tại trường Ngày kết thúc)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 75,
+      "id": "CLS_005",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Giá trị biên",
+      "title": "Ngày kết thúc SAU ngày bắt đầu 1 ngày (trong biên)",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "1. Bấm 'Tạo lớp mới'\n2. Nhập Tên lớp hợp lệ và chọn GV hợp lệ\n3. Nhập Ngày bắt đầu = hôm nay, Ngày kết thúc = hôm nay + 1 ngày\n4. Bấm Lưu\n5. Quan sát thông báo, form và danh sách lớp",
+      "testData": "Tên lớp: AUTO-DATE-03; Bắt đầu: hôm nay; Kết thúc: hôm nay + 1",
+      "expected": "Lưu thành công, danh sách hiển thị đúng khoảng thời gian 2 ngày",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 76,
+      "id": "CLS_006",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Phân vùng tương đương",
+      "title": "Phân công giáo viên bị khóa/không khả dụng",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "Chọn GV đang bị khóa",
+      "testData": "GV khóa",
+      "expected": "Cảnh báo để chọn GV khác",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 77,
+      "id": "CLS_007",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Chuyển trạng thái",
+      "title": "Đóng lớp rồi mở lại",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "Đóng lớp; mở lại",
+      "testData": "-",
+      "expected": "Trạng thái Đã kết thúc ↔ Đang mở đúng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 78,
+      "id": "CLS_008",
+      "group": "Lớp học",
+      "requirement": "UC008",
+      "technique": "Use case testing",
+      "title": "Sửa thông tin lớp",
+      "precondition": "Đăng nhập Quản lý; mở Quản lý lớp học",
+      "steps": "Sửa tên/thời gian, lưu",
+      "testData": "-",
+      "expected": "Cập nhật thành công",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC008": {
+          "pdfPage": 38,
+          "printedPage": 36
+        }
+      }
+    },
+    {
+      "row": 79,
+      "id": "MEM_001",
+      "group": "Lớp học",
+      "requirement": "UC009",
+      "technique": "Phân vùng tương đương",
+      "title": "Thêm học viên vào lớp",
+      "precondition": "Đăng nhập Quản lý; đã có lớp",
+      "steps": "Vào Thành viên lớp, thêm HV",
+      "testData": "HV hợp lệ",
+      "expected": "HV xuất hiện trong danh sách",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC009": {
+          "pdfPage": 41,
+          "printedPage": 39
+        }
+      }
+    },
+    {
+      "row": 80,
+      "id": "MEM_002",
+      "group": "Lớp học",
+      "requirement": "UC009",
+      "technique": "Phân vùng tương đương",
+      "title": "Thêm học viên đã có trong lớp",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Tìm học viên đã ghi danh trên picker; kiểm không thêm được bản trùng; gửi POST thêm trùng và đối chiếu409/roster.",
+      "testData": "HV trùng",
+      "expected": "Không ghi danh trùng; khi thực sự yêu cầu thêm trùng, thông báo đã có trong lớp và giữ nguyên roster.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC009": {
+          "pdfPage": 41,
+          "printedPage": 39
+        }
+      },
+      "originalExpected": "Thông báo đã tham gia, bỏ qua",
+      "originalSteps": "Thêm HV đã thuộc lớp",
+      "requirementClarification": "UC009: phân biệt không cho chọn người đã có trong picker với phản hồi khi gửi yêu cầu thêm trùng.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "UC009: phân biệt không cho chọn người đã có trong picker với phản hồi khi gửi yêu cầu thêm trùng."
+      }
+    },
+    {
+      "row": 81,
+      "id": "MEM_003",
+      "group": "Lớp học",
+      "requirement": "UC009",
+      "technique": "Use case testing",
+      "title": "Xóa học viên có xác nhận; hủy xác nhận",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Bấm xóa; chọn Hủy rồi xóa lại và Xác nhận",
+      "testData": "-",
+      "expected": "Có hộp xác nhận; Hủy giữ nguyên; Xác nhận xóa",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC009": {
+          "pdfPage": 41,
+          "printedPage": 39
+        }
+      }
+    },
+    {
+      "row": 82,
+      "id": "MEM_004",
+      "group": "Lớp học",
+      "requirement": "UC009",
+      "technique": "Giá trị biên",
+      "title": "Sĩ số tối đa: max-1, max, max+1 (nếu có giới hạn)",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Thêm HV đến biên sĩ số",
+      "testData": "Sĩ số max (xác nhận)",
+      "expected": "Không vượt sĩ số; báo lỗi ở max+1",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC009": {
+          "pdfPage": 41,
+          "printedPage": 39
+        }
+      },
+      "pendingOracleOrFixture": "Class capacity limit unspecified"
+    },
+    {
+      "row": 83,
+      "id": "MEM_005",
+      "group": "Lớp học",
+      "requirement": "UC009",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Giáo viên chỉ quản lý lớp mình phụ trách",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Mở thành viên của lớp GV khác",
+      "testData": "ID lớp khác",
+      "expected": "Bị từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC009": {
+          "pdfPage": 41,
+          "printedPage": 39
+        }
+      }
+    },
+    {
+      "row": 84,
+      "id": "CLV_001",
+      "group": "Lớp học",
+      "requirement": "UC010",
+      "technique": "Use case testing",
+      "title": "Học viên chỉ thấy lớp mình tham gia",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở Danh sách lớp học",
+      "testData": "-",
+      "expected": "Chỉ lớp của HV; có tên lớp, GV, sĩ số, trạng thái",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC010": {
+          "pdfPage": 44,
+          "printedPage": 42
+        }
+      }
+    },
+    {
+      "row": 85,
+      "id": "CLV_002",
+      "group": "Lớp học",
+      "requirement": "UC010",
+      "technique": "Use case testing",
+      "title": "Giáo viên chỉ thấy lớp mình phụ trách",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Mở Danh sách lớp học",
+      "testData": "-",
+      "expected": "Đúng lớp phụ trách",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC010": {
+          "pdfPage": 44,
+          "printedPage": 42
+        }
+      }
+    },
+    {
+      "row": 86,
+      "id": "CLV_003",
+      "group": "Lớp học",
+      "requirement": "UC010",
+      "technique": "Phân vùng tương đương",
+      "title": "Chưa thuộc lớp nào",
+      "precondition": "Đăng nhập Học viên (HV chưa có lớp)",
+      "steps": "Mở Danh sách lớp học",
+      "testData": "HV chưa có lớp",
+      "expected": "Thông báo chưa có lớp + gợi ý liên hệ",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC010": {
+          "pdfPage": 44,
+          "printedPage": 42
+        }
+      }
+    },
+    {
+      "row": 87,
+      "id": "ASG_001",
+      "group": "Bài tập",
+      "requirement": "UC011",
+      "technique": "Phân vùng tương đương",
+      "title": "Lọc bài tập theo kỹ năng (Nghe/Nói/Đọc/Viết)",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Chọn từng kỹ năng",
+      "testData": "-",
+      "expected": "Chỉ hiện bài đúng kỹ năng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC011": {
+          "pdfPage": 47,
+          "printedPage": 45
+        }
+      }
+    },
+    {
+      "row": 88,
+      "id": "ASG_002",
+      "group": "Bài tập",
+      "requirement": "UC011",
+      "technique": "Phân vùng tương đương",
+      "title": "Lọc theo trạng thái mở/đóng + tìm từ khóa",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Áp dụng lọc/tìm kiếm",
+      "testData": "-",
+      "expected": "Kết quả đúng; xóa lọc trả danh sách đầy đủ (USA06)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC011": {
+          "pdfPage": 47,
+          "printedPage": 45
+        }
+      }
+    },
+    {
+      "row": 89,
+      "id": "ASG_003",
+      "group": "Bài tập",
+      "requirement": "UC011",
+      "technique": "Đoán lỗi",
+      "title": "Xóa bài tập đã có học viên nộp",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Xóa bài tập có bài nộp",
+      "testData": "-",
+      "expected": "Cảnh báo ảnh hưởng dữ liệu, yêu cầu xác nhận",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC011": {
+          "pdfPage": 47,
+          "printedPage": 45
+        }
+      }
+    },
+    {
+      "row": 90,
+      "id": "ASG_004",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo bài tập Viết hợp lệ và lưu nháp",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Nhập thông tin chung + đề Viết; Lưu bản nháp",
+      "testData": "Dữ liệu hợp lệ",
+      "expected": "Tạo thành công ở trạng thái Nháp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 91,
+      "id": "ASG_005",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo bài tập Đọc trắc nghiệm có đáp án + thang điểm",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Soạn đoạn văn + câu hỏi + đáp án; lưu & xuất bản",
+      "testData": "-",
+      "expected": "Tạo thành công; hiển thị đúng với HV",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 92,
+      "id": "ASG_006",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Tạo bài tập Nghe tải file âm thanh hợp lệ",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Upload .mp3 hợp lệ",
+      "testData": "audio.mp3 nhỏ",
+      "expected": "Tải lên được; trình phát hoạt động",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 93,
+      "id": "ASG_007",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Upload tệp sai định dạng (.exe) cho bài Nghe",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Upload file .exe",
+      "testData": "virus.exe",
+      "expected": "Bị từ chối, báo lỗi cụ thể",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 94,
+      "id": "ASG_008",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Tệp âm thanh tại biên dung lượng (limit-1, limit, limit+1)",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Upload file theo biên",
+      "testData": "(xác nhận limit)",
+      "expected": "≤ limit chấp nhận; > limit báo lỗi quá dung lượng",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      },
+      "pendingOracleOrFixture": "Audio byte limit is not specified in approved PDF Group-04 or agreed supplement; cannot run limit-1/limit/limit+1."
+    },
+    {
+      "row": 95,
+      "id": "ASG_009",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Thiếu tiêu đề bắt buộc",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Bỏ trống tiêu đề, lưu",
+      "testData": "(trống)",
+      "expected": "Báo lỗi trường bắt buộc",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      },
+      "reviewCorrection": "Required-title test. Previous title-max-length blocker was unrelated and withdrawn after independent review."
+    },
+    {
+      "row": 96,
+      "id": "ASG_010",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Số lần làm tối đa = -1",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "1. Bấm 'Tạo bài tập mới'\n2. Nhập tiêu đề AUTO-ATTEMPT--1, chọn kỹ năng Viết\n3. Nhập 'Số lần làm tối đa' = -1\n4. Điền các trường bắt buộc còn lại hợp lệ\n5. Bấm Lưu\n6. Quan sát thông báo và danh sách bài tập",
+      "testData": "Số lần làm tối đa: -1",
+      "expected": "Không lưu; thông báo tại trường 'Số lần làm tối đa' nêu phải là số nguyên ≥ 1",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 97,
+      "id": "ASG_011",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Số lần làm tối đa = 0",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "1. Bấm 'Tạo bài tập mới'\n2. Nhập tiêu đề AUTO-ATTEMPT-0, chọn kỹ năng Viết\n3. Nhập 'Số lần làm tối đa' = 0\n4. Điền các trường bắt buộc còn lại hợp lệ\n5. Bấm Lưu\n6. Quan sát thông báo và danh sách bài tập",
+      "testData": "Số lần làm tối đa: 0",
+      "expected": "Không lưu; thông báo tại trường 'Số lần làm tối đa' nêu phải ≥ 1",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 98,
+      "id": "ASG_012",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Số lần làm tối đa = 1",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "1. Bấm 'Tạo bài tập mới'\n2. Nhập tiêu đề AUTO-ATTEMPT-1, chọn kỹ năng Viết\n3. Nhập 'Số lần làm tối đa' = 1\n4. Điền các trường bắt buộc còn lại hợp lệ\n5. Bấm Lưu\n6. Quan sát thông báo và danh sách bài tập",
+      "testData": "Số lần làm tối đa: 1",
+      "expected": "Lưu thành công; bài xuất hiện ở danh sách, chi tiết hiển thị số lần tối đa = 1",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 99,
+      "id": "ASG_013",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Số lần làm tối đa = 2",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "1. Bấm 'Tạo bài tập mới'\n2. Nhập tiêu đề AUTO-ATTEMPT-2, chọn kỹ năng Viết\n3. Nhập 'Số lần làm tối đa' = 2\n4. Điền các trường bắt buộc còn lại hợp lệ\n5. Bấm Lưu\n6. Quan sát thông báo và danh sách bài tập",
+      "testData": "Số lần làm tối đa: 2",
+      "expected": "Lưu thành công; chi tiết hiển thị số lần tối đa = 2",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 100,
+      "id": "ASG_014",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Số lần làm tối đa = 1000",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "1. Bấm 'Tạo bài tập mới'\n2. Nhập tiêu đề AUTO-ATTEMPT-1000, chọn kỹ năng Viết\n3. Nhập 'Số lần làm tối đa' = 1000\n4. Điền các trường bắt buộc còn lại hợp lệ\n5. Bấm Lưu\n6. Quan sát thông báo và danh sách bài tập",
+      "testData": "Số lần làm tối đa: 1000",
+      "expected": "Hệ thống chấp nhận hoặc báo giới hạn trên rõ ràng (cần xác nhận giới hạn); không lỗi 500",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      },
+      "pendingOracleOrFixture": "Upper attempt limit unspecified"
+    },
+    {
+      "row": 101,
+      "id": "ASG_015",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Giá trị biên",
+      "title": "Điểm tối đa / điểm từng câu: âm, 0, thập phân, quá lớn",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Nhập các giá trị điểm",
+      "testData": "-1/0/0.5/1000",
+      "expected": "Chỉ chấp nhận giá trị hợp lệ",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      },
+      "pendingOracleOrFixture": "Valid maximum-score range unspecified"
+    },
+    {
+      "row": 102,
+      "id": "ASG_016",
+      "group": "Bài tập",
+      "requirement": "UC012",
+      "technique": "Phân vùng tương đương",
+      "title": "Hạn nộp ở quá khứ",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Chọn hạn nộp < hiện tại",
+      "testData": "Hôm qua",
+      "expected": "Cảnh báo/từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC012": {
+          "pdfPage": 50,
+          "printedPage": 48
+        }
+      }
+    },
+    {
+      "row": 103,
+      "id": "ASG_017",
+      "group": "Bài tập",
+      "requirement": "UC013",
+      "technique": "Chuyển trạng thái",
+      "title": "Nháp → Mở bài tập (có hộp xác nhận)",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Chọn Mở/Xuất bản, xác nhận",
+      "testData": "Bài Nháp",
+      "expected": "Trạng thái Mở; HV thấy bài",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC013": {
+          "pdfPage": 53,
+          "printedPage": 51
+        }
+      }
+    },
+    {
+      "row": 104,
+      "id": "ASG_018",
+      "group": "Bài tập",
+      "requirement": "UC013",
+      "technique": "Đoán lỗi",
+      "title": "Mở bài khi hạn nộp đã qua",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Mở bài có hạn quá khứ",
+      "testData": "-",
+      "expected": "Yêu cầu cập nhật hạn nộp trước khi mở",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC013": {
+          "pdfPage": 53,
+          "printedPage": 51
+        }
+      }
+    },
+    {
+      "row": 105,
+      "id": "ASG_019",
+      "group": "Bài tập",
+      "requirement": "UC014",
+      "technique": "Chuyển trạng thái",
+      "title": "Mở → Khóa bài tập; HV không nộp mới được",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Khóa bài; HV thử nộp",
+      "testData": "Bài đang Mở",
+      "expected": "Trạng thái Đã khóa; HV bị chặn",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC014": {
+          "pdfPage": 55,
+          "printedPage": 53
+        }
+      }
+    },
+    {
+      "row": 106,
+      "id": "ASG_020",
+      "group": "Bài tập",
+      "requirement": "UC014",
+      "technique": "Phân vùng tương đương",
+      "title": "Hủy xác nhận khóa",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Bấm Khóa → Hủy",
+      "testData": "-",
+      "expected": "Giữ nguyên trạng thái Mở",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC014": {
+          "pdfPage": 55,
+          "printedPage": 53
+        }
+      }
+    },
+    {
+      "row": 107,
+      "id": "ASG_021",
+      "group": "Bài tập",
+      "requirement": "UC013/14",
+      "technique": "Chuyển trạng thái",
+      "title": "Khóa → Mở lại",
+      "precondition": "Đăng nhập Giáo viên; vào lớp phụ trách",
+      "steps": "Mở lại bài đã khóa",
+      "testData": "Bài Khóa",
+      "expected": "Trạng thái Mở; HV làm được",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC013": {
+          "pdfPage": 53,
+          "printedPage": 51
+        },
+        "UC014": {
+          "pdfPage": 55,
+          "printedPage": 53
+        }
+      }
+    },
+    {
+      "row": 108,
+      "id": "ASG_022",
+      "group": "Bài tập",
+      "requirement": "UC011",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "HV không thấy bài ở trạng thái Nháp",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở danh sách bài tập của lớp",
+      "testData": "Bài Nháp",
+      "expected": "Không hiển thị bài Nháp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC011": {
+          "pdfPage": 47,
+          "printedPage": 45
+        }
+      }
+    },
+    {
+      "row": 109,
+      "id": "DO_001",
+      "group": "Làm bài",
+      "requirement": "UC015",
+      "technique": "Use case testing",
+      "title": "Xem chi tiết bài tập",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Chọn bài từ danh sách",
+      "testData": "-",
+      "expected": "Thấy tên, hạn nộp, kỹ năng, số lần còn lại, lịch sử nộp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC015": {
+          "pdfPage": 57,
+          "printedPage": 55
+        }
+      }
+    },
+    {
+      "row": 110,
+      "id": "DO_002",
+      "group": "Làm bài",
+      "requirement": "UC015",
+      "technique": "Chuyển trạng thái",
+      "title": "Xem bài đã khóa / chưa mở",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở bài Khóa",
+      "testData": "Bài Khóa",
+      "expected": "Chỉ xem tổng quan; không cho làm bài",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC015": {
+          "pdfPage": 57,
+          "printedPage": 55
+        }
+      }
+    },
+    {
+      "row": 111,
+      "id": "DO_003",
+      "group": "Làm bài",
+      "requirement": "UC016",
+      "technique": "Use case testing",
+      "title": "Làm bài Viết: nhập nội dung và lưu",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nhập bài viết, Lưu",
+      "testData": "Đoạn văn mẫu",
+      "expected": "Lưu thành công; reload vẫn còn nội dung",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC016": {
+          "pdfPage": 59,
+          "printedPage": 57
+        }
+      }
+    },
+    {
+      "row": 112,
+      "id": "DO_004",
+      "group": "Làm bài",
+      "requirement": "UC016",
+      "technique": "Giá trị biên",
+      "title": "Giới hạn số từ Viết: min-1, min, max, max+1",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nhập số từ theo biên",
+      "testData": "(xác nhận limit)",
+      "expected": "Báo đúng theo quy định; hiển thị đếm từ",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC016": {
+          "pdfPage": 59,
+          "printedPage": 57
+        }
+      },
+      "pendingOracleOrFixture": "Word-count min/max configuration not approved"
+    },
+    {
+      "row": 113,
+      "id": "DO_005",
+      "group": "Làm bài",
+      "requirement": "UC016",
+      "technique": "Phân vùng tương đương",
+      "title": "Tải tệp bài viết sai định dạng",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Upload file không hỗ trợ",
+      "testData": "a.exe",
+      "expected": "Báo lỗi định dạng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC016": {
+          "pdfPage": 59,
+          "printedPage": 57
+        }
+      }
+    },
+    {
+      "row": 114,
+      "id": "DO_006",
+      "group": "Làm bài",
+      "requirement": "UC017",
+      "technique": "Use case testing",
+      "title": "Bài Nói: ghi âm → nghe lại → lưu",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở; trình duyệt cấp quyền micro",
+      "steps": "Ghi âm, dừng, nghe lại, lưu",
+      "testData": "Micro giả (Chrome flag fake-device)",
+      "expected": "Tệp tải lên và liên kết vào bài làm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC017": {
+          "pdfPage": 62,
+          "printedPage": 60
+        }
+      }
+    },
+    {
+      "row": 115,
+      "id": "DO_007",
+      "group": "Làm bài",
+      "requirement": "UC017",
+      "technique": "Phân vùng tương đương",
+      "title": "Ghi âm lại sau khi hủy bản tạm",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Hủy bản ghi, ghi lại",
+      "testData": "-",
+      "expected": "Bản mới thay thế bản cũ",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC017": {
+          "pdfPage": 62,
+          "printedPage": 60
+        }
+      }
+    },
+    {
+      "row": 116,
+      "id": "DO_008",
+      "group": "Làm bài",
+      "requirement": "UC017",
+      "technique": "Đoán lỗi",
+      "title": "Từ chối quyền micro",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Chặn quyền micro",
+      "testData": "Quyền bị chặn",
+      "expected": "Nhắc cấp quyền micro",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC017": {
+          "pdfPage": 62,
+          "printedPage": 60
+        }
+      }
+    },
+    {
+      "row": 117,
+      "id": "DO_009",
+      "group": "Làm bài",
+      "requirement": "UC018",
+      "technique": "Phân vùng tương đương",
+      "title": "Bài Đọc: trả lời đủ và lưu",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Trả lời đầy đủ, dùng thao tác ghi nhận phần Đọc; đọc lại đáp án đúng ID quaAPI.",
+      "testData": "-",
+      "expected": "Đáp án Đọc được ghi nhận đúng; đối chiếu chính xác bài nộp và câu hỏi.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC018": {
+          "pdfPage": 65,
+          "printedPage": 63
+        }
+      },
+      "originalExpected": "Đáp án được ghi nhận",
+      "originalSteps": "Chọn đáp án mọi câu, lưu",
+      "requirementClarification": "UC018 không bắt buộc nhãn nút phải trùng nguyên văn tên trong Excel; không dùng kết quả này nghiệm thu xác nhận nộp cuối UC021.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "UC018 không bắt buộc nhãn nút phải trùng nguyên văn tên trong Excel; không dùng kết quả này nghiệm thu xác nhận nộp cuối UC021."
+      }
+    },
+    {
+      "row": 118,
+      "id": "DO_010",
+      "group": "Làm bài",
+      "requirement": "UC018/19",
+      "technique": "Phân vùng tương đương",
+      "title": "Chưa trả lời hết: cảnh báo số câu trống",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Bỏ trống một số câu; lưu/nộp",
+      "testData": "3 câu trống",
+      "expected": "Cảnh báo đúng số câu còn trống",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC018": {
+          "pdfPage": 65,
+          "printedPage": 63
+        },
+        "UC019": {
+          "pdfPage": 67,
+          "printedPage": 65
+        }
+      }
+    },
+    {
+      "row": 119,
+      "id": "DO_011",
+      "group": "Làm bài",
+      "requirement": "UC019",
+      "technique": "Use case testing",
+      "title": "Bài Nghe: phát audio + chọn đáp án",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Phát audio, kiểm thời gian tiến lên; trả lời, ghi nhận phần Nghe và đọc lạiAPI.",
+      "testData": "-",
+      "expected": "Audio phát được; đáp án Nghe được lưu đúng bài nộp/module.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC019": {
+          "pdfPage": 67,
+          "printedPage": 65
+        }
+      },
+      "originalExpected": "Audio phát được; đáp án lưu",
+      "originalSteps": "Phát audio, chọn đáp án, lưu",
+      "requirementClarification": "UC019 đánh giá phát audio và lưu đáp án, không bắt buộc nguyên văn tên nút Excel.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "UC019 đánh giá phát audio và lưu đáp án, không bắt buộc nguyên văn tên nút Excel."
+      }
+    },
+    {
+      "row": 120,
+      "id": "DO_012",
+      "group": "Làm bài",
+      "requirement": "UC019",
+      "technique": "Giá trị biên",
+      "title": "Giới hạn số lượt nghe: lần 1, lần cuối, lần cuối+1",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Phát audio vượt giới hạn",
+      "testData": "(nếu bật giới hạn)",
+      "expected": "Chặn khi vượt giới hạn",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC019": {
+          "pdfPage": 67,
+          "printedPage": 65
+        }
+      },
+      "pendingOracleOrFixture": "Optional listening replay limit unspecified"
+    },
+    {
+      "row": 121,
+      "id": "DO_013",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Use case testing",
+      "title": "Nộp bài: hộp thoại xác nhận → Xác nhận",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nhấn Nộp, xác nhận",
+      "testData": "-",
+      "expected": "Trạng thái Đã nộp; ghi thời gian nộp; chuyển trang kết quả nộp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 122,
+      "id": "DO_014",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Phân vùng tương đương",
+      "title": "Nộp bài: Hủy xác nhận",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nhấn Nộp → Hủy",
+      "testData": "-",
+      "expected": "Quay lại màn làm bài, bài chưa nộp",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 123,
+      "id": "DO_015",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Đoán lỗi",
+      "title": "Nhấn nộp bài hai lần liên tiếp",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Double-click nút Nộp",
+      "testData": "-",
+      "expected": "Chỉ tạo 1 bài nộp; không tăng 2 lần số lần làm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 124,
+      "id": "DO_016",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Đoán lỗi",
+      "title": "Mất mạng khi nộp",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Bật offline (CDP) rồi nộp, bật lại, thử gửi lại",
+      "testData": "Network offline",
+      "expected": "Báo lỗi đường truyền; gửi lại không mất nội dung",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 125,
+      "id": "DO_017",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Chuyển trạng thái",
+      "title": "Hết giờ tự động thu bài",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở; bài có giới hạn thời gian",
+      "steps": "Chờ hết giờ",
+      "testData": "Bài có timer ngắn",
+      "expected": "Hệ thống tự nộp bài",
+      "priority": "Cao",
+      "scopeExclusion": {
+        "source": "User confirmation in conversation",
+        "date": "2026-11-16",
+        "reason": "Không có chức năng tự nộp khi hết giờ; loại khỏi phạm vi kiểm thử theo xác nhận của người dùng."
+      },
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 126,
+      "id": "DO_018",
+      "group": "Làm bài",
+      "requirement": "UC021",
+      "technique": "Use case testing",
+      "title": "Sau khi nộp, số lần làm tăng 1; bài trắc nghiệm được chấm sơ bộ",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nộp bài hỗn hợp",
+      "testData": "-",
+      "expected": "Số lần +1; Đọc/Nghe có điểm tự động",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC021": {
+          "pdfPage": 71,
+          "printedPage": 69
+        }
+      }
+    },
+    {
+      "row": 127,
+      "id": "DO_019",
+      "group": "Làm bài",
+      "requirement": "UC022",
+      "technique": "Giá trị biên",
+      "title": "Làm lại: lần = max-1, = max (nút bị vô hiệu)",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Nộp đủ hai lượt; kiểm loại CTA khi hết lượt, thử tạo lượt thứ ba bị từ chối và lịch sử vẫn hai lượt.",
+      "testData": "Số lần tối đa = 2",
+      "expected": "Còn lượt làm lại được; hết lượt không tạo được lượt mới. Nút Xem kết quả có thể vẫn hoạt động.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC022": {
+          "pdfPage": 74,
+          "printedPage": 72
+        }
+      },
+      "originalExpected": "Còn lượt: làm lại được; hết lượt: nút disabled + thông báo",
+      "originalSteps": "Nộp bài nhiều lần đến giới hạn",
+      "requirementClarification": "UC022 vô hiệu hóa Làm lại, không yêu cầu vô hiệu mọi nút tại cùng vị trí giao diện.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "UC022 vô hiệu hóa Làm lại, không yêu cầu vô hiệu mọi nút tại cùng vị trí giao diện."
+      }
+    },
+    {
+      "row": 128,
+      "id": "DO_020",
+      "group": "Làm bài",
+      "requirement": "UC022",
+      "technique": "Chuyển trạng thái",
+      "title": "Làm lại khi bài đã bị khóa",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "GV khóa bài; HV bấm Làm lại",
+      "testData": "-",
+      "expected": "Thông báo bài không còn mở",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC022": {
+          "pdfPage": 74,
+          "printedPage": 72
+        }
+      }
+    },
+    {
+      "row": 129,
+      "id": "DO_021",
+      "group": "Làm bài",
+      "requirement": "UC022",
+      "technique": "Use case testing",
+      "title": "Lịch sử các lần nộp hiển thị đúng",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Mở chi tiết bài đã làm",
+      "testData": "-",
+      "expected": "Thấy thời gian nộp, điểm từng lần, số lượt còn lại",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC022": {
+          "pdfPage": 74,
+          "printedPage": 72
+        }
+      }
+    },
+    {
+      "row": 130,
+      "id": "DO_022",
+      "group": "Làm bài",
+      "requirement": "UC020",
+      "technique": "Use case testing",
+      "title": "Xem lại bài làm sau khi nộp",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Chọn Xem lại bài làm",
+      "testData": "-",
+      "expected": "Hiển thị câu trả lời mọi kỹ năng; trạng thái Đã chấm/Chờ chấm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC020": {
+          "pdfPage": 69,
+          "printedPage": 67
+        }
+      }
+    },
+    {
+      "row": 131,
+      "id": "DO_023",
+      "group": "Làm bài",
+      "requirement": "UC023",
+      "technique": "Chuyển trạng thái",
+      "title": "Nhãn trạng thái: Chưa làm → Đang làm → Đã nộp → Đang chấm → Đã chấm",
+      "precondition": "Đăng nhập Học viên; bài tập đang Mở",
+      "steps": "Quan sát danh sách khi đi qua từng trạng thái",
+      "testData": "-",
+      "expected": "Nhãn có chữ mô tả (không chỉ màu) (USA04)",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC023": {
+          "pdfPage": 77,
+          "printedPage": 75
+        }
+      }
+    },
+    {
+      "row": 132,
+      "id": "GRD_001",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Phân vùng tương đương",
+      "title": "Chấm thủ công hợp lệ",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Nhập điểm từng tiêu chí + nhận xét; Hoàn thành chấm",
+      "testData": "Điểm hợp lệ",
+      "expected": "Lưu thành công; trạng thái Đã chấm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 133,
+      "id": "GRD_002",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Giá trị biên",
+      "title": "Nhập điểm -0.1 (thang tối đa 10 - giả định)",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "1. Mở danh sách bài nộp của lớp\n2. Chọn bài nộp Viết của học viên test ở trạng thái Chờ chấm\n3. Nhập điểm = -0.1 vào ô điểm\n4. Nhập nhận xét 'Good'\n5. Bấm 'Hoàn thành chấm bài'\n6. Quan sát thông báo và trạng thái bài",
+      "testData": "Điểm: -0.1; Nhận xét: Good",
+      "expected": "Không lưu; báo lỗi điểm phải trong khoảng 0-10 tại ô điểm; trạng thái bài vẫn là Chờ chấm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 134,
+      "id": "GRD_003",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Giá trị biên",
+      "title": "Nhập điểm 0 (thang tối đa 10 - giả định)",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "1. Mở danh sách bài nộp của lớp\n2. Chọn bài nộp Viết của học viên test ở trạng thái Chờ chấm\n3. Nhập điểm = 0 vào ô điểm\n4. Nhập nhận xét 'Good'\n5. Bấm 'Hoàn thành chấm bài'\n6. Quan sát thông báo và trạng thái bài",
+      "testData": "Điểm: 0; Nhận xét: Good",
+      "expected": "Lưu thành công; bài chuyển 'Đã chấm' với điểm 0",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 135,
+      "id": "GRD_004",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Giá trị biên",
+      "title": "Nhập điểm 10 (thang tối đa 10 - giả định)",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "1. Mở danh sách bài nộp của lớp\n2. Chọn bài nộp Viết của học viên test ở trạng thái Chờ chấm\n3. Nhập điểm = 10 vào ô điểm\n4. Nhập nhận xét 'Good'\n5. Bấm 'Hoàn thành chấm bài'\n6. Quan sát thông báo và trạng thái bài",
+      "testData": "Điểm: 10; Nhận xét: Good",
+      "expected": "Lưu thành công; bài chuyển 'Đã chấm' với điểm 10",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 136,
+      "id": "GRD_005",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Giá trị biên",
+      "title": "Nhập điểm 10.1 (thang tối đa 10 - giả định)",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "1. Mở danh sách bài nộp của lớp\n2. Chọn bài nộp Viết của học viên test ở trạng thái Chờ chấm\n3. Nhập điểm = 10.1 vào ô điểm\n4. Nhập nhận xét 'Good'\n5. Bấm 'Hoàn thành chấm bài'\n6. Quan sát thông báo và trạng thái bài",
+      "testData": "Điểm: 10.1; Nhận xét: Good",
+      "expected": "Không lưu; báo lỗi điểm vượt thang tối đa 10; trạng thái bài vẫn là Chờ chấm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 137,
+      "id": "GRD_006",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Phân vùng tương đương",
+      "title": "Điểm không phải số",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Nhập ký tự chữ",
+      "testData": "abc",
+      "expected": "Báo lỗi hoặc không nhận",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 138,
+      "id": "GRD_007",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Phân vùng tương đương",
+      "title": "Nhận xét trống",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Chấm không nhập nhận xét",
+      "testData": "(trống)",
+      "expected": "Hành vi theo quy định (ghi nhận)",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      },
+      "pendingOracleOrFixture": "Empty feedback acceptance convention unspecified"
+    },
+    {
+      "row": 139,
+      "id": "GRD_008",
+      "group": "Chấm bài",
+      "requirement": "UC025",
+      "technique": "Use case testing",
+      "title": "AI hỗ trợ chấm Viết: highlight lỗi, giải thích, điểm đề xuất",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Phân tích bài Viết; đối chiếu điểm/chú thích; Duyệt rồi Từ chối đúng annotation và đọc lại trạng thái API; lưu điểm giáo viên.",
+      "testData": "Bài viết mẫu",
+      "expected": "Có kết quả AI, điểm đề xuất; giáo viên duyệt/bác bỏ annotation và lưu quyết định cuối.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC025": {
+          "pdfPage": 82,
+          "printedPage": 80
+        }
+      },
+      "originalExpected": "Hiển thị kết quả AI; GV chấp nhận/điều chỉnh/bác bỏ được",
+      "originalSteps": "Bấm 'Yêu cầu AI phân tích'",
+      "requirementClarification": "Tìm thao tác theo ý nghĩa và đúng annotation; không phụ thuộc classCSS riêng của Button. Không F5 để che lỗi tự cập nhật giao diện.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "Tìm thao tác theo ý nghĩa và đúng annotation; không phụ thuộc classCSS riêng của Button. Không F5 để che lỗi tự cập nhật giao diện."
+      }
+    },
+    {
+      "row": 140,
+      "id": "GRD_009",
+      "group": "Chấm bài",
+      "requirement": "UC025",
+      "technique": "Đoán lỗi",
+      "title": "AI chậm/gián đoạn → cho chấm thủ công / gửi lại",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Giả lập AI lỗi (chặn request)",
+      "testData": "AI service down",
+      "expected": "Báo lỗi tạm thời; vẫn chấm thủ công được",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC025": {
+          "pdfPage": 82,
+          "printedPage": 80
+        }
+      }
+    },
+    {
+      "row": 141,
+      "id": "GRD_010",
+      "group": "Chấm bài",
+      "requirement": "UC025",
+      "technique": "Phân vùng tương đương",
+      "title": "AI với bài viết rỗng/rất ngắn/ngôn ngữ khác",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Gửi bài 1 từ; bài tiếng Việt",
+      "testData": "-",
+      "expected": "Không crash; phản hồi hợp lý",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC025": {
+          "pdfPage": 82,
+          "printedPage": 80
+        }
+      },
+      "pendingOracleOrFixture": "Reasonable AI response lacks an objective oracle"
+    },
+    {
+      "row": 142,
+      "id": "GRD_011",
+      "group": "Chấm bài",
+      "requirement": "UC026",
+      "technique": "Use case testing",
+      "title": "AI hỗ trợ chấm Nói: transcript + IPA + điểm đề xuất",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "AI phân tích bản ghi; đối chiếu transcript, các phiên âm được trả và điểm đề xuất trên UI/API.",
+      "testData": "File ghi âm mẫu",
+      "expected": "Hiển thị transcript, từ sai kèm phiên âm thực và điểm đề xuất.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC026": {
+          "pdfPage": 85,
+          "printedPage": 83
+        }
+      },
+      "originalExpected": "Hiển thị transcript, từ sai kèm IPA, điểm đề xuất",
+      "originalSteps": "Bấm 'AI hỗ trợ đánh giá phát âm'",
+      "requirementClarification": "UC026 yêu cầu nội dung phiên âm, không bắt buộc literal chữ IPA; dữ liệu không có lỗi phát âm cần giữ BLOCKED cho nhánh này.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "UC026 yêu cầu nội dung phiên âm, không bắt buộc literal chữ IPA; dữ liệu không có lỗi phát âm cần giữ BLOCKED cho nhánh này."
+      }
+    },
+    {
+      "row": 143,
+      "id": "GRD_012",
+      "group": "Chấm bài",
+      "requirement": "UC026",
+      "technique": "Đoán lỗi",
+      "title": "Ghi âm chất lượng kém/nhiều tạp âm",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Chạy AI trên file nhiễu",
+      "testData": "noise.wav",
+      "expected": "Cảnh báo độ chính xác giảm",
+      "priority": "Trung bình",
+      "scopeExclusion": {
+        "source": "User confirmation in conversation",
+        "date": "2026-11-16",
+        "reason": "Không có đặc tả xử lý audio nhiễu; loại khỏi phạm vi kiểm thử theo xác nhận của người dùng."
+      },
+      "sourceReferences": {
+        "UC026": {
+          "pdfPage": 85,
+          "printedPage": 83
+        }
+      }
+    },
+    {
+      "row": 144,
+      "id": "GRD_013",
+      "group": "Chấm bài",
+      "requirement": "UC027",
+      "technique": "Giá trị biên",
+      "title": "Chấm tự động Đọc: 0 đúng / một phần / tất cả đúng",
+      "precondition": "Đăng nhập Học viên nộp bài Đọc",
+      "steps": "Nộp 3 bộ đáp án; GV xem điểm",
+      "testData": "Đáp án mẫu",
+      "expected": "Điểm = số câu đúng × thang; đúng 0, giữa, max",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC027": {
+          "pdfPage": 88,
+          "printedPage": 86
+        }
+      }
+    },
+    {
+      "row": 145,
+      "id": "GRD_014",
+      "group": "Chấm bài",
+      "requirement": "UC028",
+      "technique": "Giá trị biên",
+      "title": "Chấm tự động Nghe: điền từ khớp/ không khớp hoa-thường, khoảng trắng",
+      "precondition": "Đăng nhập Học viên nộp bài Nghe",
+      "steps": "Nộp đáp án điền từ biến thể",
+      "testData": "'Apple' vs 'apple ' ",
+      "expected": "Hành vi so khớp nhất quán với quy ước",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC028": {
+          "pdfPage": 91,
+          "printedPage": 89
+        }
+      },
+      "pendingOracleOrFixture": "Case/whitespace matching convention unspecified"
+    },
+    {
+      "row": 146,
+      "id": "GRD_015",
+      "group": "Chấm bài",
+      "requirement": "UC027/28",
+      "technique": "Đoán lỗi",
+      "title": "Bài Đọc/Nghe chưa có đáp án chuẩn",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Nộp bài khi chưa cấu hình đáp án",
+      "testData": "-",
+      "expected": "Không crash; trạng thái chờ chấm",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC027": {
+          "pdfPage": 88,
+          "printedPage": 86
+        },
+        "UC028": {
+          "pdfPage": 91,
+          "printedPage": 89
+        }
+      }
+    },
+    {
+      "row": 147,
+      "id": "GRD_016",
+      "group": "Chấm bài",
+      "requirement": "UC024",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "GV không chấm được bài của lớp không phụ trách",
+      "precondition": "Đăng nhập Giáo viên; có bài nộp",
+      "steps": "Mở bài nộp của lớp khác",
+      "testData": "ID khác",
+      "expected": "Bị từ chối",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC024": {
+          "pdfPage": 79,
+          "printedPage": 77
+        }
+      }
+    },
+    {
+      "row": 148,
+      "id": "SCR_001",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC029",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Học viên chỉ thấy điểm của mình",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở Điểm số",
+      "testData": "-",
+      "expected": "Chỉ điểm cá nhân",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC029": {
+          "pdfPage": 94,
+          "printedPage": 92
+        }
+      }
+    },
+    {
+      "row": 149,
+      "id": "SCR_002",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC029",
+      "technique": "Use case testing",
+      "title": "Giáo viên xem điểm cả lớp; lọc theo bài/khoảng thời gian",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Lọc theo lớp, bài, ngày",
+      "testData": "-",
+      "expected": "Dữ liệu đúng bộ lọc",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC029": {
+          "pdfPage": 94,
+          "printedPage": 92
+        }
+      }
+    },
+    {
+      "row": 150,
+      "id": "SCR_003",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC029",
+      "technique": "Chuyển trạng thái",
+      "title": "Bài chưa chấm hiển thị 'Đang chấm'",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở Điểm số",
+      "testData": "Bài chưa chấm",
+      "expected": "Hiển thị trạng thái thay cho điểm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC029": {
+          "pdfPage": 94,
+          "printedPage": 92
+        }
+      }
+    },
+    {
+      "row": 151,
+      "id": "SCR_004",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC030",
+      "technique": "Phân vùng tương đương",
+      "title": "Điều chỉnh điểm kèm lý do; lưu lịch sử",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Chấm5; sửa7 và bấmLưu; nhập lý do trong modal, xác nhận; đọc lại điểm7 và lịch sử5→7 có lý do.",
+      "testData": "Điểm mới hợp lệ",
+      "expected": "Điều chỉnh điểm kèm lý do; lưu đúng điểm mới và lịch sử oldScore/newScore/note.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC030": {
+          "pdfPage": 97,
+          "printedPage": 95
+        }
+      },
+      "originalExpected": "Cập nhật; lịch sử sửa đổi được lưu; điểm tổng cập nhật",
+      "originalSteps": "Sửa điểm, nhập lý do, lưu",
+      "requirementClarification": "Ô lý do xuất hiện sau bấm Lưu điểm điều chỉnh; phải mở đúng hộp thoại trước nhập.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "Ô lý do xuất hiện sau bấm Lưu điểm điều chỉnh; phải mở đúng hộp thoại trước nhập."
+      }
+    },
+    {
+      "row": 152,
+      "id": "SCR_005",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC030",
+      "technique": "Giá trị biên",
+      "title": "Điều chỉnh điểm ngoài khoảng / thiếu lý do",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Chấm5; thử điểm âm; sau đó sửa6, mởmodal và bỏ trống lý do; kiểm không xác nhận được và điểm vẫn5.",
+      "testData": "-1/ >max",
+      "expected": "Điểm ngoài khoảng hoặc lý do trống không được cập nhật.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC030": {
+          "pdfPage": 97,
+          "printedPage": 95
+        }
+      },
+      "originalExpected": "Báo lỗi, không cập nhật",
+      "originalSteps": "Nhập điểm ngoài khoảng; bỏ trống lý do",
+      "requirementClarification": "Validation có thể dùng trình duyệt hoặc nút xác nhận disabled; không bắt một thông báoDOM khi thao tác đã bị chặn đúng.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "Validation có thể dùng trình duyệt hoặc nút xác nhận disabled; không bắt một thông báoDOM khi thao tác đã bị chặn đúng."
+      }
+    },
+    {
+      "row": 153,
+      "id": "RES_001",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC031",
+      "technique": "Use case testing",
+      "title": "Học viên xem kết quả học tập (biểu đồ, TB kỹ năng, % hoàn thành)",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở Kết quả học tập",
+      "testData": "-",
+      "expected": "Có số liệu đúng so với bảng điểm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC031": {
+          "pdfPage": 100,
+          "printedPage": 98
+        }
+      }
+    },
+    {
+      "row": 154,
+      "id": "RES_002",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC031",
+      "technique": "Phân vùng tương đương",
+      "title": "Chưa có bài được chấm",
+      "precondition": "Đăng nhập Học viên (HV mới)",
+      "steps": "Mở Kết quả học tập",
+      "testData": "-",
+      "expected": "Thông báo chưa đủ dữ liệu",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC031": {
+          "pdfPage": 100,
+          "printedPage": 98
+        }
+      }
+    },
+    {
+      "row": 155,
+      "id": "RES_003",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC032",
+      "technique": "Use case testing",
+      "title": "Xem bài chữa: đáp án, nhận xét GV, lỗi AI",
+      "precondition": "Đăng nhập Học viên; bài đã chấm",
+      "steps": "Mở Xem bài chữa",
+      "testData": "Bài đã chấm",
+      "expected": "Hiển thị song song bài làm - đáp án; nhận xét GV; lỗi từ vựng/ngữ pháp/phát âm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC032": {
+          "pdfPage": 103,
+          "printedPage": 101
+        }
+      }
+    },
+    {
+      "row": 156,
+      "id": "RES_004",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC032",
+      "technique": "Kiểm thử phân quyền/bảo mật",
+      "title": "Không xem được bài chữa khi chưa chấm",
+      "precondition": "Đăng nhập Học viên",
+      "steps": "Mở URL bài chữa bài chưa chấm",
+      "testData": "-",
+      "expected": "Bị chặn/hiển thị thông báo",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC032": {
+          "pdfPage": 103,
+          "printedPage": 101
+        }
+      }
+    },
+    {
+      "row": 157,
+      "id": "RES_005",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC033",
+      "technique": "Use case testing",
+      "title": "Giáo viên đánh giá năng lực học viên",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Chọn HV, nhập nhận xét, lưu",
+      "testData": "-",
+      "expected": "Lưu vào hồ sơ HV",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC033": {
+          "pdfPage": 106,
+          "printedPage": 104
+        }
+      }
+    },
+    {
+      "row": 158,
+      "id": "RES_006",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC033",
+      "technique": "Phân vùng tương đương",
+      "title": "Học viên mới thiếu dữ liệu",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Mở HV chưa nộp bài",
+      "testData": "-",
+      "expected": "Nhắc dữ liệu hạn chế",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC033": {
+          "pdfPage": 106,
+          "printedPage": 104
+        }
+      }
+    },
+    {
+      "row": 159,
+      "id": "RES_007",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC034",
+      "technique": "Use case testing",
+      "title": "Theo dõi tiến độ lớp: % hoàn thành, chưa nộp, nộp muộn",
+      "precondition": "Đăng nhập Giáo viên",
+      "steps": "Mở Theo dõi tiến độ; lọc theo bài",
+      "testData": "-",
+      "expected": "Số liệu khớp dữ liệu nộp bài",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC034": {
+          "pdfPage": 109,
+          "printedPage": 107
+        }
+      }
+    },
+    {
+      "row": 160,
+      "id": "RES_008",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC035",
+      "technique": "Use case testing",
+      "title": "Dashboard Quản lý hiển thị chỉ số tổng",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Mở Báo cáo & Thống kê",
+      "testData": "-",
+      "expected": "Có số user/lớp/bài nộp/phổ điểm",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC035": {
+          "pdfPage": 112,
+          "printedPage": 110
+        }
+      }
+    },
+    {
+      "row": 161,
+      "id": "RES_009",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC035",
+      "technique": "Phân vùng tương đương",
+      "title": "Lọc theo thời gian không có dữ liệu",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Chọn khoảng không có dữ liệu",
+      "testData": "Khoảng cũ",
+      "expected": "Thông báo chưa có dữ liệu + hướng dẫn mở rộng lọc",
+      "priority": "Cao",
+      "sourceReferences": {
+        "UC035": {
+          "pdfPage": 112,
+          "printedPage": 110
+        }
+      }
+    },
+    {
+      "row": 162,
+      "id": "RES_010",
+      "group": "Điểm & Báo cáo",
+      "requirement": "UC035",
+      "technique": "Use case testing",
+      "title": "Xuất báo cáo",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Tạo dữ liệu lớp riêng; chọn lớp ởBáo cáo; lưu response nguồn, tảiCSV; đọc hàng lớp và đối chiếu số bài/tỷ lệ/điểm.",
+      "testData": "-",
+      "expected": "Tải được báo cáo đúng bộ lọc, đọc được nội dung và các số liệu khớp response nguồn của cùng bộ lọc.",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "UC035": {
+          "pdfPage": 112,
+          "printedPage": 110
+        }
+      },
+      "originalExpected": "Tải được file đúng số liệu",
+      "originalSteps": "Bấm Xuất báo cáo",
+      "requirementClarification": "Nhãn Xuất báo cáo(CSV) hợp lệ; không đối chiếu dữ liệu xuất với một response đọc sau đã khác snapshot.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "Nhãn Xuất báo cáo(CSV) hợp lệ; không đối chiếu dữ liệu xuất với một response đọc sau đã khác snapshot."
+      }
+    },
+    {
+      "row": 163,
+      "id": "NFR_001",
+      "group": "Phi chức năng",
+      "requirement": "USA01",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Biểu mẫu có nhãn, trường bắt buộc, thông báo lỗi bằng chữ",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Duyệt form đăng nhập, tạo lớp, tạo bài tập, nhập điểm",
+      "testData": "-",
+      "expected": "Đủ label hiển thị; lỗi chỉ rõ trường/nguyên nhân",
+      "priority": "Cao",
+      "sourceReferences": {
+        "USA01": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 164,
+      "id": "NFR_002",
+      "group": "Phi chức năng",
+      "requirement": "USA02",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Phản hồi trạng thái thao tác (loading/thành công/lỗi)",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Thực hiện đăng nhập, tạo bài tập, nộp bài, lưu điểm",
+      "testData": "-",
+      "expected": "Có chỉ báo đang xử lý; thành công/lỗi hiển thị đúng",
+      "priority": "Cao",
+      "sourceReferences": {
+        "USA02": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 165,
+      "id": "NFR_003",
+      "group": "Phi chức năng",
+      "requirement": "USA03",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Điều hướng bằng menu và nút quay lại",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Dùng menu từng vai trò; vào chi tiết lớp/bài rồi quay lại",
+      "testData": "-",
+      "expected": "Không cần nhập URL; quay lại đúng trang",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "USA03": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 166,
+      "id": "NFR_004",
+      "group": "Phi chức năng",
+      "requirement": "USA04",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Nút hành động Lưu/Hủy/Xóa/Sửa có tên gọi thống nhất giữa các màn",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Thu nhãn bốn màn; tách theo tác dụng và so các cặp thực sự cùng hành động.",
+      "testData": "4 màn nêu trên",
+      "expected": "Cùng hành động dùng tên gọi nhất quán; không buộc tạo tài khoản, lưu nháp, phát hành và gửi điểm có tên giống nhau.",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "USA04": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      },
+      "originalExpected": "Cùng một hành động dùng cùng một tên gọi ở cả 4 màn (ví dụ luôn là 'Lưu', không lẫn 'Cập nhật'/'Submit'); không màn nào dùng tên khác cho cùng hành động",
+      "originalSteps": "1. Mở lần lượt 4 màn: Tạo/Sửa tài khoản, Tạo/Sửa lớp, Tạo/Sửa bài tập, Nhập điểm\n2. Ghi lại nhãn chữ của nút xác nhận lưu, nút hủy, nút xóa, nút sửa trên từng màn\n3. Điền vào bảng đối chiếu của checklist",
+      "requirementClarification": "USA04 so sánh cùng tác dụng; kiểm nhóm Lưu bản nháp giữa bài/nhận xét và nhóm Hủy giữa các form tương ứng.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "USA04 so sánh cùng tác dụng; kiểm nhóm Lưu bản nháp giữa bài/nhận xét và nhóm Hủy giữa các form tương ứng."
+      }
+    },
+    {
+      "row": 167,
+      "id": "NFR_005",
+      "group": "Phi chức năng",
+      "requirement": "USA04",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Biểu tượng của cùng hành động giống nhau giữa các màn",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "1. Mở danh sách tài khoản, danh sách lớp, danh sách bài tập\n2. Chụp biểu tượng của hành động Sửa, Xóa, Khóa/Mở khóa, Tìm kiếm trên từng danh sách\n3. So sánh các biểu tượng cùng hành động",
+      "testData": "3 danh sách nêu trên",
+      "expected": "Mỗi hành động dùng cùng một biểu tượng ở cả 3 danh sách; không có 2 hành động khác nhau dùng chung 1 biểu tượng",
+      "priority": "Thấp",
+      "sourceReferences": {
+        "USA04": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 168,
+      "id": "NFR_006",
+      "group": "Phi chức năng",
+      "requirement": "USA04",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Nhãn trạng thái nghiệp vụ cùng ý nghĩa thì hiển thị giống nhau",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "1. Tạo dữ liệu có đủ trạng thái: lớp Đang mở/Đã kết thúc, bài tập Nháp/Mở/Đã khóa, tài khoản Hoạt động/Bị khóa\n2. Xem các trạng thái này ở danh sách và ở màn chi tiết tương ứng\n3. So sánh chữ và kiểu hiển thị (badge) giữa danh sách và chi tiết",
+      "testData": "Lớp, bài tập, tài khoản ở từng trạng thái",
+      "expected": "Cùng một trạng thái có cùng chữ và kiểu hiển thị ở danh sách và chi tiết; trạng thái khác nhau có chữ khác nhau",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "USA04": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 169,
+      "id": "NFR_007",
+      "group": "Phi chức năng",
+      "requirement": "USA04",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Trạng thái có chữ mô tả, không chỉ phân biệt bằng màu",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "1. Mở danh sách bài tập (Nháp/Mở/Đã khóa) và danh sách tài khoản (Hoạt động/Bị khóa)\n2. Với mỗi badge trạng thái, đọc nội dung chữ bên trong\n3. Bật bộ lọc thang xám (grayscale) của DevTools và kiểm tra vẫn phân biệt được",
+      "testData": "Danh sách bài tập và tài khoản",
+      "expected": "Mọi badge trạng thái đều có chữ mô tả; ở chế độ thang xám vẫn phân biệt được các trạng thái",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "USA04": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 170,
+      "id": "NFR_008",
+      "group": "Phi chức năng",
+      "requirement": "USA05",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Hiển thị đúng trên Chrome & Edge, zoom 100%",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Chạy bộ test trên Chrome và Edge 1920x1080 và 1366x768",
+      "testData": "-",
+      "expected": "Không che trường/nút; bảng rộng cuộn ngang được",
+      "priority": "Trung bình",
+      "sourceReferences": {
+        "USA05": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      }
+    },
+    {
+      "row": 171,
+      "id": "NFR_009",
+      "group": "Phi chức năng",
+      "requirement": "USA06",
+      "technique": "Kiểm thử phi chức năng",
+      "title": "Danh sách rỗng có thông báo + xóa điều kiện lọc",
+      "precondition": "Đăng nhập Quản lý",
+      "steps": "Tìm rỗng trên tài khoản/lớp/bài; xóa từ khóa bằng bàn phím; kiểm danh sách được khôi phục.",
+      "testData": "zzzz",
+      "expected": "Danh sách rỗng có giải thích; người dùng xóa được điều kiện để khôi phục danh sách.",
+      "priority": "Cao",
+      "sourceReferences": {
+        "USA06": {
+          "pdfPages": [
+            114,
+            115
+          ],
+          "section": "4.1 Usability"
+        }
+      },
+      "originalExpected": "Hiển thị thông báo rỗng; Xóa bộ lọc khôi phục danh sách",
+      "originalSteps": "Tìm kiếm rỗng ở TK, lớp, bài tập",
+      "requirementClarification": "USA06 không quy định bắt buộc nút nguyên văn Xóa bộ lọc.",
+      "reviewCorrection": {
+        "date": "2026-11-16",
+        "review": "R5",
+        "basis": "PDF Group-04 + đặc tả đã chốt.md + kiểm chứng R4; giữ nguyên ID và workbook gốc",
+        "note": "USA06 không quy định bắt buộc nút nguyên văn Xóa bộ lọc."
+      }
+    }
+  ],
+  "scopeNote": "USA01-06 covered by UI cases. MAI01-06 require source/CI/coverage evidence and cannot be inferred from Selenium pass rate."
+}

@@ -1,0 +1,5 @@
+{
+  "name": "overleaf-integration",
+  "description": "Overleaf LaTeX MCP integration for reading, compiling, and managing project reports",
+  "version": "1.0.0"
+}

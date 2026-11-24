@@ -8,3 +8,5 @@ export * from './assignment.service';
 export * from './submission.service';
 export * from './student-evaluation.service';
 export * from './report.service';
+export * from './module.service';
+export * from './question.service';

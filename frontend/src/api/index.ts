@@ -1,5 +1,6 @@
 // API Core exports
 export { apiClient, httpClient, createApiClient, AxiosHttpClientAdapter } from './core/client';
+export { apiCache, ApiCache } from './core/cache';
 export { BaseApiService } from './core/base-api.service';
 export { tokenStorage, LocalStorageTokenStorage, MemoryTokenStorage } from './core/token-storage';
 export {
@@ -11,6 +12,8 @@ export {
   ConflictError,
   NetworkError,
   TimeoutError,
+  RequestCanceledError,
+  isRequestCanceled,
   parseApiError,
 } from './core/errors';
 export { TokenRefreshManager, AUTH_EVENTS } from './core/interceptors';

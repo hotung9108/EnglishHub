@@ -1,0 +1,21 @@
+[Unit]
+Description=EnglishHub - kiem tra & deploy backend/ai-service khi khoi dong server
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# User/duong dan phai khop SERVER_USER va noi dat script trong startup-deploy.sh
+User=pmtuan
+ExecStart=/home/pmtuan/scripts/startup-deploy.sh
+# Khong gioi han thoi gian chay: 1 lan boot co the phai cho healthcheck + rollback
+# (HEALTH_CHECK_TIMEOUT x so service), 600s mac dinh se bi systemd kill giua chung.
+TimeoutStartSec=infinity
+# Loi ghi log cho systemd (script da tu ghi log rieng ra LOG_FILE)
+StandardOutput=journal
+StandardError=journal
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

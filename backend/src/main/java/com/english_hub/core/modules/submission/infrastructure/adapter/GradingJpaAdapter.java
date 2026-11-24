@@ -32,7 +32,14 @@ public class GradingJpaAdapter implements GradingRepository {
 		List<com.english_hub.core.infrastructure.persistence.entity.Grading> entities =
 				drafts.stream()
 						.map(draft -> mapper.toEntity(new Grading(
-								draft.submissionModuleId(), draft.method(), GradingStatus.PENDING, null, null, null, null)))
+								draft.submissionModuleId(),
+								draft.method(),
+								GradingStatus.PENDING,
+								null,
+								draft.maxScoreSnapshot(),
+								null,
+								null,
+								draft.aiInstructionSnapshot())))
 						.toList();
 		return jpaRepository.saveAllAndFlush(entities).stream().map(mapper::toDomain).toList();
 	}

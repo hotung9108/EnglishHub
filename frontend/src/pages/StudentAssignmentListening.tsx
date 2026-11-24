@@ -1,412 +1,1041 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ArrowLeft, ChevronRight, Search, Bell, Headphones, 
-  Timer, Pause, Save, Send, Bookmark, ChevronLeft,
-  Play, Volume2, SkipBack, SkipForward
+  ArrowLeft, ChevronRight, Headphones, 
+  Bookmark, ChevronLeft,
+  Play, Pause, Volume2, SkipBack, SkipForward,
+  AlertCircle, RefreshCw, AlertTriangle
 } from 'lucide-react';
+import { parseApiError } from '../api';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
+import { questionService } from '../api/services/question.service';
+import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
+import { Button } from '../components/common/Button';
+import { Skeleton } from '../components/common/Skeleton';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getSkillLabel,
+  getExamPageRedirectRoute,
+  resolveEffectiveModules
+} from '../utils/examStepper.utils';
+import { useStudentQuizSubmit, QUIZ_SUBMIT_ERROR } from '../hooks/useStudentQuizSubmit';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
+import {
+  validateStudentQuizQuestions, buildStudentQuizPayload, isStudentQuizBlank,
+  classifyStudentQuizProgress, isStudentQuizPendingFinalization, isStudentQuizSubmitScopeValid,
+  type StudentQuizAnswer, type StudentQuizAnswers, type StudentQuizSubmitScope,
+} from '../utils/studentQuiz.utils';
+import '../styles/student-exam.css';
+
+const NAVIGATION_DELAY_MS = 1200;
+const PENDING_MESSAGE = 'Đáp án của bạn đã được lưu, nhưng hệ thống chưa xác nhận hoàn tất bài thi. Vui lòng thử nộp lại.';
+const UNCONFIRMED_MESSAGE = 'Chưa thể xác nhận trạng thái nộp bài. Vui lòng tải lại trang để kiểm tra trước khi thử lại.';
+const AUDIO_NOT_FOUND_MESSAGE = 'Bài nghe chưa có tệp audio.';
+const AUDIO_LOAD_ERROR_MESSAGE = 'Không tải được audio đề bài. Vui lòng thử lại.';
+const AUDIO_PLAY_ERROR_MESSAGE = 'Phát audio thất bại. Vui lòng bấm phát lại.';
+const AUDIO_MEDIA_ERROR_MESSAGE = 'Không thể phát audio đề bài. Vui lòng thử lại.';
+
+interface ListeningAudioState {
+  moduleId: number | null;
+  url: string | null;
+  isAudioLoading: boolean;
+  audioError: string | null;
+  audioErrorCanRetry: boolean;
+  playError: string | null;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+}
+
+function createListeningAudioState(moduleId: number | null, isAudioLoading = false): ListeningAudioState {
+  return {
+    moduleId,
+    url: null,
+    isAudioLoading,
+    audioError: null,
+    audioErrorCanRetry: false,
+    playError: null,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+  };
+}
+
+// An unavailable scope disables submission; these values are never sent to the API.
+const UNAVAILABLE_SCOPE: StudentQuizSubmitScope = {
+  assignmentId: 0, submissionId: 0, moduleId: 0, submissionModuleId: 0, expectedModuleIds: [],
+};
+
+function formatAudioTime(seconds: number): string {
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function createSubmitScope(assignment: AssignmentDetail, submission: SubmissionDetail, moduleId: number, submissionId: number): StudentQuizSubmitScope {
+  if (!Array.isArray(assignment.modules) || !Array.isArray(submission?.modules)) return UNAVAILABLE_SCOPE;
+  const currentModules = submission.modules.filter(module => module?.moduleId === moduleId && module.skill === 'LISTENING');
+  if (currentModules.length !== 1) return UNAVAILABLE_SCOPE;
+  const scope = { assignmentId: assignment.id, submissionId, moduleId,
+    submissionModuleId: currentModules[0].id, expectedModuleIds: assignment.modules.map(module => module?.id) };
+  return isStudentQuizSubmitScopeValid(scope) ? scope : UNAVAILABLE_SCOPE;
+}
 
 const StudentAssignmentListening: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // The id can be used to fetch assignment details. Console log to avoid unused variable warning.
-  console.log('Assignment ID:', id);
-  
-  // Mock State
+  const { user } = useAuth();
+  const { warning: toastWarning, error: toastError } = useToast();
+  const isReviewMode = searchParams.get('mode') === 'review';
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const viewKey = `${id}:${searchParams.toString()}:${reloadKey}`;
+  const [pageError, setPageError] = useState<{ key: string; message: string | null }>({ key: viewKey, message: null });
+  const error = pageError.key === viewKey ? pageError.message : null;
+  const setError = useCallback((message: string | null) => setPageError({ key: viewKey, message }), [viewKey]);
+  const [loadedScope, setLoadedScope] = useState({ key: '', scope: UNAVAILABLE_SCOPE });
+  const submitScope = loadedScope.key === viewKey ? loadedScope.scope : UNAVAILABLE_SCOPE;
+  const scopeReady = isStudentQuizSubmitScopeValid(submitScope);
+  const quizSubmit = useStudentQuizSubmit(submitScope, { isReviewMode });
+  const submitState = quizSubmit.state;
+  const isSubmitting = submitState.kind === 'submitting';
+  const viewGeneration = useRef(0);
+  useLayoutEffect(() => {
+    viewGeneration.current += 1;
+    return () => { viewGeneration.current += 1; };
+  }, [viewKey, submitScope]);
+
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [audioModuleId, setAudioModuleId] = useState<number | null>(null);
+  const [questions, setQuestions] = useState<unknown>([]);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useLayoutEffect(() => () => {
+    audioRef.current?.pause();
+  }, []);
+  const audioRequestId = useRef(0);
+  const audioRefetchUsed = useRef(false);
+  const pendingAudioTime = useRef<number | null>(null);
+  const [audioState, setAudioState] = useState(() => createListeningAudioState(null));
+  const activeAudioState = audioState.moduleId === audioModuleId
+    ? audioState
+    : createListeningAudioState(audioModuleId, audioModuleId !== null);
+  const {
+    url: audioUrl,
+    isAudioLoading,
+    audioError,
+    audioErrorCanRetry,
+    playError,
+    isPlaying,
+    currentTime: audioCurrentTime,
+    duration: audioDuration,
+  } = activeAudioState;
   const [activeQuestion, setActiveQuestion] = useState(1);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<StudentQuizAnswers>({});
+  const answerScope = useRef<{ assignmentId: number | null; submissionId: number | null; moduleId: number | null }>({
+    assignmentId: null, submissionId: null, moduleId: null,
+  });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
+  const [showUnansweredConfirm, setShowUnansweredConfirm] = useState<boolean>(false);
 
-  const totalQuestions = 10;
-  const answeredCount = Object.keys(selectedAnswers).length;
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+  }, [id]);
 
-  const handleSelectAnswer = (qId: number, answer: string) => {
-    setSelectedAnswers(prev => ({ ...prev, [qId]: answer }));
+  const handleRetry = () => setReloadKey((k) => k + 1);
+
+  const updateAudioState = useCallback((currentModuleId: number | null, updates: Partial<ListeningAudioState>) => {
+    setAudioState((current) => {
+      const base = current.moduleId === currentModuleId
+        ? current
+        : createListeningAudioState(currentModuleId, true);
+      return { ...base, ...updates, moduleId: currentModuleId };
+    });
+  }, []);
+
+  const loadAudioUrl = useCallback(async (currentModuleId: number, requestId: number) => {
+    try {
+      const response = await moduleService.getAudioDownloadUrl(currentModuleId);
+      if (requestId !== audioRequestId.current) return;
+      if (!response.downloadUrl) {
+        updateAudioState(currentModuleId, {
+          url: null,
+          audioError: AUDIO_LOAD_ERROR_MESSAGE,
+          audioErrorCanRetry: true,
+          isAudioLoading: false,
+        });
+        return;
+      }
+      updateAudioState(currentModuleId, {
+        url: response.downloadUrl,
+        audioError: null,
+        audioErrorCanRetry: false,
+        playError: null,
+      });
+    } catch (err: unknown) {
+      if (requestId !== audioRequestId.current) return;
+      const apiError = parseApiError(err);
+      updateAudioState(currentModuleId, {
+        url: null,
+        audioError: apiError.statusCode === 404 ? AUDIO_NOT_FOUND_MESSAGE : AUDIO_LOAD_ERROR_MESSAGE,
+        audioErrorCanRetry: apiError.statusCode !== 404,
+        isAudioLoading: false,
+      });
+    }
+  }, [updateAudioState]);
+
+  useEffect(() => {
+    const requestId = ++audioRequestId.current;
+    audioRefetchUsed.current = false;
+    pendingAudioTime.current = null;
+    const audio = audioRef.current;
+    audio?.pause();
+
+    if (audioModuleId) {
+      void loadAudioUrl(audioModuleId, requestId);
+    }
+
+    return () => {
+      if (audioRequestId.current === requestId) audioRequestId.current += 1;
+      audio?.pause();
+    };
+  }, [audioModuleId, loadAudioUrl]);
+
+  useEffect(() => {
+    if (audioUrl) audioRef.current?.load();
+  }, [audioUrl]);
+
+  const handleAudioRetry = () => {
+    if (!audioModuleId) return;
+    audioRefetchUsed.current = false;
+    pendingAudioTime.current = null;
+    audioRef.current?.pause();
+    setAudioState(createListeningAudioState(audioModuleId, true));
+    void loadAudioUrl(audioModuleId, ++audioRequestId.current);
+  };
+
+  const handleAudioPlay = async () => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl || isAudioLoading) return;
+    updateAudioState(audioModuleId, { playError: null });
+    try {
+      await audio.play();
+      updateAudioState(audioModuleId, { isPlaying: true });
+    } catch {
+      updateAudioState(audioModuleId, { isPlaying: false, playError: AUDIO_PLAY_ERROR_MESSAGE });
+    }
+  };
+
+  const handleAudioError = () => {
+    if (!audioModuleId || (isAudioLoading && !audioUrl)) return;
+    const audio = audioRef.current;
+    if (audio && Number.isFinite(audio.currentTime)) {
+      pendingAudioTime.current = audio.currentTime;
+    }
+    audio?.pause();
+    updateAudioState(audioModuleId, {
+      url: null,
+      isPlaying: false,
+      isAudioLoading: true,
+      playError: null,
+    });
+
+    if (audioRefetchUsed.current) {
+      pendingAudioTime.current = null;
+      updateAudioState(audioModuleId, {
+        audioError: AUDIO_MEDIA_ERROR_MESSAGE,
+        audioErrorCanRetry: true,
+        isAudioLoading: false,
+      });
+      return;
+    }
+
+    audioRefetchUsed.current = true;
+    void loadAudioUrl(audioModuleId, ++audioRequestId.current);
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const duration = audio.duration;
+    if (!Number.isFinite(duration) || duration <= 0) {
+      updateAudioState(audioModuleId, { duration: 0, currentTime: 0, isAudioLoading: false });
+      pendingAudioTime.current = null;
+      return;
+    }
+
+    if (pendingAudioTime.current !== null) {
+      const restoredTime = Math.min(Math.max(pendingAudioTime.current, 0), duration);
+      audio.currentTime = restoredTime;
+      updateAudioState(audioModuleId, { duration, currentTime: restoredTime, isAudioLoading: false });
+      pendingAudioTime.current = null;
+    } else {
+      updateAudioState(audioModuleId, {
+        duration,
+        currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        isAudioLoading: false,
+      });
+    }
+  };
+
+  const handleAudioTimeUpdate = () => {
+    const currentTime = audioRef.current?.currentTime ?? 0;
+    updateAudioState(audioModuleId, { currentTime: Number.isFinite(currentTime) ? currentTime : 0 });
+  };
+
+  const handleAudioSeek = (value: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audioDuration) || audioDuration <= 0) return;
+    const nextTime = Math.min(Math.max(value, 0), audioDuration);
+    audio.currentTime = nextTime;
+    updateAudioState(audioModuleId, { currentTime: nextTime });
+  };
+
+  const canSeekAudio = Boolean(audioUrl) && !isAudioLoading && Number.isFinite(audioDuration) && audioDuration > 0;
+  const audioProgress = canSeekAudio ? Math.min((audioCurrentTime / audioDuration) * 100, 100) : 0;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const applySubmission = (sub: SubmissionDetail, currentAssignment: AssignmentDetail, moduleId: number, expectedSubmissionId: number) => {
+      if (!isMounted) return;
+      const scope = createSubmitScope(currentAssignment, sub, moduleId, expectedSubmissionId);
+      const progress = classifyStudentQuizProgress(sub, scope);
+      if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
+      if (!isStudentQuizPendingFinalization(sub, scope)) {
+        const redirectRoute = getExamPageRedirectRoute(sub, 'LISTENING', numericId, currentAssignment.modules, moduleId, isReviewMode);
+        if (redirectRoute) {
+          navigate(redirectRoute, { replace: true });
+          return;
+        }
+      }
+      if (answerScope.current.submissionId !== sub.id) {
+        answerScope.current.submissionId = sub.id;
+        let savedAnswers: StudentQuizAnswers = {};
+        if (isReviewMode) {
+          try {
+            const raw = localStorage.getItem(`eh_draft_quiz_${numericId}_${moduleId}`)
+              || localStorage.getItem(`eh_draft_quiz_${numericId}_${sub.id}_${moduleId}`);
+            if (raw) savedAnswers = JSON.parse(raw);
+          } catch { /* ignore */ }
+        }
+        setSelectedAnswers(savedAnswers);
+        setActiveQuestion(1);
+      }
+      setSubmission(sub);
+      setLoadedScope({ key: viewKey, scope });
+    };
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      setAudioModuleId(null);
+      setAudioState(createListeningAudioState(null));
+      setLoadedScope({ key: viewKey, scope: UNAVAILABLE_SCOPE });
+      setSubmission(null);
+      const requestedId = searchParams.get('submissionId');
+      const requestedSubmissionId = requestedId && Number.isFinite(Number(requestedId)) ? Number(requestedId) : null;
+      const scope = answerScope.current;
+      if (scope.assignmentId !== numericId || (requestedSubmissionId !== null && scope.submissionId !== requestedSubmissionId)) {
+        answerScope.current = { assignmentId: numericId, submissionId: requestedSubmissionId, moduleId: null };
+        setSelectedAnswers({});
+        setActiveQuestion(1);
+      }
+      try {
+        if (requestedId !== null && (!Number.isSafeInteger(Number(requestedId)) || Number(requestedId) <= 0)) throw new Error(UNCONFIRMED_MESSAGE);
+        if (!numericId) throw new Error('Không tìm thấy bài tập hợp lệ.');
+        const currentAssignment = await assignmentService.getAssignment(numericId);
+        if (!isMounted) return;
+        if (currentAssignment?.id !== numericId || !Array.isArray(currentAssignment.modules)) throw new Error(UNCONFIRMED_MESSAGE);
+        if (!currentAssignment.modules.every(module => Number.isSafeInteger(module?.id) && module.id > 0 && typeof module.skill === 'string')) throw new Error(UNCONFIRMED_MESSAGE);
+        setAssignment(currentAssignment);
+        const skillModules = currentAssignment.modules.filter(module => module?.skill === 'LISTENING');
+        if (skillModules.length === 0) throw new Error(UNCONFIRMED_MESSAGE);
+        const queryModParam = searchParams.get('moduleId');
+        const matchedQueryMod = queryModParam && Number.isSafeInteger(Number(queryModParam))
+          ? skillModules.find(m => m.id === Number(queryModParam))
+          : null;
+        const targetModule = matchedQueryMod || skillModules[0];
+        const moduleId = targetModule.id;
+        if (!Number.isSafeInteger(moduleId) || moduleId <= 0) throw new Error(UNCONFIRMED_MESSAGE);
+
+        if (!isMounted) return;
+        setAudioModuleId(moduleId);
+        setAudioState(createListeningAudioState(moduleId, true));
+        if (answerScope.current.moduleId !== (moduleId ?? null)) {
+          answerScope.current.moduleId = moduleId ?? null;
+          let savedAnswers: StudentQuizAnswers = {};
+          if (isReviewMode && moduleId) {
+            try {
+              const raw = localStorage.getItem(`eh_draft_quiz_${numericId}_${moduleId}`)
+                || (requestedSubmissionId ? localStorage.getItem(`eh_draft_quiz_${numericId}_${requestedSubmissionId}_${moduleId}`) : null);
+              if (raw) savedAnswers = JSON.parse(raw);
+            } catch { /* ignore */ }
+          }
+          setSelectedAnswers(savedAnswers);
+          setActiveQuestion(1);
+        }
+
+        if (moduleId) {
+          const [modRes, qRes] = await Promise.allSettled([
+            moduleService.getModule(moduleId),
+            questionService.listQuestions(moduleId)
+          ]);
+          if (!isMounted) return;
+
+          if (modRes.status === 'fulfilled') {
+            setModuleDetail(modRes.value);
+          }
+          if (qRes.status === 'fulfilled') {
+            const qList = qRes.value.questions ?? qRes.value.data;
+            setQuestions(() => qList);
+          } else {
+            setQuestions([]);
+          }
+        } else {
+          if (isMounted) setQuestions([]);
+        }
+
+        if (!isMounted) return;
+        // Resolve or start submission attempt
+        const urlSubmissionId = searchParams.get('submissionId');
+        if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+          try {
+            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+            if (!isMounted) return;
+            applySubmission(sub, currentAssignment, moduleId, Number(urlSubmissionId));
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+            }
+          }
+        } else if (user?.id) {
+          try {
+            const subList = await submissionService.listSubmissions({
+              assignmentId: numericId,
+              studentId: user.id,
+              limit: 10
+            });
+            const subs = subList.data || [];
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              applySubmission(sub, currentAssignment, moduleId, inProgressItem.id);
+            } else {
+              const completedItem = subs.find(
+                (s) => s.status === 'GRADED' || s.status === 'SUBMITTED'
+              );
+              if (completedItem) {
+                const sub = await submissionService.getSubmission(completedItem.id);
+                applySubmission(sub, currentAssignment, moduleId, completedItem.id);
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                if (!isMounted) return;
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (!isMounted) return;
+                applySubmission(sub, currentAssignment, moduleId, startRes.id);
+              } else if (currentAssignment?.status === 'CLOSED') {
+                if (isMounted) {
+                  setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+                }
+              }
+            }
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải đề bài nghe.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, searchParams, user?.id, viewKey, navigate, setError, isReviewMode]);
+
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
+  const questionValidation = useMemo(() => validateStudentQuizQuestions(questions), [questions]);
+  const quizPayload = useMemo(() => buildStudentQuizPayload(questions, selectedAnswers), [questions, selectedAnswers]);
+  const validatedQuestions = questionValidation.questions;
+  const totalQuestions = validatedQuestions.length;
+  const validQuestionCount = validatedQuestions.filter(result => result.question !== null).length;
+  const invalidQuestionNumbers = validatedQuestions.filter(result => result.reason !== null).map(result => result.index + 1);
+  const answeredCount = quizPayload.answers.length;
+  const answeredQuestionIds = new Set(quizPayload.answers.map(answer => answer.questionId));
+  let questionDataError: string | null = null;
+  if (!questionValidation.isValid) {
+    questionDataError = invalidQuestionNumbers.length > 0
+      ? `Đề bài có dữ liệu lỗi ở câu ${invalidQuestionNumbers.join(', ')}. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.`
+      : 'Đề bài không có danh sách câu hỏi hợp lệ. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.';
+  }
+  const recoveryPending = !isReviewMode && scopeReady && isStudentQuizPendingFinalization(submission, submitScope);
+  const finalRejected = submitState.kind === 'failed' && submitState.reason === QUIZ_SUBMIT_ERROR.FINAL_REJECTED;
+  const showFinalRetry = submitState.kind === 'pendingFinalization' || finalRejected
+    || (submitState.kind === 'idle' && recoveryPending);
+  const canSubmitModule = scopeReady && !isLoading && !recoveryPending
+    && (submitState.kind === 'idle' || (submitState.kind === 'failed' && submitState.reason === QUIZ_SUBMIT_ERROR.MODULE_REJECTED));
+  let submitError: string | null = null;
+  if (submitState.kind === 'unconfirmed') submitError = UNCONFIRMED_MESSAGE;
+  if (submitState.kind === 'failed') {
+    submitError = submitState.reason === QUIZ_SUBMIT_ERROR.MODULES_INCOMPLETE
+      ? 'Tiến độ bài thi đã thay đổi. Vui lòng tải lại trang để kiểm tra các phần chưa hoàn tất.'
+      : parseApiError(submitState.cause).message || 'Không thể nộp bài. Vui lòng thử lại.';
+  }
+  const displayError = error || submitError || (!isLoading && canSubmitModule ? questionDataError : null);
+  const successMessage = submitState.kind === 'completed'
+    ? (isReviewMode
+        ? 'Cập nhật phần thi Listening thành công! Đang chuyển đến màn hình xem lại bài làm...'
+        : 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...')
+    : submitState.kind === 'nextSkill'
+      ? `Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${getSkillLabel(submitState.nextModule.skill)}...` : null;
+
+  useEffect(() => {
+    if (!scopeReady || (submitState.kind !== 'completed' && submitState.kind !== 'nextSkill')) return;
+    const generation = viewGeneration.current;
+    const destination = isReviewMode
+      ? `/student/assignments/${submitScope.assignmentId}/overview`
+      : (submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
+          : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id));
+    if (submitState.kind === 'completed' && !isReviewMode) notifyAssignmentSubmitted();
+    const timer = setTimeout(() => {
+      if (viewGeneration.current === generation) navigate(destination, { replace: true });
+    }, NAVIGATION_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [scopeReady, submitState, submitScope, viewKey, navigate, isReviewMode]);
+
+  const handleSelectAnswer = (questionId: number, answer: StudentQuizAnswer) => {
+    if (canSubmitModule) {
+      setSelectedAnswers(prev => {
+        const next = { ...prev, [questionId]: answer };
+        if (import.meta.env?.MODE !== 'test' && numericId && submitScope?.moduleId) {
+          try {
+            localStorage.setItem(`eh_draft_quiz_${numericId}_${submitScope.moduleId}`, JSON.stringify(next));
+          } catch { /* ignore */ }
+        }
+        return next;
+      });
+    }
   };
 
   const toggleBookmark = (qId: number) => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const unansweredCount = validQuestionCount - answeredCount;
+
+  const handleSubmit = () => {
+    if (assignment?.status === 'CLOSED') {
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
+    if (!canSubmitModule) return;
+    if (!quizPayload.validation.isValid) {
+      setError(questionDataError);
+      return;
+    }
+    if (isStudentQuizBlank(questions, selectedAnswers)) {
+      toastWarning('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
+      return;
+    }
+    if (unansweredCount > 0) {
+      setShowUnansweredConfirm(true);
+      return;
+    }
+    setError(null);
+    void quizSubmit.submit(quizPayload.answers);
+  };
+
+  const handleConfirmSubmitUnanswered = () => {
+    setShowUnansweredConfirm(false);
+    setError(null);
+    void quizSubmit.submit(quizPayload.answers);
+  };
+
+  const handleRetryFinal = () => {
+    if (!scopeReady || isLoading || assignment?.status === 'CLOSED') return;
+    setError(null);
+    void quizSubmit.retryFinal();
+  };
+
+  const currentQuestionResult = validatedQuestions[activeQuestion - 1] || validatedQuestions[0];
+  const currentQuestionItem = currentQuestionResult?.question;
+
   return (
-    <div style={{ 
-      margin: 'calc(var(--margin-desktop, 40px) * -1)',
-      display: 'flex', 
-      flexDirection: 'column', 
-      backgroundColor: '#F8FAFC'
-    }}>
-      
-      {/* Page Header (replaces standard header) */}
-      <div style={{ padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <button 
-            onClick={() => navigate('/student/assignments')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}
+    <div className="exam-page">
+      {/* Page Header */}
+      <div className="exam-header">
+        <div className="exam-header-left">
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={ArrowLeft}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
           >
-            <ArrowLeft size={16} /> Quay lại danh sách bài tập
-          </button>
+            Tổng quan bài thi
+          </Button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B' }}>
-            <span>Hệ thống</span> <ChevronRight size={14} />
-            <span>Lớp học của tôi</span> <ChevronRight size={14} />
-            <span>ENG-IELTS-6.5A</span> <ChevronRight size={14} />
-            <span style={{ color: '#2563EB', fontWeight: 500 }}>Listening 01</span>
+          <div className="exam-breadcrumbs">
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/dashboard')}>
+              Trang chủ
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/assignments')}>
+              Danh sách bài tập
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-title">
+              {assignment?.title || `Listening #${id}`}
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-skill-badge exam-skill-badge-listening">
+              Kỹ năng Nghe
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input type="text" placeholder="Tìm kiếm tài liệu..." style={{ padding: '8px 16px 8px 36px', borderRadius: '20px', border: '1px solid #E2E8F0', fontSize: '14px', width: '240px', outline: 'none' }} />
+        {effectiveModules.length > 1 && (
+          <div className="exam-header-right">
+            <ExamStepper
+              variant="compact"
+              modules={effectiveModules}
+              submissionModules={submission?.modules}
+              currentSkill="LISTENING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isAccessible && step.status !== 'ACTIVE') {
+                  const baseRoute = getSkillRoute(skill, numericId, submission?.id, step.module.id);
+                  const targetUrl = step.isCompleted ? `${baseRoute}&mode=review` : baseRoute;
+                  navigate(targetUrl);
+                }
+              }}
+            />
           </div>
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <Bell size={20} color="#64748B" />
-            <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', backgroundColor: '#EF4444', borderRadius: '50%' }}></div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', backgroundColor: '#4F46E5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>AJ</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>Alice Johnson</span>
-              <span style={{ fontSize: '12px', color: '#64748B' }}>Học viên IELTS 6.5A</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Assignment Header - Title only (scrolls away) */}
-      <div style={{ padding: '24px 24px 16px 24px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <span style={{ padding: '4px 12px', backgroundColor: '#3B82F6', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '4px', textTransform: 'uppercase' }}>Listening 01</span>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase' }}>CAMBRIDGE IELTS 15 - TEST 1</h1>
+      {displayError && (
+        <div className="exam-alert-error" role="alert">
+          <div className="exam-alert-msg">
+            <AlertCircle size={20} />
+            <span>{displayError}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#64748B' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Headphones size={16} /> IELTS Academic Listening Part 1</span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Tổng số: <strong style={{ color: '#1E293B' }}>10 câu</strong></span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Mã đề: LS-CAM15-01</span>
-          </div>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={RefreshCw}
+            onClick={handleRetry}
+          >
+            Thử lại
+          </Button>
         </div>
-      </div>
+      )}
 
-      {/* Sticky Action Bar */}
-      <div style={{ position: 'sticky', top: '64px', zIndex: 50, padding: '10px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px', color: '#D97706' }}>
-            <Timer size={16} />
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700 }}>TIME LEFT</span>
-              <span style={{ fontSize: '16px', fontWeight: 800, lineHeight: '1' }}>58:24</span>
-            </div>
+      {showFinalRetry && (
+        <div className="exam-alert-error" role="alert">
+          <div className="exam-alert-msg">
+            <AlertCircle size={20} />
+            <span>{PENDING_MESSAGE}</span>
           </div>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Pause size={14} /> Tạm dừng
-          </button>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Save size={14} /> Lưu nháp
-          </button>
-          <button className="btn btn-primary" style={{ backgroundColor: '#3B82F6', border: 'none', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Send size={14} /> Nộp bài thi
-          </button>
+          <Button variant="danger" size="sm" icon={RefreshCw} onClick={handleRetryFinal}
+            disabled={isSubmitting || isLoading || assignment?.status === 'CLOSED'}>
+            Thử nộp lại bài
+          </Button>
         </div>
-      </div>
+      )}
 
-      {/* Split View Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', flex: 1 }}>
-        
-        {/* Left Column: Audio & Context */}
-        <div style={{ borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
-          
-          {/* Custom Audio Player UI */}
-          <div style={{ padding: '24px 32px', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer', boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)' }}>
-                  <Play size={24} fill="currentColor" style={{ marginLeft: '4px' }} />
-                </div>
-                <div>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Audio Track 01</h3>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>Part 1: Bank Account Opening</p>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                  <SkipBack size={18} cursor="pointer" />
-                  <SkipForward size={18} cursor="pointer" />
-                </div>
-                <div style={{ width: '1px', height: '24px', backgroundColor: '#CBD5E1' }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                  <Volume2 size={18} />
-                  <div style={{ width: '80px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', position: 'relative', cursor: 'pointer' }}>
-                    <div style={{ width: '60%', height: '100%', backgroundColor: '#3B82F6', borderRadius: '2px' }}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Audio Progress Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>02:14</span>
-              <div style={{ flex: 1, height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', position: 'relative', cursor: 'pointer' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '35%', height: '100%', backgroundColor: '#3B82F6', borderRadius: '3px' }}></div>
-                <div style={{ position: 'absolute', top: '50%', left: '35%', transform: 'translate(-50%, -50%)', width: '12px', height: '12px', backgroundColor: '#3B82F6', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></div>
-              </div>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>06:45</span>
-            </div>
-          </div>
-
-          <div style={{ padding: '32px 48px', flex: 1 }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <div style={{ padding: '24px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', marginBottom: '32px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#B45309', fontWeight: 700 }}>Instructions:</h4>
-                <ul style={{ margin: 0, paddingLeft: '20px', color: '#92400E', fontSize: '15px', lineHeight: '1.6' }}>
-                  <li>You will hear a conversation between a bank clerk and a customer.</li>
-                  <li>Write <strong>NO MORE THAN TWO WORDS AND/OR A NUMBER</strong> for each answer.</li>
-                  <li>Listen carefully, the recording will be played <strong>ONLY ONCE</strong>.</li>
-                </ul>
-              </div>
-
-              {/* Visual Context (Diagram / Note completion preview) */}
-              <div style={{ padding: '32px', backgroundColor: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ textAlign: 'center', fontSize: '20px', fontWeight: 700, color: '#1E293B', marginBottom: '24px', textTransform: 'uppercase' }}>Bank Account Application</h2>
-                
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '16px' }}>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569', width: '40%' }}>Account Type:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>Select <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>1</span> account</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>First Name:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>Pieter</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Surname:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}><span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>2</span></td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Date of Birth:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>27th <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>3</span> 1991</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Current Address:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>14 <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>4</span> Street, Exeter</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-          </div>
+      {successMessage && (
+        <div className="exam-alert-success">
+          <AlertCircle size={20} />
+          <span>{successMessage}</span>
         </div>
+      )}
 
-        {/* Right Column: Questions (Sticky) */}
-        <div style={{ position: 'sticky', top: '128px', height: 'calc(100vh - 128px)', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
-          
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', backgroundColor: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      {/* Main 2-Column Split Workspace */}
+      <div className="exam-workspace-grid">
+        {/* Left Column: Audio Player & Instructions */}
+        <div className="exam-pane-left">
+          <div className="exam-audio-header-wrap">
+            <div className="exam-audio-title-row">
+              <div className="exam-audio-icon-box">
+                <Headphones size={22} />
+              </div>
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>Danh sách câu hỏi (Questions 1 - 10)</h2>
-                <span style={{ fontSize: '13px', color: '#64748B' }}>Chọn một đáp án đúng nhất cho mỗi câu hỏi</span>
+                <h3 className="exam-audio-title">
+                  {moduleDetail?.instructions || assignment?.title || 'Phần thi Nghe'}
+                </h3>
+                <span className="exam-audio-subtitle">Audio Track • Tiếng Anh chuẩn học thuật</span>
               </div>
-              <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
-                {answeredCount} / {totalQuestions} đã làm
+            </div>
+
+            {/* Audio Controls */}
+            <div className="exam-audio-player-box">
+              <audio
+                ref={audioRef}
+                src={audioUrl ?? undefined}
+                preload="metadata"
+                aria-label="Audio đề bài Listening"
+                onPlay={() => {
+                  updateAudioState(audioModuleId, { isPlaying: true, playError: null });
+                }}
+                onPause={() => updateAudioState(audioModuleId, { isPlaying: false })}
+                onTimeUpdate={handleAudioTimeUpdate}
+                onLoadedMetadata={handleAudioMetadata}
+                onEnded={() => {
+                  updateAudioState(audioModuleId, { isPlaying: false, currentTime: audioDuration });
+                }}
+                onError={handleAudioError}
+              />
+              <div className="exam-audio-controls-row">
+                <div className="exam-audio-btn-group">
+                  <button 
+                    type="button"
+                    onClick={() => handleAudioSeek(audioCurrentTime - 10)}
+                    disabled={!canSeekAudio}
+                    className="exam-audio-skip-btn"
+                    aria-label="Tua lùi 10s"
+                  >
+                    <SkipBack size={18} />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (isPlaying) {
+                        audioRef.current?.pause();
+                        updateAudioState(audioModuleId, { isPlaying: false });
+                      } else {
+                        void handleAudioPlay();
+                      }
+                    }}
+                    disabled={!audioUrl || isAudioLoading}
+                    className="exam-audio-play-btn"
+                    aria-label={isPlaying ? 'Tạm dừng' : 'Phát âm thanh'}
+                  >
+                    {isPlaying ? <Pause size={20} /> : <Play size={20} className="exam-play-icon" />}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => handleAudioSeek(audioCurrentTime + 10)}
+                    disabled={!canSeekAudio}
+                    className="exam-audio-skip-btn"
+                    aria-label="Tua tới 10s"
+                  >
+                    <SkipForward size={18} />
+                  </button>
+                </div>
+
+                <div className="exam-audio-time-info">
+                  <Volume2 size={18} />
+                  <span role="status" aria-live="polite">
+                    {isAudioLoading
+                      ? 'Đang tải audio...'
+                      : `${formatAudioTime(audioDuration > 0 ? audioCurrentTime : 0)} / ${formatAudioTime(audioDuration)}`}
+                  </span>
+                </div>
               </div>
+
+              <div className="exam-audio-progress-bar">
+                <div 
+                  className="exam-audio-progress-fill" 
+                  style={{ width: `${audioProgress}%` }}
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={audioDuration > 0 ? audioDuration : 1}
+                  step={0.1}
+                  value={audioDuration > 0 ? Math.min(audioCurrentTime, audioDuration) : 0}
+                  disabled={!canSeekAudio}
+                  aria-label="Tiến trình audio"
+                  aria-valuetext={`${formatAudioTime(audioDuration > 0 ? audioCurrentTime : 0)} / ${formatAudioTime(audioDuration)}`}
+                  onChange={(event) => handleAudioSeek(Number(event.currentTarget.value))}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    margin: 0,
+                    opacity: 0.01,
+                    cursor: canSeekAudio ? 'pointer' : 'not-allowed',
+                  }}
+                />
+              </div>
+              {(audioError || playError) && (
+                <div className="exam-alert-error" role="alert">
+                  <span>{audioError || playError}</span>
+                  {audioError && audioErrorCanRetry && (
+                    <button
+                      type="button"
+                      className="exam-audio-skip-btn"
+                      onClick={handleAudioRetry}
+                      disabled={isAudioLoading}
+                    >
+                      Thử lại
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Instructions note */}
+          <div className="exam-instructions-body">
+            <h4 className="exam-instructions-heading">
+              Hướng dẫn:
+            </h4>
+            <p className="exam-instructions-text">
+              Nghe đoạn băng và chọn đáp án đúng nhất cho các câu hỏi bên phải. Bạn có thể điều khiển âm lượng và thanh phát ở trên.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Column: Questions */}
+        <div className="exam-pane-right">
+          <div className="exam-questions-header">
+            <div className="exam-questions-meta">
+              <div>
+                <h2 className="exam-questions-title">
+                  Danh sách câu hỏi {totalQuestions > 0 ? `(1 - ${totalQuestions})` : ''}
+                </h2>
+                <span className="exam-questions-hint">
+                  {totalQuestions > 0 ? 'Chọn đáp án đúng theo nội dung nghe' : 'Chưa có câu hỏi nào được gán'}
+                </span>
+              </div>
+              {totalQuestions > 0 && (
+                <div className="exam-progress-badge">
+                  {answeredCount} / {validQuestionCount} đã làm{invalidQuestionNumbers.length > 0 ? ' (câu hợp lệ)' : ''}
+                </div>
+              )}
             </div>
 
             {/* Question Navigator */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {Array.from({ length: 10 }).map((_, i) => {
-                const qId = i + 1;
-                const isAnswered = !!selectedAnswers[qId];
-                const isBookmarked = bookmarkedQuestions[qId];
-                const isActive = activeQuestion === qId;
-                
-                let bgColor = '#F1F5F9';
-                let textColor = '#475569';
+            {totalQuestions > 0 && (
+              <div className="exam-nav-grid">
+                {validatedQuestions.map((result, i) => {
+                  const qId = i + 1;
+                  const isAnswered = result.question !== null && answeredQuestionIds.has(result.question.id);
+                  const isBookmarked = bookmarkedQuestions[qId];
+                  const isActive = activeQuestion === qId;
+                  
+                  const btnClasses = [
+                    'exam-nav-btn',
+                    isActive ? 'is-active' : '',
+                    isBookmarked ? 'is-bookmarked' : '',
+                    !isActive && !isBookmarked && isAnswered ? 'is-answered' : ''
+                  ].filter(Boolean).join(' ');
 
-                if (isActive) {
-                  bgColor = '#2563EB';
-                  textColor = 'white';
-                } else if (isBookmarked) {
-                  bgColor = '#FEF08A';
-                  textColor = '#A16207';
-                } else if (isAnswered) {
-                  bgColor = '#DBEAFE';
-                  textColor = '#1D4ED8';
-                }
-
-                return (
-                  <button 
-                    key={qId}
-                    onClick={() => setActiveQuestion(qId)}
-                    style={{ 
-                      width: '40px', height: '40px', borderRadius: '6px', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '15px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                      backgroundColor: bgColor, color: textColor,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {qId}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-            
-            {/* Question Card 1 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 1</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph A)</span>
-                </div>
-                <button 
-                  onClick={() => toggleBookmark(1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[1] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[1] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
-              </div>
-
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                According to paragraph A, what role did the Letraset sheets play in the 1960s?
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is an example of the first popularized typographic specimen' },
-                  { id: 'B', text: 'Some classical Latin texts discovered in Virginia library' },
-                  { id: 'C', text: 'Examples of the answers derived from modern translations' },
-                  { id: 'D', text: 'Of the answers provided solely by Aldus PageMaker' }
-                ].map(opt => {
-                  const isSelected = selectedAnswers[1] === opt.id;
                   return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
+                    <button 
+                      key={qId}
+                      type="button"
+                      aria-label={result.reason ? `Câu ${qId}: dữ liệu lỗi` : undefined}
+                      onClick={() => setActiveQuestion(qId)}
+                      className={btnClasses}
                     >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q1" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(1, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
+                      {qId}
+                    </button>
                   );
                 })}
               </div>
-            </div>
-
-            {/* Question Card 2 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 2</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph B)</span>
-                </div>
-                <button 
-                  onClick={() => toggleBookmark(2)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[2] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[2] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
-              </div>
-
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                Why do desktop publishing packages and layout designers actively utilize Lorem Ipsum?
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is used to maintain a realistic distribution of letters without distraction' },
-                  { id: 'B', text: 'It contains readable English translations from Cicero' },
-                ].map(opt => {
-                  const isSelected = selectedAnswers[2] === opt.id;
-                  return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q2" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(2, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
+            )}
           </div>
 
-          {/* Right Column Footer (Sticky) */}
-          <div style={{ padding: '16px 24px', backgroundColor: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
+          <div className="exam-questions-body">
+            {isLoading ? (
+              <div className="exam-skeleton-group">
+                <Skeleton height={100} borderRadius={8} />
+                <Skeleton height={60} borderRadius={8} />
+              </div>
+            ) : totalQuestions === 0 ? (
+              <div className="exam-empty-box">
+                <Headphones size={40} className="exam-empty-icon" />
+                <p className="exam-empty-title">Chưa có câu hỏi cho phần thi nghe này</p>
+                <span className="exam-empty-desc">Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
+              </div>
+            ) : currentQuestionResult?.reason ? (
+              <div className="exam-alert-error" role="alert">
+                <p>Câu {currentQuestionResult.index + 1} có dữ liệu không hợp lệ.</p>
+              </div>
+            ) : currentQuestionItem ? (() => {
+              const isShortAnswer = currentQuestionItem.questionType === 'SHORT_ANSWER';
+              const currentAnswer = selectedAnswers[currentQuestionItem.id];
+              return (
+                <div className="exam-question-card">
+                  <div className="exam-question-top">
+                    <div className="exam-question-type-wrap">
+                      <span className="exam-question-number-badge">
+                        {activeQuestion}
+                      </span>
+                      <span className="exam-question-type-badge">
+                        {isShortAnswer ? 'Trả lời ngắn' : 'Trắc nghiệm'}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => toggleBookmark(activeQuestion)}
+                      className={`exam-bookmark-btn ${bookmarkedQuestions[activeQuestion] ? 'is-active' : ''}`}
+                      aria-label="Đánh dấu câu hỏi"
+                    >
+                      <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? 'var(--eh-gold, #9a7e56)' : 'none'} />
+                    </button>
+                  </div>
+
+                  <p className="exam-question-prompt">
+                    {currentQuestionItem.content}
+                  </p>
+
+                  {isShortAnswer ? (
+                    <div className="exam-short-answer-group">
+                      <label 
+                        htmlFor={`short-answer-${currentQuestionItem.id || activeQuestion}`} 
+                        className="exam-short-answer-label"
+                      >
+                        Câu trả lời của bạn:
+                      </label>
+                      <input
+                        id={`short-answer-${currentQuestionItem.id || activeQuestion}`}
+                        type="text"
+                        className="exam-short-answer-input"
+                        disabled={!canSubmitModule}
+                        placeholder="Nhập câu trả lời ngắn của bạn tại đây..."
+                        value={currentAnswer?.questionType === 'SHORT_ANSWER' ? currentAnswer.text : ''}
+                        onChange={(e) => handleSelectAnswer(currentQuestionItem.id, { questionType: 'SHORT_ANSWER', text: e.target.value })}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : currentQuestionItem.questionType === 'MULTIPLE_CHOICE' ? (
+                    /* Options */
+                    <div className="exam-options-group">
+                      {currentQuestionItem.options?.map((option, optIdx) => {
+                        const isSelected = currentAnswer?.questionType === 'MULTIPLE_CHOICE' && currentAnswer.selectedOptionId === option.id;
+                        return (
+                          <label 
+                            key={option.id}
+                            onClick={() => handleSelectAnswer(currentQuestionItem.id, { questionType: 'MULTIPLE_CHOICE', selectedOptionId: option.id })}
+                            className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
+                          >
+                            <span className="exam-option-key">{String.fromCharCode(65 + optIdx)}</span>
+                            <span className="exam-option-content">{option.content}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })() : null}
+          </div>
+
+          {/* Right Column Footer */}
+          <div className="exam-pane-footer">
+            <div className="exam-pane-footer-nav">
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={ChevronLeft}
                 onClick={() => setActiveQuestion(Math.max(1, activeQuestion - 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                disabled={activeQuestion <= 1}
               >
-                <ChevronLeft size={18} /> Câu trước
-              </button>
-              <button 
-                onClick={() => setActiveQuestion(Math.min(10, activeQuestion + 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                Câu trước
+              </Button>
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={ChevronRight}
+                iconPosition="right"
+                onClick={() => setActiveQuestion(Math.min(totalQuestions, activeQuestion + 1))}
+                disabled={activeQuestion >= totalQuestions}
               >
-                Câu tiếp theo <ChevronRight size={18} />
-              </button>
+                Câu sau
+              </Button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <button style={{ padding: '10px 32px', border: 'none', backgroundColor: '#2563EB', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
-                Hoàn thành
-              </button>
+            <div className="exam-pane-footer-submit">
+              <Button 
+                variant="primary"
+                size="md"
+                loading={isSubmitting}
+                disabled={!canSubmitModule || isSubmitting}
+                onClick={handleSubmit}
+                className="w-full"
+              >
+                Hoàn thành & Nộp phần Nghe
+              </Button>
             </div>
           </div>
-
         </div>
-
       </div>
+
+      {/* Unanswered Questions Confirmation Modal */}
+      {showUnansweredConfirm && (
+        <div 
+          className="exam-modal-overlay tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="unanswered-modal-title"
+          onClick={() => setShowUnansweredConfirm(false)}
+        >
+          <div className="exam-modal-box tad-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 id="unanswered-modal-title" className="exam-modal-title">
+              <AlertTriangle className="text-amber-500" size={20} />
+              <span>Xác nhận nộp bài</span>
+            </h3>
+            <p className="exam-modal-desc">
+              Bạn còn {unansweredCount} câu chưa trả lời. Các câu chưa trả lời sẽ nhận 0 điểm (còn trống {unansweredCount} câu). Bạn có chắc chắn muốn nộp phần thi này không?
+            </p>
+            <div className="exam-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowUnansweredConfirm(false)}
+              >
+                Tiếp tục làm bài
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmSubmitUnanswered}
+              >
+                Nộp bài
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

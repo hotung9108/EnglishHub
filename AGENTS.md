@@ -14,26 +14,35 @@ This file contains the general rules, conventions, Definition of Done (DoD), and
 - **Management Features**: Basic management of students, classes, scores, and an Admin module for account management.
 
 ## 2. Agent Handoff Rules & Production Artifacts
-We use a shared `production_artifacts/` directory for passing deliverables between roles.
-- **@pm** creates requirement specs (`docs/features/*.md`) and drops summarized tasks into `production_artifacts/pm_to_dev/`.
-- **@be-primary** and **@be-secondary** read from `production_artifacts/pm_to_dev/`, implement APIs following DDD, and place backend testing instructions in `production_artifacts/be_to_tester/`. (Note: Formal `docs/api-contract.md` will be published once backend stabilizes).
-- **@fe-primary** and **@fe-secondary** implement UI/UX and integrate APIs following `convention-fe.md`, and drop build/test instructions in `production_artifacts/fe_to_tester/`.
-- **@tester** reads from `be_to_tester` and `fe_to_tester`, writes automated tests or manual test reports, and drops results in `production_artifacts/test_reports/`.
-- **@devops-primary** and **@devops-secondary** pick up verified code, manage staging/production environments, and handle CI/CD deployment logic.
+We use a shared `production_artifacts/` directory and Spec-Driven Development (SDD) for passing deliverables between roles. Comprehensive Trello and GitHub synchronization rules are defined in [docs/guidelines/TRELLO_GITHUB_CONVENTION.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/guidelines/TRELLO_GITHUB_CONVENTION.md), [docs/guidelines/DEVELOPER_DOCTOR_GUIDE.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/guidelines/DEVELOPER_DOCTOR_GUIDE.md), and [.agents/rules/trello-github-rules.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/trello-github-rules.md).
+- **@pm** creates requirement specs (`docs/features/*.md`), creates cards on Trello (`Product Backlog` -> `Sprint Backlog`), and drops summarized tasks into `production_artifacts/pm_to_dev/`.
+- **@be-primary** and **@be-secondary** read from `production_artifacts/pm_to_dev/`, implement APIs following DDD (`convention-be.md`), develop/integrate AI capabilities following `convention-ai.md`, run Project Doctor (`/doctor`), and place backend testing instructions in `production_artifacts/be_to_tester/`.
+- **@fe-primary** and **@fe-secondary** implement UI/UX and integrate APIs following `convention-fe.md`, run Project Doctor, and drop build/test instructions in `production_artifacts/fe_to_tester/`.
+- **@tester** reads from `be_to_tester` and `fe_to_tester`, verifies features on the Staging environment once deployed (card in `Testing`), and writes test reports in `production_artifacts/test_reports/`. **Only @tester has the authority to verify on Staging and move Trello cards to `Done (Sprint X)`**.
+- **@devops-primary** and **@devops-secondary** manage staging/production environments, GitHub Rulesets (`IMMUTABLE-CORE-BRANCHES`), and CI/CD quality gates.
 
-Always update the appropriate task tracking file in `.agents/tasks/{role}/active/`, `.agents/tasks/{role}/done/`, or `.agents/tasks/bugs/` (using the `task-board` skill). Member mapping is defined in [.agents/rules/git-user-mapping.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
+Tasks and backlogs are managed exclusively on Trello board `Project1` and GitHub PRs. Member mapping is defined in [.agents/rules/git-user-mapping.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
 
-## 3. Git Flow
+## 3. Git Flow & Conventions
+Detailed conventions are codified in [docs/guidelines/TRELLO_GITHUB_CONVENTION.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/guidelines/TRELLO_GITHUB_CONVENTION.md):
 - `main`: Production-ready code.
-- `develop`: Integration branch for features.
-- `feature/*`: For new features (e.g., `feature/ai-grading`).
-- `bugfix/*`: For fixing bugs.
-Commit messages must follow Conventional Commits (e.g., `feat(grading): add AI grading integration`).
+- `staging`: Staging pre-production environment.
+- `develop`: Integration branch for features and fixes.
+- `feat/<ROLE>-<NUMBER>-<slug>`: For new features (e.g., `feat/FE-40-teacher-grading-studio`, backwards-compatible with `feature/`).
+- `fix/<ROLE>-<NUMBER>-<slug>`: For bugfixes (e.g., `fix/BE-64-soft-deleted-account-token-issuance`).
+- `docs/<slug>`: For documentation updates.
+Commit messages must follow Conventional Commits (e.g., `feat(BE-66): dispatch auto grading when final submit finalizes modules`).
 
 ## 4. Definition of Done (DoD)
+A task is ONLY considered Done when:
+- Project Doctor (`/doctor`) passes 100% Quality Gates.
 - Code compiles and runs without errors.
 - Unit tests are written and passing (Code coverage > 80%).
 - Code has been linted and formatted.
-- Task file is moved from `.agents/tasks/{role}/active/` to `.agents/tasks/{role}/done/` to reflect the `Done` status.
+- Pull Request targeting `develop` is opened and linked to the Trello card.
+- Trello card is moved to `Review` (automatically via GitHub Actions or manually) for Lead (`@hotung9108`) code review and merge approval.
+- Code is merged to `staging` and deployed; card is moved to `Testing`.
+- **Tester (`@Zawn-Tsu`) has re-tested on Staging, confirmed pass, and moved the Trello card to `Done (Sprint X)`**.
 - Relevant documentation (`docs/`) is updated.
 - Necessary artifacts are placed in `production_artifacts/` for the next agent.
+- Strictly follow [.agents/private/rules/no-auto-commit-push.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/private/rules/no-auto-commit-push.md): NEVER commit or push without explicit user command.

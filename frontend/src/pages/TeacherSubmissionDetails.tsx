@@ -1,296 +1,2947 @@
-import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  ArrowLeft, Download, Printer, Clock, FileText, ChevronLeft, ChevronRight,
-  User, Star, Sparkles, MessageSquare,
-  List, ListOrdered, Save, Send
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
+import {
+  ArrowLeft, FileText, ChevronLeft, ChevronRight,
+  User,
+  Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
+  XCircle, Plus, Trash2, Download, BookOpen, Headphones, Mic, Eye, Edit3, HelpCircle, X
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getAnnotationErrorKind, type AnnotationErrorKind } from '../hooks/useStudentAnswerAnnotations';
+import { parseApiError } from '../api';
+import {
+  submissionService,
+  type SubmissionDetail,
+  type SubmissionListItem,
+  type SubmissionModuleDetailResponse,
+  isModuleGraded
+} from '../api/services/submission.service';
+import {
+  gradingService,
+  type AiGradingSuggestionResponse,
+  type SubmissionModuleGradingResponse,
+  type GradingDetailResponse
+} from '../api/services/grading.service';
+import {
+  answerAnnotationService,
+  type GradingAnnotation
+} from '../api/services/answer-annotation.service';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService } from '../api/services/module.service';
+import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
+import { classService } from '../api/services/class.service';
+import { resolveAudioUrl } from '../utils/audioUrl.utils';
+import { extractTranscriptText, extractAnnotationSnippet } from '../utils/annotationSnippet.utils';
 
-const TeacherSubmissionDetails = () => {
+const resolveStorageUrl = resolveAudioUrl;
+
+const getFileNameFromKey = (storageKey: string): string => {
+  const baseName = storageKey.split('/').pop();
+  return baseName || storageKey;
+};
+
+interface AnnotationRequestContext {
+  generation: number;
+  moduleId: number | null;
+  answerId: number | null;
+  isLoading: boolean;
+}
+
+interface AnnotationDataContext {
+  moduleId: number;
+  answerId: number | null;
+}
+
+export const TeacherSubmissionDetails: React.FC = () => {
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
-  const { id } = useParams();
-  const { t } = useLanguage();
+  const location = useLocation();
+  const routeState = location.state as { studentName?: string; studentEmail?: string; studentCode?: string } | null;
+  const { id, studentId } = useParams<{ id: string; studentId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
-  return (
-    <div style={{ paddingBottom: '80px', maxWidth: '1280px', margin: '0 auto' }}>
-      {/* Top Breadcrumbs & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button 
-            onClick={() => navigate(`/teacher/assignments/${id}`)}
-            style={{ 
-              display: 'inline-flex', alignItems: 'center', gap: '6px', 
-              color: '#2563EB', background: 'none', border: 'none', 
-              cursor: 'pointer', fontSize: '13px', fontWeight: 600, padding: 0
-            }}
-          >
-            <ArrowLeft size={16} /> {t('submissionDetails.backToList')}
-          </button>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: '8px', padding: '4px', border: '1px solid #E2E8F0' }}>
-            <button style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
-              <ChevronLeft size={14} /> {t('submissionDetails.btnPrev')}
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
+  const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
+  const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const [audioLoadingContext, setAudioLoadingContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Entities
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<number | null>(() => {
+    const modParam = searchParams.get('moduleId');
+    return modParam && Number.isFinite(Number(modParam)) ? Number(modParam) : null;
+  });
+  const [moduleDetail, setModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
+  const [moduleInstructions, setModuleInstructions] = useState<string>('');
+  const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
+  const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
+  const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
+  const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
+  const [annotationDataContext, setAnnotationDataContext] = useState<AnnotationDataContext | null>(null);
+  const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
+  const [annotationError, setAnnotationError] = useState<AnnotationErrorKind | null>(null);
+  const [usingAnnotationFallback, setUsingAnnotationFallback] = useState(false);
+  const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [deletingAnnotationIds, setDeletingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
+  const [isCreatingAnnotation, setIsCreatingAnnotation] = useState<boolean>(false);
+  const [isSubmittingAnnotation, setIsSubmittingAnnotation] = useState<boolean>(false);
+  const [newAnnErrorType, setNewAnnErrorType] = useState<string>('GRAMMAR');
+  const [newAnnSuggestedFix, setNewAnnSuggestedFix] = useState<string>('');
+  const [newAnnComment, setNewAnnComment] = useState<string>('');
+  const [newAnnStartOffset, setNewAnnStartOffset] = useState<string>('0');
+  const [newAnnEndOffset, setNewAnnEndOffset] = useState<string>('0');
+
+  // Audit Reason Modal State when modifying an already evaluated grade (UC030 / AD30)
+  const [showAuditReasonModal, setShowAuditReasonModal] = useState(false);
+  const [auditReasonNote, setAuditReasonNote] = useState('');
+  const [pendingGradeAdjustment, setPendingGradeAdjustment] = useState<{
+    gradingId: number;
+    scoreNum: number;
+    feedbackText: string;
+    oldScore: number;
+    targetModuleId: number | undefined;
+    context: AnnotationRequestContext;
+    autoNavigateNext: boolean;
+  } | null>(null);
+  const isMountedRef = useRef(false);
+  const moduleLoadGenerationRef = useRef(0);
+  const annotationRequestRef = useRef<AnnotationRequestContext>({
+    generation: 0,
+    moduleId: null,
+    answerId: null,
+    isLoading: false,
+  });
+  const submissionIdentityRef = useRef<string | null>(null);
+  const aiPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gradeNavigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const createRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const deleteRequestsRef = useRef(new Map<number, AnnotationRequestContext>());
+  const gradeRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const annotationItemsRef = useRef<GradingAnnotation[]>([]);
+  const submissionRef = useRef<SubmissionDetail | null>(null);
+  const moduleDetailRef = useRef<SubmissionModuleDetailResponse | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRequestRef = useRef(0);
+  const audioFallbackUsedRef = useRef(false);
+  const pendingAudioTimeRef = useRef<number | null>(null);
+  const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
+  useEffect(() => { annotationItemsRef.current = annotations; }, [annotations]);
+  useEffect(() => { submissionRef.current = submission; }, [submission]);
+  useEffect(() => { moduleDetailRef.current = moduleDetail; }, [moduleDetail]);
+
+  const isCurrentAction = useCallback((context: AnnotationRequestContext) => {
+    const current = annotationRequestRef.current;
+    return isMountedRef.current &&
+      context.generation === moduleLoadGenerationRef.current &&
+      current.generation === context.generation &&
+      current.moduleId === context.moduleId &&
+      current.answerId === context.answerId && !current.isLoading;
+  }, []);
+
+  const cancelContextActions = useCallback(() => {
+    if (aiPollTimerRef.current !== null) clearTimeout(aiPollTimerRef.current);
+    if (gradeNavigationTimerRef.current !== null) clearTimeout(gradeNavigationTimerRef.current);
+    if (toastTimeoutRef.current !== null) clearTimeout(toastTimeoutRef.current);
+    aiPollTimerRef.current = null;
+    gradeNavigationTimerRef.current = null;
+    toastTimeoutRef.current = null;
+    aiRequestRef.current = null;
+    createRequestRef.current = null;
+    deleteRequestsRef.current.clear();
+    annotationItemsRef.current = [];
+    gradeRequestRef.current = null;
+  }, []);
+  const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
+    if (routeState?.studentName) {
+      return {
+        name: routeState.studentName,
+        email: routeState.studentEmail,
+        code: routeState.studentCode || `HV-${String(studentId).padStart(4, '0')}`
+      };
+    }
+    return null;
+  });
+
+  // Class student list for Prev / Next navigation
+  const [classSubmissions, setClassSubmissions] = useState<Array<{ studentId: number; name?: string }>>([]);
+
+  // Form State
+  const [finalScoreInput, setFinalScoreInput] = useState<string>('');
+  const [feedbackText, setFeedbackText] = useState<string>('');
+  const [feedbackTab, setFeedbackTab] = useState<'edit' | 'preview'>('edit');
+  const [showFeedbackGuide, setShowFeedbackGuide] = useState<boolean>(false);
+  const [listeningAudioUrl, setListeningAudioUrl] = useState<string | null>(null);
+  const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
+  const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
+  const [moduleMaxScore, setModuleMaxScore] = useState<number | null>(null);
+
+  // In-Memory & LocalStorage Draft State per Module
+  const moduleDraftsRef = useRef<Record<number, { score: string; feedback: string; updatedAt: string }>>({});
+  const [draftModuleIds, setDraftModuleIds] = useState<Record<number, boolean>>({});
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const handleViewDocument = (storageKey: string) => {
+    const url = resolveStorageUrl(storageKey);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const showToast = (msg: string) => {
+    if (!isMountedRef.current) return;
+    setToastMessage(msg);
+
+    if (toastTimeoutRef.current !== null) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    toastTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 3500);
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const handleBeforeUnload = () => {
+      try {
+        Object.entries(moduleDraftsRef.current).forEach(([modId, draft]) => {
+          if (draft && (draft.score || draft.feedback)) {
+            localStorage.setItem(`eh_draft_grading_${modId}`, JSON.stringify(draft));
+          }
+        });
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      isMountedRef.current = false;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      moduleLoadGenerationRef.current += 1;
+      annotationRequestRef.current = {
+        generation: moduleLoadGenerationRef.current,
+        moduleId: null,
+        answerId: null,
+        isLoading: false,
+      };
+      cancelContextActions();
+    };
+  }, [cancelContextActions]);
+
+  const loadModuleData = useCallback(async (targetModuleId: number) => {
+    if (!isMountedRef.current) return;
+
+    cancelContextActions();
+    setIsAnalyzingAi(false);
+    setIsSubmittingGrade(false);
+    setIsSubmittingAnnotation(false);
+    setDeletingAnnotationIds({});
+    setIsCreatingAnnotation(false);
+    setToastMessage(null);
+    const generation = ++moduleLoadGenerationRef.current;
+    annotationRequestRef.current = {
+      generation,
+      moduleId: targetModuleId,
+      answerId: null,
+      isLoading: true,
+    };
+    setAnnotationDataContext(null);
+    setAnnotations([]);
+    setIsLoadingAnnotations(true);
+    setAnnotationError(null);
+    setUsingAnnotationFallback(false);
+    setReviewingAnnotationIds({});
+    setFinalScoreInput('');
+    setFeedbackText('');
+    setFeedbackTab('edit');
+    setListeningAudioUrl(null);
+    setQuestionFilter('all');
+    setGradingSummary(null);
+    setGradingDetail(null);
+    setAiSuggestion(null);
+    setModuleInstructions('');
+    setModuleMaxScore(null);
+
+    const isCurrentModuleLoad = () =>
+      isMountedRef.current &&
+      moduleLoadGenerationRef.current === generation &&
+      annotationRequestRef.current.generation === generation &&
+      annotationRequestRef.current.moduleId === targetModuleId;
+
+    const prevModDetail = moduleDetailRef.current?.id === targetModuleId ? moduleDetailRef.current : null;
+    let currentModDetail: SubmissionModuleDetailResponse | null = prevModDetail;
+    let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
+
+    try {
+      const modDetailRes = await submissionService.getSubmissionModuleDetail(targetModuleId);
+      if (!isCurrentModuleLoad()) return;
+      setModuleDetail(modDetailRes);
+      currentModDetail = modDetailRes;
+
+      const isQuiz = modDetailRes.skill === 'READING' || modDetailRes.skill === 'LISTENING';
+      if (isQuiz && (!modDetailRes.questions || modDetailRes.questions.length === 0) && modDetailRes.moduleId) {
+        try {
+          const qRes = await questionService.listQuestions(modDetailRes.moduleId);
+          const qRecord = qRes as unknown as Record<string, unknown>;
+          const qList = qRes.questions || (Array.isArray(qRecord.data) ? (qRecord.data as typeof qRes.questions) : []) || [];
+          if (qList.length > 0 && isCurrentModuleLoad()) {
+            setModuleDetail({ ...modDetailRes, questions: qList });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (modDetailRes.moduleId && typeof moduleService?.getModule === 'function') {
+        void moduleService.getModule(modDetailRes.moduleId).then(async (mRes) => {
+          if (!isCurrentModuleLoad()) return;
+          if (mRes?.instructions) {
+            setModuleInstructions(mRes.instructions);
+          }
+          if (mRes?.maxScore != null) {
+            setModuleMaxScore(mRes.maxScore);
+          }
+          if (modDetailRes.skill === 'LISTENING') {
+            const mRecord = mRes as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof mRecord?.audioDownloadUrl === 'string' ? mRecord.audioDownloadUrl : '';
+            let audio = mRes?.sourceAudioDownloadUrl || extraAudio || '';
+            if (!audio && mRes?.sourceAudioStorageKey) {
+              if (mRes.sourceAudioStorageKey.startsWith('http')) {
+                audio = mRes.sourceAudioStorageKey;
+              } else {
+                try {
+                  const audioRes = await moduleService.getAudioDownloadUrl(modDetailRes.moduleId!);
+                  audio = audioRes.downloadUrl || '';
+                } catch {
+                  // ignore
+                }
+              }
+            }
+            if (isCurrentModuleLoad() && audio) {
+              setListeningAudioUrl(audio);
+            }
+          }
+        }).catch(() => {
+          // ignore
+        });
+      }
+    } catch {
+      if (!isCurrentModuleLoad()) return;
+      if (!prevModDetail) {
+        setModuleDetail(null);
+      }
+    }
+
+    let resolvedGradingId: number | null = null;
+    let gradingStatus: string | null = null;
+    try {
+      const gradingRes = await gradingService.getBySubmissionModuleId(targetModuleId);
+      if (!isCurrentModuleLoad()) return;
+      setGradingSummary(gradingRes);
+      gradingStatus = gradingRes.status || null;
+      if (gradingRes.finalScore != null) {
+        setFinalScoreInput(String(gradingRes.finalScore));
+      }
+      if (gradingRes.id) {
+        resolvedGradingId = gradingRes.id;
+      }
+    } catch {
+      if (!isCurrentModuleLoad()) return;
+      setGradingSummary(null);
+    }
+
+    if (!resolvedGradingId && currentModDetail?.grading?.id) {
+      resolvedGradingId = currentModDetail.grading.id;
+      gradingStatus = currentModDetail.grading.status || gradingStatus;
+    }
+
+    if (resolvedGradingId) {
+      try {
+        const detail = await gradingService.getById(resolvedGradingId);
+        if (!isCurrentModuleLoad()) return;
+        setGradingDetail(detail);
+        if (detail.finalScore != null) {
+          setFinalScoreInput(String(detail.finalScore));
+        }
+        if (detail.finalFeedback) {
+          setFeedbackText(detail.finalFeedback);
+        } else if (detail.aiFeedback) {
+          setFeedbackText(detail.aiFeedback);
+        }
+      } catch {
+        if (!isCurrentModuleLoad()) return;
+        // ignore
+      }
+    }
+
+    if (gradingStatus === 'COMPLETED') {
+      delete moduleDraftsRef.current[targetModuleId];
+      try {
+        localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+      } catch {
+        // ignore
+      }
+      setDraftModuleIds((prev) => {
+        if (!prev[targetModuleId]) return prev;
+        const next = { ...prev };
+        delete next[targetModuleId];
+        return next;
+      });
+    } else {
+      let draftScore: string | null = null;
+      let draftFeedback: string | null = null;
+      const memDraft = moduleDraftsRef.current[targetModuleId];
+      if (memDraft) {
+        draftScore = memDraft.score;
+        draftFeedback = memDraft.feedback;
+      } else {
+        try {
+          const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
+          if (localDraft) {
+            const parsed = JSON.parse(localDraft);
+            if (parsed && typeof parsed === 'object') {
+              draftScore = parsed.score != null ? String(parsed.score) : null;
+              draftFeedback = parsed.feedback != null ? String(parsed.feedback) : null;
+              moduleDraftsRef.current[targetModuleId] = {
+                score: draftScore || '',
+                feedback: draftFeedback || '',
+                updatedAt: parsed.updatedAt || new Date().toISOString(),
+              };
+              setDraftModuleIds((prev) => ({ ...prev, [targetModuleId]: true }));
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (draftScore != null && draftScore !== '') {
+        setFinalScoreInput(draftScore);
+      }
+      if (draftFeedback != null && draftFeedback !== '') {
+        setFeedbackText(draftFeedback);
+      }
+    }
+
+    const targetSkill =
+      currentModDetail?.skill ||
+      submissionRef.current?.modules?.find((m) => m.id === targetModuleId)?.skill;
+    const isSubjective = targetSkill === 'WRITING' || targetSkill === 'SPEAKING';
+    if (isSubjective) {
+      try {
+        const aiRes = await gradingService.getAiSuggestion(targetModuleId);
+        if (!isCurrentModuleLoad()) return;
+        setAiSuggestion(aiRes);
+        currentAiSuggestion = aiRes;
+        if (aiRes.aiFeedback) {
+          const fb = aiRes.aiFeedback;
+          setFeedbackText((prev) => (!prev || prev === fb || aiRequestRef.current !== null ? fb : prev));
+        }
+        if (aiRes.suggestedScore != null) {
+          setFinalScoreInput((prev) => (!prev || aiRequestRef.current !== null ? String(aiRes.suggestedScore) : prev));
+        }
+      } catch {
+        if (!isCurrentModuleLoad()) return;
+        setAiSuggestion(null);
+      }
+    }
+
+    // Fetch Annotations for current module answer
+    const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
+    const targetAnswerId = targetAns?.id ?? null;
+    if (!isCurrentModuleLoad()) return;
+    annotationRequestRef.current = {
+      generation,
+      moduleId: targetModuleId,
+      answerId: targetAnswerId,
+      isLoading: true,
+    };
+    setAnnotationDataContext({ moduleId: targetModuleId, answerId: targetAnswerId });
+
+    const isCurrentAnnotationRequest = () =>
+      isCurrentModuleLoad() && annotationRequestRef.current.answerId === targetAnswerId;
+    const fallbackAnnotations = currentAiSuggestion?.annotations ?? [];
+    const applyFallbackAnnotations = () => {
+      if (fallbackAnnotations.length === 0) {
+        setAnnotations([]);
+        return;
+      }
+
+      setUsingAnnotationFallback(true);
+      setAnnotations(fallbackAnnotations.map((annotation) => ({
+        id: annotation.id,
+        source: annotation.source,
+        startOffset: annotation.startOffset,
+        endOffset: annotation.endOffset,
+        errorType: annotation.errorType || null,
+        comment: annotation.comment || null,
+        suggestedFix: annotation.suggestedFix || null,
+        reviewStatus: annotation.reviewStatus,
+      })));
+    };
+
+    try {
+      if (targetAnswerId !== null) {
+        try {
+          const annRes = await answerAnnotationService.listAnnotations(targetAnswerId);
+          if (!isCurrentAnnotationRequest()) return;
+          const fetchedAnns = annRes.data || [];
+          if (fetchedAnns.length > 0) {
+            setAnnotations(fetchedAnns);
+          } else if (fallbackAnnotations.length > 0) {
+            applyFallbackAnnotations();
+          } else {
+            setAnnotations([]);
+          }
+        } catch (error) {
+          if (!isCurrentAnnotationRequest()) return;
+          setAnnotationError(getAnnotationErrorKind(error));
+          applyFallbackAnnotations();
+        }
+      } else if (fallbackAnnotations.length > 0) {
+        if (!isCurrentAnnotationRequest()) return;
+        applyFallbackAnnotations();
+      } else {
+        if (!isCurrentAnnotationRequest()) return;
+        setAnnotations([]);
+      }
+    } finally {
+      if (isCurrentAnnotationRequest()) {
+        annotationRequestRef.current = { ...annotationRequestRef.current, isLoading: false };
+        setIsLoadingAnnotations(false);
+      }
+    }
+  }, [cancelContextActions]);
+
+  const handleSelectModule = (modId: number) => {
+    const currentActiveId = selectedModuleId;
+    if (currentActiveId && currentActiveId !== modId) {
+      const hasContent = finalScoreInput.trim() !== '' || feedbackText.trim() !== '';
+      if (hasContent) {
+        const draft = {
+          score: finalScoreInput,
+          feedback: feedbackText,
+          updatedAt: new Date().toISOString(),
+        };
+        moduleDraftsRef.current[currentActiveId] = draft;
+        setDraftModuleIds((prev) => ({ ...prev, [currentActiveId]: true }));
+      }
+    }
+    setSelectedModuleId(modId);
+    setSearchParams({ moduleId: String(modId) }, { replace: true });
+    loadModuleData(modId);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const submissionIdentity = `${id ?? ''}:${studentId ?? ''}`;
+    if (submissionIdentityRef.current !== submissionIdentity) {
+      submissionIdentityRef.current = submissionIdentity;
+      cancelContextActions();
+      setIsAnalyzingAi(false);
+      setIsSubmittingGrade(false);
+      setIsSubmittingAnnotation(false);
+      setDeletingAnnotationIds({});
+      setIsCreatingAnnotation(false);
+      setToastMessage(null);
+      const generation = ++moduleLoadGenerationRef.current;
+      annotationRequestRef.current = {
+        generation,
+        moduleId: null,
+        answerId: null,
+        isLoading: false,
+      };
+      setAnnotationDataContext(null);
+      setAnnotations([]);
+      setIsLoadingAnnotations(false);
+      setAnnotationError(null);
+      setUsingAnnotationFallback(false);
+      setReviewingAnnotationIds({});
+    }
+    if (!id || !studentId) return;
+
+    const loadSubmissionData = async () => {
+      try {
+        const assignmentIdNum = Number(id);
+        const studentIdNum = Number(studentId);
+
+        // 1. Fetch assignment detail & all submissions for this assignment in parallel
+        const [assignRes, allSubsRes] = await Promise.allSettled([
+          assignmentService.getAssignment(assignmentIdNum),
+          submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+        ]);
+
+        if (!isMounted) return;
+
+        if (assignRes.status === 'rejected') {
+          throw assignRes.reason;
+        }
+
+        if (assignRes.status === 'fulfilled') {
+          setAssignment(assignRes.value);
+        }
+
+        const allSubsList: SubmissionListItem[] = allSubsRes.status === 'fulfilled' ? (allSubsRes.value.data || []) : [];
+
+        // Set sibling submissions for Prev/Next
+        const uniqueStudents = Array.from(
+          new Set(allSubsList.filter((s) => s.status !== 'IN_PROGRESS').map((s) => s.studentId))
+        ).map((sId) => ({ studentId: sId }));
+        setClassSubmissions(uniqueStudents);
+
+        // 2. Resolve student profile/name (prefer routeState if available to avoid heavy queries)
+        if (routeState?.studentName) {
+          setStudentInfo({
+            name: routeState.studentName,
+            email: routeState.studentEmail,
+            code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+          });
+        } else {
+          try {
+            const classRes = await classService.list({ limit: 100 });
+            const classesList = classRes.data || [];
+            const membersList = await Promise.all(
+              classesList.map(async (cls) => {
+                try {
+                  return await classService.listMembers(cls.id);
+                } catch {
+                  return [];
+                }
+              })
+            );
+            const resolvedMember = membersList.flat().find((m) => m.studentId === studentIdNum);
+            if (isMounted) {
+              if (resolvedMember) {
+                setStudentInfo({
+                  name: resolvedMember.fullName,
+                  email: resolvedMember.email,
+                  code: resolvedMember.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+                });
+              } else {
+                setStudentInfo({
+                  name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+                  code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+                });
+              }
+            }
+          } catch {
+            if (isMounted) {
+              setStudentInfo({
+                name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+                code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+              });
+            }
+          }
+        }
+
+        // 3. Find submission for this student from the pre-fetched assignment submissions
+        const studentSubs = allSubsList.filter((s) => s.studentId === studentIdNum);
+        const completedSub = studentSubs.find((s) => s.status === 'GRADED' || s.status === 'SUBMITTED');
+        const matchedSubItem = completedSub || (studentSubs.length > 0 ? studentSubs[0] : null);
+
+        if (!matchedSubItem) {
+          if (isMounted) {
+            setSubmission(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // Fetch full submission detail
+        const subDetail = await submissionService.getSubmission(matchedSubItem.id);
+        if (!isMounted) return;
+        setSubmission(subDetail);
+
+        if (subDetail.status === 'IN_PROGRESS') {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // 4. Determine initial module
+        if (subDetail.modules && subDetail.modules.length > 0) {
+          let initialMod = subDetail.modules[0];
+          const queryModId = searchParams.get('moduleId');
+          const parsedModId = queryModId && Number.isFinite(Number(queryModId)) ? Number(queryModId) : null;
+
+          if (parsedModId) {
+            const found = subDetail.modules.find(m => m.id === parsedModId);
+            if (found) initialMod = found;
+          } else {
+            const speakingMod = subDetail.modules.find(m => m.skill === 'SPEAKING');
+            if (speakingMod) initialMod = speakingMod;
+          }
+
+          setSelectedModuleId(initialMod.id);
+          await loadModuleData(initialMod.id);
+        }
+      } catch (err) {
+        console.error('Failed to load student submission details:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải chi tiết bài nộp của học viên. Vui lòng thử lại.' : 'Failed to load submission details. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadSubmissionData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData, routeState, cancelContextActions]);
+
+  const activeModule = useMemo(() => {
+    if (!submission?.modules || submission.modules.length === 0) return null;
+    if (selectedModuleId) {
+      const found = submission.modules.find(m => m.id === selectedModuleId);
+      if (found) return found;
+    }
+    const speakingMod = submission.modules.find(m => m.skill === 'SPEAKING');
+    return speakingMod || submission.modules[0];
+  }, [submission, selectedModuleId]);
+
+  const dynamicMaxScore =
+    gradingDetail?.maxScoreSnapshot ??
+    activeModule?.grading?.maxScoreSnapshot ??
+    moduleMaxScore ??
+    10;
+
+  const remainingUnfinishedModules = (submission?.modules || []).filter(
+    (m) => m.id !== activeModule?.id && !isModuleGraded(m)
+  );
+
+  const handleScoreChange = (val: string) => {
+    setFinalScoreInput(val);
+    const targetModId = selectedModuleId || activeModule?.id;
+    if (targetModId) {
+      const draft = {
+        score: val,
+        feedback: feedbackText,
+        updatedAt: new Date().toISOString(),
+      };
+      moduleDraftsRef.current[targetModId] = draft;
+      setDraftModuleIds((prev) => ({ ...prev, [targetModId]: true }));
+    }
+  };
+
+  const handleFeedbackChange = (val: string) => {
+    setFeedbackText(val);
+    const targetModId = selectedModuleId || activeModule?.id;
+    if (targetModId) {
+      const draft = {
+        score: finalScoreInput,
+        feedback: val,
+        updatedAt: new Date().toISOString(),
+      };
+      moduleDraftsRef.current[targetModId] = draft;
+      setDraftModuleIds((prev) => ({ ...prev, [targetModId]: true }));
+    }
+  };
+
+  // Navigate to prev/next student
+  const currentIndex = useMemo(() => {
+    if (!studentId || classSubmissions.length === 0) return 0;
+    const idx = classSubmissions.findIndex((s) => String(s.studentId) === studentId);
+    return idx >= 0 ? idx : 0;
+  }, [classSubmissions, studentId]);
+
+  const handleNavigateSibling = (direction: 'prev' | 'next') => {
+    if (classSubmissions.length <= 1) return;
+    const targetIdx = direction === 'prev'
+      ? (currentIndex - 1 + classSubmissions.length) % classSubmissions.length
+      : (currentIndex + 1) % classSubmissions.length;
+    const nextStudent = classSubmissions[targetIdx];
+    if (nextStudent) {
+      navigate(`/teacher/assignments/${id}/submissions/${nextStudent.studentId}`, {
+        state: nextStudent.name ? { studentName: nextStudent.name } : undefined
+      });
+    }
+  };
+
+  // Trigger AI Analyze
+  const handleTriggerAiAnalyze = async () => {
+    const context = { ...annotationRequestRef.current };
+    const targetModuleId = activeModule?.id;
+    if (!targetModuleId || context.moduleId !== targetModuleId ||
+      !isCurrentAction(context) || aiRequestRef.current) return;
+
+    aiRequestRef.current = context;
+    setIsAnalyzingAi(true);
+    try {
+      showToast(isVi ? 'Đang gửi yêu cầu chấm điểm bằng AI...' : 'Requesting AI grading...');
+      await gradingService.requestAiAnalysis(targetModuleId);
+      if (!isCurrentAction(context)) return;
+      showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
+
+      const POLL_INTERVAL_MS = 2500;
+      const MAX_ATTEMPTS = 24;
+
+      const finishAiPolling = async (message: string) => {
+        const loading = loadModuleData(targetModuleId);
+        const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+        try {
+          await loading;
+          if (isCurrentAction(pollContext)) {
+            showToast(message);
+          }
+        } catch (pollErr) {
+          console.error('Error refreshing grading after AI:', pollErr);
+        } finally {
+          if (isCurrentAction(pollContext)) {
+            aiRequestRef.current = null;
+            setIsAnalyzingAi(false);
+          }
+        }
+      };
+
+      const pollAiSuggestion = (attempt: number) => {
+        aiPollTimerRef.current = setTimeout(async () => {
+          aiPollTimerRef.current = null;
+          if (!isCurrentAction(context)) return;
+
+          try {
+            const suggestion = await gradingService.getAiSuggestion(targetModuleId);
+            if (!isCurrentAction(context)) return;
+
+            if (suggestion.status === 'FAILED') {
+              const fallbackMsg = suggestion.fallbackMessage || (isVi ? 'AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.' : 'AI grading failed. You can grade manually.');
+              return finishAiPolling(fallbackMsg);
+            }
+
+            if (suggestion.status === 'AI_GRADED' || suggestion.status === 'COMPLETED') {
+              return finishAiPolling(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+            }
+
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              const timeoutMsg = isVi ? 'Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.' : 'AI analysis is taking longer than expected. Please check back shortly.';
+              return finishAiPolling(timeoutMsg);
+            }
+          } catch (pollErr) {
+            console.error('Error polling AI suggestion:', pollErr);
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              if (isCurrentAction(pollContext)) {
+                aiRequestRef.current = null;
+                setIsAnalyzingAi(false);
+                showToast(isVi ? 'Lỗi khi kiểm tra kết quả AI. Vui lòng thử lại.' : 'Failed to retrieve AI grading result. Please try again.');
+              }
+            }
+          }
+        }, POLL_INTERVAL_MS);
+      };
+
+      pollAiSuggestion(1);
+    } catch (err) {
+      if (!isCurrentAction(context)) return;
+      aiRequestRef.current = null;
+      console.error('Failed to trigger AI analyze:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Lỗi khi kích hoạt AI. Vui lòng thử lại.' : 'Failed to trigger AI analysis.'));
+      setIsAnalyzingAi(false);
+    }
+  };
+
+  // Submit Grade
+  const executeSubmitGrade = async (
+    gradingId: number,
+    scoreNum: number,
+    feedback: string,
+    note: string | undefined,
+    targetModuleId: number | undefined,
+    context: AnnotationRequestContext,
+    autoNavigateNext: boolean
+  ) => {
+    gradeRequestRef.current = context;
+    setIsSubmittingGrade(true);
+    try {
+      await gradingService.submitGrade(gradingId, {
+        finalScore: scoreNum,
+        finalFeedback: feedback,
+        note: note || undefined,
+      });
+
+      if (!isCurrentAction(context)) return;
+
+      // Clear local draft upon successful publication
+      if (targetModuleId) {
+        delete moduleDraftsRef.current[targetModuleId];
+        try {
+          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+        } catch {
+          // ignore
+        }
+        setDraftModuleIds((prev) => {
+          if (!prev[targetModuleId]) return prev;
+          const next = { ...prev };
+          delete next[targetModuleId];
+          return next;
+        });
+      }
+
+      showToast(
+        note
+          ? (isVi ? `Đã điều chỉnh điểm thành công (${scoreNum}đ - Lý do: ${note})!` : `Grade adjusted successfully (${scoreNum} - Reason: ${note})!`)
+          : (isVi ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Grade finalized and published to student!')
+      );
+
+      // Refresh grading detail
+      try {
+        const updatedDetail = await gradingService.getById(gradingId);
+        setGradingDetail(updatedDetail);
+      } catch (err) {
+        console.warn('Failed to refresh grading detail after submit', err);
+      }
+
+      if (autoNavigateNext) {
+        const otherModules = (submission?.modules || []).filter((m) => m.id !== targetModuleId);
+        const nextPending = otherModules.find((m) => !isModuleGraded(m));
+        if (nextPending) {
+          handleSelectModule(nextPending.id);
+          return;
+        }
+      }
+
+      gradeNavigationTimerRef.current = setTimeout(() => {
+        gradeNavigationTimerRef.current = null;
+        if (isCurrentAction(context)) navigate(`/teacher/assignments/${id}`);
+      }, 1000);
+    } catch (err) {
+      if (!isCurrentAction(context)) return;
+      console.error('Failed to submit grade:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!'));
+    } finally {
+      if (isCurrentAction(context)) {
+        gradeRequestRef.current = null;
+        setIsSubmittingGrade(false);
+      }
+    }
+  };
+
+  const handleConfirmAuditGradeAdjustment = async () => {
+    if (!pendingGradeAdjustment) return;
+    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
+      showToast(
+        isVi
+          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán)!'
+          : 'Please enter an audit reason note (mandatory per audit policy)!'
+      );
+      return;
+    }
+
+    const { gradingId, scoreNum, feedbackText, targetModuleId, context, autoNavigateNext } = pendingGradeAdjustment;
+    const note = auditReasonNote.trim();
+    setShowAuditReasonModal(false);
+    setPendingGradeAdjustment(null);
+    await executeSubmitGrade(gradingId, scoreNum, feedbackText, note, targetModuleId, context, autoNavigateNext);
+  };
+
+  const handleSaveGrade = async (isFinalize: boolean, autoNavigateNext: boolean = false) => {
+    const context = { ...annotationRequestRef.current };
+    const gradingId = gradingSummary?.id;
+    if (!gradingId) {
+      if (!isMountedRef.current || (!isCurrentAction(context) && !(context.moduleId === null && submission?.status === 'IN_PROGRESS'))) return;
+      showToast(isVi ? 'Chưa tìm thấy bản ghi chấm điểm của bài này.' : 'Grading record not found.');
+      return;
+    }
+
+    if (!isCurrentAction(context) || context.moduleId !== activeModule?.id || gradeRequestRef.current) return;
+    const normalizedScoreStr = finalScoreInput.trim().replace(',', '.');
+    const scoreNum = parseFloat(normalizedScoreStr);
+    if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > dynamicMaxScore) {
+      const formattedMax = Number(dynamicMaxScore).toFixed(1);
+      showToast(isVi ? `Điểm số không hợp lệ (thang 0.0 - ${formattedMax})!` : `Invalid score (range 0.0 - ${formattedMax})!`);
+      return;
+    }
+
+    const targetModuleId = activeModule?.id;
+
+    // 1. If saving draft: persist locally and do NOT call submitGrade to avoid premature finalization
+    if (!isFinalize) {
+      if (targetModuleId) {
+        const draft = {
+          score: normalizedScoreStr,
+          feedback: feedbackText,
+          updatedAt: new Date().toISOString(),
+        };
+        moduleDraftsRef.current[targetModuleId] = draft;
+        try {
+          localStorage.setItem(`eh_draft_grading_${targetModuleId}`, JSON.stringify(draft));
+        } catch (e) {
+          console.warn('Failed to save grading draft to localStorage', e);
+        }
+        setDraftModuleIds((prev) => ({ ...prev, [targetModuleId]: true }));
+      }
+      showToast(isVi ? 'Đã lưu bản nháp nhận xét!' : 'Grading draft saved!');
+      return;
+    }
+
+    // 2. Check if score is being changed for an already evaluated/completed grade (UC030 / AD30 / UC31)
+    const isAlreadyGraded = Boolean(
+      submission?.status === 'GRADED' ||
+      activeModule?.status === 'GRADED' ||
+      gradingSummary?.status === 'COMPLETED' ||
+      gradingDetail?.status === 'COMPLETED'
+    );
+
+    let existingFinalScore: number | null = null;
+    if (isAlreadyGraded) {
+      const rawScore = gradingDetail?.finalScore ?? gradingSummary?.finalScore ?? activeModule?.grading?.finalScore;
+      if (rawScore != null) {
+        existingFinalScore = Number(rawScore);
+      }
+    }
+
+    if (existingFinalScore !== null && Math.abs(existingFinalScore - scoreNum) > 0.001) {
+      setPendingGradeAdjustment({
+        gradingId,
+        scoreNum,
+        feedbackText,
+        oldScore: existingFinalScore,
+        targetModuleId,
+        context,
+        autoNavigateNext,
+      });
+      setAuditReasonNote('');
+      setShowAuditReasonModal(true);
+      return;
+    }
+
+    await executeSubmitGrade(gradingId, scoreNum, feedbackText, undefined, targetModuleId, context, autoNavigateNext);
+  };
+
+  const targetModuleId = activeModule?.id ?? null;
+  const currentModuleDetail = moduleDetail?.id === targetModuleId ? moduleDetail : null;
+  const audioAnswer = currentModuleDetail?.answers?.find((answer) =>
+    Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
+  );
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
+  const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
+  const currentAudioContext = targetModuleId && audioAnswer
+    ? { moduleId: targetModuleId, answerId: audioAnswer.id }
+    : null;
+  const currentAudioModuleId = currentAudioContext?.moduleId ?? null;
+  const currentAudioAnswerId = currentAudioContext?.answerId ?? null;
+  useLayoutEffect(() => {
+    audioContextRef.current = currentAudioModuleId !== null && currentAudioAnswerId !== null
+      ? { moduleId: currentAudioModuleId, answerId: currentAudioAnswerId }
+      : null;
+  }, [currentAudioModuleId, currentAudioAnswerId]);
+
+  const isSpeaking = activeModule?.skill === 'SPEAKING' ||
+    currentModuleDetail?.answers?.some((answer) => Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim()));
+  const audioUrl = currentAudioContext && audioUrlOverride?.moduleId === currentAudioContext.moduleId &&
+    audioUrlOverride.answerId === currentAudioContext.answerId
+    ? audioUrlOverride.url
+    : directAudioUrl;
+  const audioError = Boolean(currentAudioContext && audioErrorContext?.moduleId === currentAudioContext.moduleId &&
+    audioErrorContext.answerId === currentAudioContext.answerId);
+  const isAudioLoading = Boolean(currentAudioContext && audioLoadingContext?.moduleId === currentAudioContext.moduleId &&
+    audioLoadingContext.answerId === currentAudioContext.answerId);
+
+  const loadAudioFallback = useCallback(async (
+    moduleId: number,
+    answerId: number,
+    requestId: number,
+    preserveTime: boolean,
+  ) => {
+    if (preserveTime && audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    setAudioLoadingContext({ moduleId, answerId });
+    setAudioErrorContext(null);
+    try {
+      const response = await submissionService.getAudioDownloadUrl(moduleId);
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      const downloadUrl = response.downloadUrl?.trim();
+      if (!downloadUrl) throw new Error('Audio URL is empty.');
+      setAudioUrlOverride({ moduleId, answerId, url: downloadUrl });
+    } catch {
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      setAudioErrorContext({ moduleId, answerId });
+    } finally {
+      if (requestId === audioRequestRef.current &&
+        audioContextRef.current?.moduleId === moduleId && audioContextRef.current.answerId === answerId) {
+        setAudioLoadingContext(null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const requestId = ++audioRequestRef.current;
+    audioFallbackUsedRef.current = false;
+    pendingAudioTimeRef.current = null;
+    const audio = audioRef.current;
+    audio?.pause();
+
+    if (currentAudioModuleId !== null && currentAudioAnswerId !== null && isSpeaking && !directAudioUrl) {
+      audioFallbackUsedRef.current = true;
+      void loadAudioFallback(currentAudioModuleId, currentAudioAnswerId, requestId, false);
+    }
+
+    return () => {
+      audioRequestRef.current += 1;
+      audio?.pause();
+    };
+  }, [
+    currentAudioModuleId,
+    currentAudioAnswerId,
+    directAudioUrl,
+    isSpeaking,
+    loadAudioFallback,
+  ]);
+
+  const handleAudioError = () => {
+    if (!currentAudioContext || isAudioLoading) return;
+    if (audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    audioRef.current?.pause();
+
+    if (audioFallbackUsedRef.current) {
+      setAudioErrorContext(currentAudioContext);
+      return;
+    }
+
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioRetry = () => {
+    if (!currentAudioContext) return;
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    const savedTime = pendingAudioTimeRef.current;
+    if (!audio || savedTime === null) return;
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = Math.min(Math.max(savedTime, 0), audio.duration);
+    }
+    pendingAudioTimeRef.current = null;
+  };
+
+  const handleDownloadDocument = async (storageKey?: string) => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
+    try {
+      setIsDownloadingDoc(true);
+      const res = await submissionService.getDocumentDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (storageKey ? getFileNameFromKey(storageKey) : 'submission-document');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.');
+    } finally {
+      setIsDownloadingDoc(false);
+    }
+  };
+
+  const handleDownloadAudio = async () => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...');
+    try {
+      setIsDownloadingAudio(true);
+      const res = await submissionService.getAudioDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (audioStorageKey ? getFileNameFromKey(audioStorageKey) : 'submission-audio.webm');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.');
+    } finally {
+      setIsDownloadingAudio(false);
+    }
+  };
+
+  const targetAnswer = useMemo(() => {
+    return moduleDetail?.answers?.find((a) => !!a.audioStorageKey) || moduleDetail?.answers?.[0] || null;
+  }, [moduleDetail]);
+
+  const annotationsMatchCurrentAnswer = Boolean(
+    annotationDataContext &&
+    activeModule?.id === annotationDataContext.moduleId &&
+    (targetAnswer?.id ?? null) === annotationDataContext.answerId
+  );
+  const currentAnnotations = useMemo(
+    () => (annotationsMatchCurrentAnswer ? annotations : []),
+    [annotationsMatchCurrentAnswer, annotations]
+  );
+  const currentAnnotationError = annotationsMatchCurrentAnswer ? annotationError : null;
+  const usingCurrentAnnotationFallback = annotationsMatchCurrentAnswer && usingAnnotationFallback;
+  const canReviewCurrentAnnotations = Boolean(
+    annotationsMatchCurrentAnswer &&
+    annotationDataContext?.answerId !== null &&
+    annotationDataContext?.answerId !== undefined &&
+    !isLoadingAnnotations
+  );
+
+  // Extract attached documents (for Writing or file uploads)
+  const attachedDocAnswers = useMemo(() => {
+    return moduleDetail?.answers?.filter((a) => !!a.docStorageKey) || [];
+  }, [moduleDetail?.answers]);
+
+  const [loadedDocText, setLoadedDocText] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const txtAnswer = moduleDetail?.answers?.find(
+      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
+    );
+    if (!txtAnswer || !activeModule?.id) {
+      return;
+    }
+
+    submissionService
+      .getDocumentFileBlob(activeModule.id)
+      .then((blob) => blob.text())
+      .then((text) => {
+        if (isMounted) setLoadedDocText(text);
+      })
+      .catch((err) => {
+        console.warn('Failed to load essay.txt content:', err);
+      });
+
+    return () => {
+      isMounted = false;
+      setLoadedDocText(null);
+    };
+  }, [moduleDetail, activeModule?.id]);
+
+  // Extract student text answer
+  const studentAnswerText = useMemo(() => {
+    if (!moduleDetail?.answers || moduleDetail.answers.length === 0) {
+      return loadedDocText || '';
+    }
+
+    const firstAnswer = moduleDetail.answers[0];
+    if (firstAnswer.content === null || firstAnswer.content === undefined) {
+      return loadedDocText || '';
+    }
+    if (typeof firstAnswer.content === 'string') {
+      const trimmed = firstAnswer.content.trim();
+      return trimmed || loadedDocText || '';
+    }
+    if (typeof firstAnswer.content === 'object') {
+      const obj = firstAnswer.content as Record<string, unknown>;
+      const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
+      if (typeof textVal === 'string') {
+        const trimmed = textVal.trim();
+        return trimmed || loadedDocText || '';
+      }
+      return JSON.stringify(obj);
+    }
+    return String(firstAnswer.content ?? '').trim() || loadedDocText || '';
+  }, [moduleDetail, loadedDocText]);
+
+  const wordCount = useMemo(() => {
+    if (!studentAnswerText.trim()) return 0;
+    return studentAnswerText.trim().split(/\s+/).filter(Boolean).length;
+  }, [studentAnswerText]);
+
+  const handleReviewAnnotation = async (annotationId: number, status: 'ACCEPTED' | 'REJECTED') => {
+    const currentModuleId = activeModule?.id;
+    const currentAnswerId = targetAnswer?.id ?? null;
+    const requestContext = annotationRequestRef.current;
+    if (
+      !isMountedRef.current ||
+      currentModuleId == null ||
+      currentAnswerId === null ||
+      isLoadingAnnotations ||
+      requestContext.isLoading ||
+      requestContext.moduleId !== currentModuleId ||
+      requestContext.answerId !== currentAnswerId ||
+      !annotationsMatchCurrentAnswer ||
+      !annotations.some((annotation) => annotation.id === annotationId)
+    ) {
+      return;
+    }
+
+    const generation = requestContext.generation;
+    const isCurrentReview = () =>
+      isMountedRef.current &&
+      moduleLoadGenerationRef.current === generation &&
+      annotationRequestRef.current.generation === generation &&
+      annotationRequestRef.current.moduleId === currentModuleId &&
+      annotationRequestRef.current.answerId === currentAnswerId &&
+      !annotationRequestRef.current.isLoading;
+
+    setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.reviewAnnotation(annotationId, { reviewStatus: status });
+      if (!isCurrentReview()) return;
+      setAnnotations((prev) =>
+        prev.map((ann) => (ann.id === annotationId ? { ...ann, reviewStatus: status } : ann))
+      );
+      showToast(
+        isVi
+          ? (status === 'ACCEPTED' ? 'Đã duyệt gợi ý của AI.' : 'Đã từ chối gợi ý của AI.')
+          : (status === 'ACCEPTED' ? 'AI annotation accepted.' : 'AI annotation rejected.')
+      );
+    } catch (err) {
+      if (!isCurrentReview()) return;
+      console.error('Failed to review annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể cập nhật trạng thái duyệt.' : 'Failed to update review status.'));
+    } finally {
+      if (isCurrentReview()) {
+        setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      }
+    }
+  };
+
+  const handleCreateAnnotation = async () => {
+    const context = { ...annotationRequestRef.current };
+    if (!targetAnswer?.id || !isCurrentAction(context) || context.moduleId !== activeModule?.id ||
+      context.answerId !== targetAnswer.id || createRequestRef.current) return;
+    if (!newAnnComment.trim()) {
+      showToast(isVi ? 'Vui lòng nhập nhận xét cho chú thích.' : 'Please enter a comment.');
+      return;
+    }
+    const startNum = Math.max(0, parseInt(newAnnStartOffset, 10) || 0);
+    const endNum = Math.max(startNum, parseInt(newAnnEndOffset, 10) || startNum);
+
+    createRequestRef.current = context;
+    setIsSubmittingAnnotation(true);
+    try {
+      const res = await answerAnnotationService.createAnnotation(targetAnswer.id, {
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+      });
+      if (!isCurrentAction(context)) return;
+      if (res?.id == null) throw new Error(isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.');
+      const createdItem: GradingAnnotation = {
+        id: res.id,
+        source: 'TEACHER',
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+        reviewStatus: 'ACCEPTED',
+      };
+      setAnnotations((prev) => [...prev, createdItem]);
+      setNewAnnComment('');
+      setNewAnnSuggestedFix('');
+      setNewAnnStartOffset('0');
+      setNewAnnEndOffset('0');
+      setIsCreatingAnnotation(false);
+      showToast(isVi ? 'Đã thêm chú thích mới.' : 'Annotation added.');
+    } catch (err) {
+      if (!isCurrentAction(context)) return;
+      console.error('Failed to create annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.'));
+    } finally {
+      if (isCurrentAction(context)) {
+        createRequestRef.current = null;
+        setIsSubmittingAnnotation(false);
+      }
+    }
+  };
+
+  const handleDeleteAnnotation = async (annotationId: number) => {
+    const context = { ...annotationRequestRef.current };
+    if (!isCurrentAction(context) || context.moduleId !== activeModule?.id ||
+      context.answerId !== (targetAnswer?.id ?? null) ||
+      !annotationItemsRef.current.some(annotation => annotation.id === annotationId) || deleteRequestsRef.current.has(annotationId)) return;
+    deleteRequestsRef.current.set(annotationId, context);
+    setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.deleteAnnotation(annotationId);
+      if (!isCurrentAction(context)) return;
+      setAnnotations((prev) => prev.filter((ann) => ann.id !== annotationId));
+      showToast(isVi ? 'Đã xóa chú thích.' : 'Annotation deleted.');
+    } catch (err) {
+      if (!isCurrentAction(context)) return;
+      console.error('Failed to delete annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể xóa chú thích.' : 'Failed to delete annotation.'));
+    } finally {
+      if (isCurrentAction(context)) {
+        deleteRequestsRef.current.delete(annotationId);
+        setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      }
+    }
+  };
+
+  const filteredAnnotations = useMemo(() => {
+    if (annotationFilter === 'ALL') return currentAnnotations;
+    return currentAnnotations.filter((a) => a.reviewStatus === annotationFilter);
+  }, [currentAnnotations, annotationFilter]);
+
+  const annotationCounts = useMemo(() => {
+    return {
+      all: currentAnnotations.length,
+      pending: currentAnnotations.filter((a) => a.reviewStatus === 'PENDING').length,
+      accepted: currentAnnotations.filter((a) => a.reviewStatus === 'ACCEPTED').length,
+      rejected: currentAnnotations.filter((a) => a.reviewStatus === 'REJECTED').length,
+    };
+  }, [currentAnnotations]);
+
+  const transcriptText = useMemo(() => {
+    const candidates = [
+      gradingDetail?.aiTranscript,
+      aiSuggestion?.transcript,
+      (gradingSummary as { aiTranscript?: unknown })?.aiTranscript,
+      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript,
+      (activeModule?.grading as { aiTranscript?: unknown })?.aiTranscript,
+    ];
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) continue;
+      const text = extractTranscriptText(candidate);
+      if (text && text.trim().length > 0) {
+        return text.trim();
+      }
+    }
+    return null;
+  }, [gradingDetail, aiSuggestion, gradingSummary, moduleDetail, activeModule]);
+
+  const parsedInstructions = useMemo(() => {
+    if (!moduleInstructions) {
+      return { minWords: null, diagramUrl: null, cleanInstructions: '', readingTitle: '', readingBody: '' };
+    }
+    const minWordsMatch = moduleInstructions.match(/<!--\s*minWords:\s*(\d+)\s*-->/i);
+    const minWords = minWordsMatch ? Number(minWordsMatch[1]) : null;
+    const imgMatch = moduleInstructions.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+    const diagramUrl = imgMatch ? imgMatch[1] : null;
+    const cleanInstructions = moduleInstructions
+      .replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '')
+      .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
+      .trim();
+
+    let readingTitle = '';
+    let readingBody = cleanInstructions || moduleInstructions;
+    if (activeModule?.skill === 'READING' && readingBody.includes('\n\n')) {
+      const firstDoubleNewline = readingBody.indexOf('\n\n');
+      const candidateTitle = readingBody.slice(0, firstDoubleNewline).trim();
+      const isInstructionLike =
+        candidateTitle.toLowerCase().startsWith('hãy đọc') ||
+        candidateTitle.toLowerCase().startsWith('read the') ||
+        candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+        candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+      if (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 120) {
+        readingTitle = candidateTitle;
+        readingBody = readingBody.slice(firstDoubleNewline + 2).trim();
+      }
+    }
+
+    return { minWords, diagramUrl, cleanInstructions, readingTitle, readingBody };
+  }, [moduleInstructions, activeModule?.skill]);
+
+  const questionsList = useMemo(() => {
+    if (!moduleDetail?.questions || moduleDetail.questions.length === 0) return [];
+    return moduleDetail.questions.map((q, idx) => {
+      const studentAnsItem = moduleDetail.answers?.find((a) => a.questionId === q.id);
+      const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+
+      let mcq = {
+        options: [] as string[],
+        correctOptionContent: '',
+        correctOptionIndex: 0,
+      };
+      let shortAns = '';
+
+      if (isMcq) {
+        mcq = extractMcqOptions(q.correctAnswer as Record<string, unknown> | null);
+      } else {
+        shortAns = extractShortAnswerText(q.correctAnswer as Record<string, unknown> | null);
+      }
+
+      const displayOptions = isMcq
+        ? mcq.options.map((optText, optIdx) => ({
+            key: String.fromCharCode(65 + optIdx),
+            text: optText,
+          }))
+        : [];
+
+      const correctOptLetter = String.fromCharCode(65 + mcq.correctOptionIndex);
+      const cAnsText = isMcq
+        ? `${correctOptLetter}. ${mcq.correctOptionContent}`
+        : (shortAns || '--');
+
+      let sAnsText = '--';
+      let studentSelectedOptId: number | null = null;
+      let isAnswerCorrect: boolean | undefined = undefined;
+
+      if (studentAnsItem) {
+        if (typeof studentAnsItem.content === 'string') {
+          sAnsText = studentAnsItem.content;
+        } else if (studentAnsItem.content && typeof studentAnsItem.content === 'object') {
+          const obj = studentAnsItem.content as Record<string, unknown>;
+
+          if (typeof obj.isCorrect === 'boolean') {
+            isAnswerCorrect = obj.isCorrect;
+          } else if (typeof obj.is_correct === 'boolean') {
+            isAnswerCorrect = obj.is_correct;
+          }
+
+          if (isMcq) {
+            const selIds = obj.selectedOptionIds;
+            if (Array.isArray(selIds) && selIds.length > 0 && typeof selIds[0] === 'number') {
+              studentSelectedOptId = selIds[0];
+            } else if (typeof obj.selectedOptionId === 'number') {
+              studentSelectedOptId = obj.selectedOptionId;
+            } else if (typeof obj.selectedOption === 'string') {
+              const upper = obj.selectedOption.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            } else if (typeof obj.answer === 'string') {
+              const upper = obj.answer.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            }
+
+            if (studentSelectedOptId !== null && studentSelectedOptId >= 1 && studentSelectedOptId <= mcq.options.length) {
+              const sLetter = String.fromCharCode(65 + studentSelectedOptId - 1);
+              const sText = mcq.options[studentSelectedOptId - 1] || '';
+              sAnsText = `${sLetter}. ${sText}`;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            } else if (typeof obj.selectedOption === 'string') {
+              sAnsText = obj.selectedOption;
+            }
+          } else {
+            if (typeof obj.text === 'string') {
+              sAnsText = obj.text;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            }
+          }
+        }
+      }
+
+      if (isAnswerCorrect === undefined) {
+        if (studentAnsItem && sAnsText !== '--') {
+          if (isMcq) {
+            if (studentSelectedOptId !== null) {
+              isAnswerCorrect = (studentSelectedOptId - 1) === mcq.correctOptionIndex;
+            }
+          } else if (shortAns) {
+            isAnswerCorrect = sAnsText.trim().toLowerCase() === shortAns.trim().toLowerCase();
+          }
+        } else {
+          isAnswerCorrect = false;
+        }
+      }
+
+      return {
+        id: q.id,
+        questionNumber: q.orderIndex || idx + 1,
+        prompt: q.content,
+        questionType: q.questionType,
+        options: displayOptions,
+        studentAnswer: sAnsText,
+        correctAnswer: cAnsText,
+        isCorrect: isAnswerCorrect,
+      };
+    });
+  }, [moduleDetail]);
+
+  const filteredQuestions = useMemo(() => {
+    if (questionFilter === 'correct') return questionsList.filter((q) => q.isCorrect === true);
+    if (questionFilter === 'incorrect') return questionsList.filter((q) => q.isCorrect === false);
+    return questionsList;
+  }, [questionsList, questionFilter]);
+
+  const FEEDBACK_TEMPLATE_VI = `### 1. Điểm mạnh (Strengths)
+- Phát âm tương đối rõ ràng, tự tin, diễn đạt ý tương đối trôi chảy.
+- Vận dụng được một số từ vựng và cấu trúc câu phù hợp chủ đề bài học.
+
+### 2. Điểm cần khắc phục (Areas for Improvement)
+- Chú ý các lỗi ngữ pháp / phát âm đã được đánh dấu chú thích trong bài.
+- Cần phát triển thêm ý mở rộng và liên kết các câu mạch lạc hơn.
+
+### 3. Đề xuất luyện tập (Actionable Advice)
+- Luyện nói lại theo transcript và sửa các lỗi gạch chân.
+- Ôn tập lại cấu trúc ngữ pháp và từ vựng trọng tâm.`;
+
+  const FEEDBACK_TEMPLATE_EN = `### 1. Strengths
+- Clear pronunciation, confident delivery, and natural pacing.
+- Good application of topic-specific vocabulary and sentence patterns.
+
+### 2. Areas for Improvement
+- Pay close attention to grammar and pronunciation annotations highlighted in the transcript.
+- Expand explanations and use cohesive transition devices.
+
+### 3. Actionable Advice
+- Re-practice recording using the AI transcript as a reference.
+- Review key grammatical rules and practice vocabulary drills.`;
+
+  const handleInsertFeedbackTemplate = () => {
+    const template = isVi ? FEEDBACK_TEMPLATE_VI : FEEDBACK_TEMPLATE_EN;
+    if (!feedbackText.trim()) {
+      handleFeedbackChange(template);
+    } else {
+      handleFeedbackChange(`${feedbackText.trim()}\n\n${template}`);
+    }
+    showToast(isVi ? 'Đã chèn mẫu nhận xét chuẩn sư phạm!' : 'Pedagogical feedback template inserted!');
+  };
+
+  const renderFeedbackEditor = (rows: number = 6) => {
+    return (
+      <div className="tsd-feedback-wrap">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <label className="tsd-card-label m-0">
+            {t('submissionDetails.feedbackTitle')}
+          </label>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              className={`tsd-feedback-guide-toggle-btn ${showFeedbackGuide ? 'active' : ''}`}
+              onClick={() => setShowFeedbackGuide((prev) => !prev)}
+              title={isVi ? 'Xem cấu trúc nhận xét gợi ý' : 'Toggle feedback guidelines'}
+            >
+              <HelpCircle size={13} />
+              <span>{isVi ? 'Hướng dẫn nhận xét' : 'Guide'}</span>
             </button>
-            <span style={{ padding: '0 8px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>14 / 28</span>
-            <button style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}>
-              {t('submissionDetails.btnNextPrefix')} (David Pham) <ChevronRight size={14} />
+            <button
+              type="button"
+              className="tsd-feedback-insert-template-btn"
+              onClick={handleInsertFeedbackTemplate}
+              title={isVi ? 'Chèn mẫu cấu trúc nhận xét chuẩn' : 'Insert feedback template'}
+            >
+              <Sparkles size={13} />
+              <span>{isVi ? 'Chèn mẫu' : 'Template'}</span>
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Header Info */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', margin: 0 }}>WRITING TASK 2 - ESSAY</h1>
-          <span style={{ fontSize: '12px', fontWeight: 600, padding: '2px 10px', borderRadius: '9999px', backgroundColor: '#DBEAFE', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
-            IELTS Academic
-          </span>
-        </div>
-        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-          {t('submissionDetails.duePrefix')} <span style={{ fontWeight: 500, color: '#334155' }}>Jan 05, 2026, 23:59</span> • {t('submissionDetails.targetBandPrefix')} <span style={{ fontWeight: 600, color: '#334155' }}>6.5 - 7.5</span> • {t('submissionDetails.topicPrefix')} <span style={{ color: '#475569', fontStyle: 'italic' }}>"Should governments invest solely in renewable energy sources?"</span>
-        </p>
-      </div>
-
-      {/* Quick Actions Bar */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-        <button className="btn btn-secondary bg-white btn-sm" style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-          <Download size={14} color="#64748B" /> {t('submissionDetails.btnDownloadAll')}
-        </button>
-        <button className="btn btn-secondary bg-white btn-sm" style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-          <Printer size={14} color="#64748B" /> {t('submissionDetails.btnPrint')}
-        </button>
-      </div>
-
-      {/* Student Banner */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <User size={24} color="#94A3B8" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Alice Johnson</h2>
-              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}>
-                {t('submissionDetails.statusSubmitted')}
-              </span>
-              <span style={{ fontSize: '12px', color: '#94A3B8', fontFamily: 'monospace' }}>HV-8801</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span>alice.j@student.edu.vn</span>
-              <span>•</span>
-              <span>{t('submissionDetails.coursePrefix')}IELTS Intensive 2026</span>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: '#94A3B8', fontSize: '11px' }}>{t('submissionDetails.submissionTimePrefix')}</div>
-            <div style={{ fontWeight: 600, color: '#334155' }}>04/01/2026 - 21:30:15</div>
-          </div>
-          <div style={{ width: '1px', height: '32px', backgroundColor: '#E2E8F0' }}></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-            <span style={{ fontWeight: 500, color: '#334155' }}>{t('submissionDetails.statusOnTime')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        {/* Score Card */}
-        <MetricCard 
-          title={t('submissionDetails.metricBand')}
-          value="7.5"
-          suffix="/ 9.0"
-          icon={<Star size={16} />}
-          footerText={<span style={{ color: 'var(--success)', fontWeight: 500 }}><Star size={14} style={{ display: 'inline', verticalAlign: 'middle' }}/> {t('submissionDetails.metricBandAchieved')} (≥ 6.5)</span>}
-        />
-
-        {/* Time Spent Card */}
-        <MetricCard 
-          title={t('submissionDetails.metricTime')}
-          value="45"
-          suffix={t('submissionDetails.unitMinutes')}
-          icon={<Clock size={16} />}
-          iconBgColor="var(--surface-container)"
-          iconColor="var(--on-surface-variant)"
-          footerText={t('submissionDetails.metricTimeHint')}
-        />
-      </div>
-
-      {/* Submission Files */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px', marginBottom: '24px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.025em', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            <FileText size={16} color="#2563EB" /> {t('submissionDetails.filesTitle')}
-          </h3>
-          <span style={{ fontSize: '12px', color: '#64748B' }}>2{t('submissionDetails.filesCountSuffix')}</span>
-        </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <FileItem 
-            name="writing-task-2-renewable-energy.docx"
-            extension="docx"
-            size="2.4 MB"
-            details={`${t('submissionDetails.submittedOn')}04/01/2026, 21:30`}
-            onDownload={() => {}}
-          />
-
-          <FileItem 
-            name="explanation-and-brainstorming-outline.pdf"
-            extension="pdf"
-            size="1.2 MB"
-            details={`${t('submissionDetails.submittedOn')}04/01/2026, 21:28`}
-            onDownload={() => {}}
-          />
-        </div>
-      </div>
-
-      {/* Two-Column Working Space */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <style>{`
-          @media (min-width: 1024px) {
-            .grading-grid { grid-template-columns: 7fr 5fr !important; }
-          }
-          .grammar-highlight {
-            background-color: #FEF3C7;
-            border-bottom: 2px dashed #F59E0B;
-            padding: 1px 3px;
-            border-radius: 2px;
-            cursor: pointer;
-          }
-          .lexical-highlight {
-            background-color: #DCFCE7;
-            border-bottom: 2px solid #10B981;
-            padding: 1px 3px;
-            border-radius: 2px;
-            cursor: pointer;
-          }
-        `}</style>
-        <div className="grading-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-          
-          {/* Left Column: Document Viewer */}
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, color: '#334155' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB' }}></span>
-                <span>{t('submissionDetails.docViewerTitle')}<strong style={{ fontWeight: 600, color: '#0F172A' }}>writing-task-2-renewable-energy.docx</strong></span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748B' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', backgroundColor: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A', padding: '2px 8px', borderRadius: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', backgroundColor: '#F59E0B', borderRadius: '50%' }}></span> {t('submissionDetails.noteGrammar')}
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', backgroundColor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', padding: '2px 8px', borderRadius: '4px' }}>
-                  <span style={{ width: '6px', height: '6px', backgroundColor: '#10B981', borderRadius: '50%' }}></span> {t('submissionDetails.noteVocab')}
-                </span>
-              </div>
-            </div>
-
-            <div style={{ padding: '24px', fontFamily: 'serif', color: '#1E293B', lineHeight: 1.8, fontSize: '15px', maxHeight: '580px', overflowY: 'auto' }}>
-              <div style={{ fontFamily: 'sans-serif', fontWeight: 600, fontSize: '14px', color: '#94A3B8', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9', letterSpacing: '0.025em', textTransform: 'uppercase', marginBottom: '16px' }}>
-                Topic: Some people believe that governments should prioritize renewable energy over fossil fuels. To what extent do you agree or disagree?
-              </div>
-              <p style={{ marginBottom: '16px' }}>
-                In recent decades, global warming and climate change have escalated into critical international concerns. Consequently, an increasing number of analysts assert that national authorities ought to allocate their financial and infrastructural resources <span className="lexical-highlight" title={t('submissionDetails.lexicalHint1')}>predominantly towards</span> renewable energy sources rather than persisting with fossil fuels. I wholeheartedly agree with this proposition, considering both the undeniable environmental preservation and the long-term economic sustainability.
-              </p>
-              <p style={{ marginBottom: '16px' }}>
-                First and foremost, the ecological hazards posed by conventional energy extraction cannot be overstated. Traditional coal and petroleum combustion releases massive volumes of greenhouse gases, notably carbon dioxide and methane, which expedite polar ice melting and severe meteorological anomalies. Conversely, clean alternatives such as solar arrays, wind turbines, and hydroelectric generators produce virtually zero carbon emissions during operational cycles. For instance, countries like Denmark and Iceland have witnessed <span className="lexical-highlight" title={t('submissionDetails.lexicalHint2')}>remarkable ecological revitalisation</span> by shifting their national grids towards zero-emission technologies.
-              </p>
-              <p style={{ marginBottom: '16px' }}>
-                Furthermore, from an economic and geopolitical standpoint, renewable infrastructure offers a hedge against unpredictable global oil market volatilities. While establishing clean energy facilities demands substantial initial capital investments, their operational and maintenance expenses remain exceptionally low over time. <span className="grammar-highlight" title={t('submissionDetails.grammarHint')}>Moreover, government subsidy</span> directed towards green energy stimulate technological innovation and generate numerous high-skilled employment positions, effectively invigorating the national economic landscape.
-              </p>
-              <p style={{ marginBottom: '16px' }}>
-                In conclusion, although the immediate transition to clean energy involves considerable fiscal commitments, the multifaceted advantages regarding biosphere preservation and future-proof economic resilience justify prioritized state expenditure. It is imperative that global policymakers accelerate this structural paradigm shift before environmental damages become irreversible.
-              </p>
-            </div>
-
-            <div style={{ padding: '10px 20px', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span>{t('submissionDetails.wordCountPrefix')}<strong style={{ color: '#1E293B', fontWeight: 600 }}>285{t('submissionDetails.wordCountSuffix')}</strong></span>
-              </div>
-              <button style={{ color: '#2563EB', fontWeight: 500, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                <MessageSquare size={14} /> {t('submissionDetails.btnAddNote')}
+            <div className="tsd-feedback-tab-bar">
+              <button
+                type="button"
+                className={`tsd-feedback-tab-btn ${feedbackTab === 'edit' ? 'active' : ''}`}
+                onClick={() => setFeedbackTab('edit')}
+              >
+                <Edit3 size={13} />
+                <span>{isVi ? 'Soạn thảo' : 'Edit'}</span>
+              </button>
+              <button
+                type="button"
+                className={`tsd-feedback-tab-btn ${feedbackTab === 'preview' ? 'active' : ''}`}
+                onClick={() => setFeedbackTab('preview')}
+              >
+                <Eye size={13} />
+                <span>{isVi ? 'Xem trước (MD)' : 'Preview (MD)'}</span>
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Right Column: AI Insights & Feedback */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* AI Grading Insight */}
-            <div style={{ padding: '14px', borderRadius: '12px', backgroundColor: 'rgba(239, 246, 255, 0.8)', border: '1px solid #BFDBFE' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#1E3A8A', fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={16} color="#2563EB" /> {t('submissionDetails.aiSuggestionsTitle')}
-                </span>
-                <span style={{ fontSize: '10px', backgroundColor: 'rgba(191, 219, 254, 0.7)', color: '#1E40AF', padding: '2px 6px', borderRadius: '4px', fontWeight: 500 }}>{t('submissionDetails.aiConfidence')}94%</span>
+        {showFeedbackGuide && (
+          <div className="tsd-feedback-guide-panel">
+            <div className="tsd-feedback-guide-title">
+              <BookOpen size={14} className="text-primary" />
+              <strong>{isVi ? 'Cấu trúc nhận xét chuẩn sư phạm gợi ý:' : 'Recommended Pedagogical Structure:'}</strong>
+            </div>
+            <div className="tsd-feedback-guide-grid">
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">1</span>
+                <div>
+                  <strong>{isVi ? 'Khen ngợi & Điểm mạnh:' : 'Strengths:'}</strong>
+                  <p>{isVi ? 'Ghi nhận nỗ lực, phát âm rõ ràng, từ vựng phong phú hoặc ý tưởng sáng tạo.' : 'Highlight effort, clear pronunciation, rich vocabulary, or good ideas.'}</p>
+                </div>
               </div>
-              <p style={{ color: '#334155', lineHeight: 1.6, fontSize: '11px', margin: 0 }}>
-                "Bài viết có cấu trúc mở - thân - kết rất chặt chẽ, luận điểm rõ ràng và dẫn chứng thuyết phục. Sử dụng tự nhiên nhiều thuật ngữ chuyên đề (meteorological anomalies, paradigm shift). Điểm cần cải thiện: Lưu ý mạo từ ở câu đầu đoạn thân bài 2."
-              </p>
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">2</span>
+                <div>
+                  <strong>{isVi ? 'Điểm cần khắc phục:' : 'Areas for Improvement:'}</strong>
+                  <p>{isVi ? 'Chỉ rõ các lỗi ngữ pháp, phát âm (dựa trên transcript và chú thích AI).' : 'Specify grammar, pronunciation issues based on transcript & annotations.'}</p>
+                </div>
+              </div>
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">3</span>
+                <div>
+                  <strong>{isVi ? 'Đề xuất luyện tập:' : 'Actionable Advice:'}</strong>
+                  <p>{isVi ? 'Đưa ra bài tập, tài liệu hoặc phương pháp cụ thể để học viên tiến bộ.' : 'Provide actionable tips, materials, or exercises for next time.'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="tsd-feedback-guide-footer">
+              <span className="text-xs text-muted">
+                {isVi ? 'Hỗ trợ Markdown: **in đậm**, *in nghiêng*, - danh sách, > trích dẫn.' : 'Markdown supported: **bold**, *italic*, - list, > quote.'}
+              </span>
+              <button
+                type="button"
+                className="tsd-guide-apply-btn"
+                onClick={handleInsertFeedbackTemplate}
+              >
+                {isVi ? 'Áp dụng mẫu ngay' : 'Apply template now'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {feedbackTab === 'edit' ? (
+          <textarea
+            className="tsd-feedback-textarea"
+            placeholder={t('submissionDetails.feedbackPlaceholder')}
+            rows={rows}
+            value={feedbackText}
+            onChange={(e) => handleFeedbackChange(e.target.value)}
+          />
+        ) : (
+          <div className="tsd-feedback-preview-box">
+            <MarkdownView
+              content={feedbackText}
+              fallbackText={isVi ? 'Chưa có nhận xét để xem trước. Hãy nhập nội dung ở tab "Soạn thảo".' : 'No feedback content to preview.'}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const extractSnippet = (start?: number, end?: number): string | null => {
+    const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
+    if (!baseText) return null;
+    const res = extractAnnotationSnippet(baseText, start, end, '');
+    return res.length > 0 ? res : null;
+  };
+
+  const renderAnnotationsSection = () => {
+    return (
+      <div className="tsd-annotations-section">
+        <div className="tsd-annotations-header">
+          <div className="tsd-ann-header-top">
+            <div className="tsd-annotations-title-wrap">
+              <h4 className="tsd-annotations-title">
+                {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'Segment Annotations'}
+              </h4>
+              <span className="tsd-annotations-counter">{currentAnnotations.length}</span>
             </div>
 
-            {/* Feedback Editor */}
-            <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.025em', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  <MessageSquare size={16} color="#475569" /> {t('submissionDetails.feedbackTitle')}
-                </h3>
-                <button style={{ fontSize: '12px', color: '#2563EB', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <List size={12} /> {t('submissionDetails.btnInsertTemplate')}
-                </button>
+            {targetAnswer?.id && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={Plus}
+                onClick={() => setIsCreatingAnnotation((prev) => !prev)}
+              >
+                {isVi ? 'Thêm chú thích' : 'Add annotation'}
+              </Button>
+            )}
+          </div>
+
+          {currentAnnotations.length > 0 && (
+            <div className="tsd-annotations-filter-bar">
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ALL')}
+              >
+                {isVi ? 'Tất cả' : 'All'} ({annotationCounts.all})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'PENDING' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('PENDING')}
+              >
+                {isVi ? 'Chờ duyệt' : 'Pending'} ({annotationCounts.pending})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ACCEPTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ACCEPTED')}
+              >
+                {isVi ? 'Đã duyệt' : 'Accepted'} ({annotationCounts.accepted})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'REJECTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('REJECTED')}
+              >
+                {isVi ? 'Đã từ chối' : 'Rejected'} ({annotationCounts.rejected})
+              </button>
+            </div>
+          )}
+        </div>
+
+        {isCreatingAnnotation && (
+          <div className="tsd-ann-create-form">
+            <div className="tsd-ann-form-grid">
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Loại lỗi' : 'Error type'}
+                </label>
+                <select
+                  className="tsd-ann-select"
+                  value={newAnnErrorType}
+                  onChange={(e) => setNewAnnErrorType(e.target.value)}
+                >
+                  <option value="GRAMMAR">GRAMMAR</option>
+                  <option value="VOCABULARY">VOCABULARY</option>
+                  <option value="PRONUNCIATION">PRONUNCIATION</option>
+                  <option value="COHESION">COHESION</option>
+                  <option value="SPELLING">SPELLING</option>
+                  <option value="PUNCTUATION">PUNCTUATION</option>
+                </select>
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Từ ký tự' : 'Start offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnStartOffset}
+                  onChange={(e) => setNewAnnStartOffset(e.target.value)}
+                />
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Đến ký tự' : 'End offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnEndOffset}
+                  onChange={(e) => setNewAnnEndOffset(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Gợi ý sửa' : 'Suggested fix'}
+              </label>
+              <input
+                type="text"
+                className="tsd-ann-input"
+                placeholder={isVi ? 'Nhập câu/từ gợi ý sửa...' : 'Enter suggested correction...'}
+                value={newAnnSuggestedFix}
+                onChange={(e) => setNewAnnSuggestedFix(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Nhận xét chi tiết' : 'Comment'}
+              </label>
+              <textarea
+                rows={2}
+                className="tsd-ann-textarea"
+                placeholder={isVi ? 'Giải thích lỗi hoặc hướng dẫn sửa...' : 'Explain the issue or feedback...'}
+                value={newAnnComment}
+                onChange={(e) => setNewAnnComment(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-actions">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={isSubmittingAnnotation}
+                onClick={() => setIsCreatingAnnotation(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                loading={isSubmittingAnnotation}
+                disabled={isSubmittingAnnotation}
+                onClick={handleCreateAnnotation}
+              >
+                {isVi ? 'Lưu chú thích' : 'Save annotation'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {usingCurrentAnnotationFallback && currentAnnotations.length > 0 && !isLoadingAnnotations && (
+          <div role="status" className="tsd-annotations-empty">
+            <AlertCircle size={18} /> {t('annotationStatus.fallback')}
+          </div>
+        )}
+
+        {isLoadingAnnotations ? (
+          <div className="tsd-annotations-loading">
+            <RefreshCw size={18} className="animate-spin" />
+            <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
+          </div>
+        ) : currentAnnotationError && (!usingCurrentAnnotationFallback || currentAnnotations.length === 0) ? (
+          <div role="alert" className="tsd-annotations-empty">{t(`annotationStatus.${currentAnnotationError}`)}</div>
+        ) : filteredAnnotations.length === 0 ? (
+          <EmptyState
+            title={
+              currentAnnotations.length === 0
+                ? (isVi ? 'Chưa có gợi ý sửa lỗi từ AI' : 'No AI annotations available')
+                : (isVi ? 'Không có gợi ý trong bộ lọc này' : 'No annotations in this filter')
+            }
+            description={
+              currentAnnotations.length === 0
+                ? (isVi ? 'AI chưa phát hiện lỗi cần chú thích hoặc bài làm chưa được phân tích bằng AI.' : 'AI has not identified segment errors or submission has not been analyzed.')
+                : undefined
+            }
+            className="tsd-annotations-empty"
+          />
+        ) : (
+          <div className="tsd-annotations-list">
+            {filteredAnnotations.map((ann) => {
+              const isReviewing = !!reviewingAnnotationIds[ann.id];
+              const isDeleting = !!deletingAnnotationIds[ann.id];
+              const snippet = extractSnippet(ann.startOffset, ann.endOffset);
+              const badgeStatus =
+                ann.reviewStatus === 'ACCEPTED' ? 'success' : ann.reviewStatus === 'REJECTED' ? 'error' : 'warning';
+              const badgeLabel =
+                ann.reviewStatus === 'ACCEPTED'
+                  ? (isVi ? 'Đã duyệt' : 'Accepted')
+                  : ann.reviewStatus === 'REJECTED'
+                  ? (isVi ? 'Đã từ chối' : 'Rejected')
+                  : (isVi ? 'Chờ duyệt' : 'Pending');
+
+              return (
+                <div key={ann.id} className={`tsd-annotation-item ${ann.reviewStatus.toLowerCase()}`}>
+                  <div className="tsd-ann-item-header">
+                    <div className="tsd-ann-type-group">
+                      <span className="tsd-ann-type-pill">
+                        {ann.errorType || (isVi ? 'Gợi ý' : 'Suggestion')}
+                      </span>
+                      {ann.source === 'TEACHER' && (
+                        <span className="tsd-ann-source-badge">
+                          {isVi ? 'Giáo viên' : 'Teacher'}
+                        </span>
+                      )}
+                      <span className="tsd-ann-range">
+                        [{ann.startOffset} - {ann.endOffset}]
+                      </span>
+                    </div>
+                    <StatusBadge status={badgeStatus} label={badgeLabel} showDot />
+                  </div>
+
+                  <div className="tsd-ann-item-body">
+                    {snippet && (
+                      <div className="tsd-ann-snippet">
+                        <span className="tsd-ann-quote-mark">&ldquo;</span>
+                        {snippet}
+                        <span className="tsd-ann-quote-mark">&rdquo;</span>
+                      </div>
+                    )}
+
+                    {ann.suggestedFix && (
+                      <div className="tsd-ann-fix-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Gợi ý sửa:' : 'Suggested fix:'}</span>
+                        <span className="tsd-ann-fix-val">{ann.suggestedFix}</span>
+                      </div>
+                    )}
+
+                    {ann.comment && (
+                      <div className="tsd-ann-comment-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Nhận xét:' : 'Comment:'}</span>
+                        <span className="tsd-ann-comment-val">{ann.comment}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="tsd-ann-item-actions">
+                    {ann.source === 'AI' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
+                          icon={CheckCircle2}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting || !canReviewCurrentAnnotations}
+                          onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
+                          className="tsd-btn-review-accept"
+                        >
+                          {ann.reviewStatus === 'ACCEPTED' ? (isVi ? 'Đã duyệt' : 'Accepted') : (isVi ? 'Duyệt' : 'Accept')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
+                          icon={XCircle}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting || !canReviewCurrentAnnotations}
+                          onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
+                          className="tsd-btn-review-reject"
+                        >
+                          {ann.reviewStatus === 'REJECTED' ? (isVi ? 'Đã từ chối' : 'Rejected') : (isVi ? 'Từ chối' : 'Reject')}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      icon={Trash2}
+                      loading={isDeleting}
+                      disabled={isReviewing || isDeleting}
+                      onClick={() => handleDeleteAnnotation(ann.id)}
+                      className="tsd-btn-delete-ann"
+                    >
+                      {isVi ? 'Xóa' : 'Delete'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="tsd-page-container py-6">
+        <LoadingState 
+          title={isVi ? 'Đang tải bài làm học viên và phân tích AI...' : 'Loading student submission & AI insights...'}
+          description={isVi ? 'Đang kết nối hệ thống chấm chữa và bài nộp thực tế.' : 'Connecting to grading engine and live answers.'}
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="tsd-error-card">
+        <div className="tsd-error-header">
+          <AlertCircle size={24} color="var(--error)" />
+          <h3 className="tsd-error-title">{error}</h3>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleRetry}
+          icon={RefreshCw}
+        >
+          {isVi ? 'Thử lại' : 'Retry'}
+        </Button>
+      </div>
+    );
+  }
+
+  if (!submission) {
+    return (
+      <div className="tsd-page-container tsd-page-empty">
+        <EmptyState
+          icon={FileText}
+          title={isVi ? 'Học viên này chưa nộp bài tập' : 'No submission found for this student'}
+          description={`${studentInfo?.name || 'Học viên'} ${isVi ? 'hiện chưa hoàn thành nộp bài tập này.' : 'has not submitted this assignment yet.'}`}
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={ArrowLeft}
+              onClick={() => navigate(`/teacher/assignments/${id}`)}
+            >
+              {t('submissionDetails.backToList')}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="tsd-page-container">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="tsd-toast">
+          <CheckCircle2 size={16} color="#4ade80" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Top Breadcrumbs & Actions */}
+      <div className="tsd-nav-bar">
+        <button
+          onClick={() => navigate(`/teacher/assignments/${id}`)}
+          className="tsd-back-link"
+        >
+          <ArrowLeft size={16} /> {t('submissionDetails.backToList')}
+        </button>
+
+        {classSubmissions.length > 0 && (
+          <div className="tsd-pager-bar">
+            <button
+              onClick={() => handleNavigateSibling('prev')}
+              className="tsd-pager-btn"
+            >
+              <ChevronLeft size={14} /> {t('submissionDetails.btnPrev')}
+            </button>
+            <span className="tsd-pager-count">
+              {currentIndex + 1} / {classSubmissions.length}
+            </span>
+            <button
+              onClick={() => handleNavigateSibling('next')}
+              className="tsd-pager-btn next"
+            >
+              {t('submissionDetails.btnNextPrefix')} <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Header Info */}
+      <div className="tsd-header">
+        <h1 className="tsd-header-title">
+          {assignment?.title || (isVi ? 'BÀI TẬP TIẾNG ANH' : 'ENGLISH ASSIGNMENT')}
+        </h1>
+      </div>
+
+      {/* Student Banner */}
+      <div className="tsd-student-card">
+        <div className="tsd-student-info-left">
+          <div className="tsd-student-avatar">
+            <User size={24} />
+          </div>
+          <div>
+            <div className="tsd-student-name-row">
+              <h2 className="tsd-student-name">
+                {studentInfo?.name || (isVi ? `Học viên #${studentId}` : `Student #${studentId}`)}
+              </h2>
+              <StatusBadge
+                status={submission.status === 'GRADED' ? 'success' : 'info'}
+                label={submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
+              />
+              <span className="tsd-student-code">
+                {studentInfo?.code || `HV-${studentId}`}
+              </span>
+            </div>
+            {studentInfo?.email && (
+              <div className="tsd-student-meta">
+                <span>{studentInfo.email}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="tsd-time-info">
+          <div className="tsd-time-block">
+            <div className="tsd-time-label">{t('submissionDetails.submissionTimePrefix')}</div>
+            <div className="tsd-time-val">
+              {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'Vừa xong'}
+            </div>
+          </div>
+          {!isSpeaking && (
+            <>
+              <div className="tsd-time-divider" />
+              <div className="tsd-ontime-indicator">
+                <span className="tsd-ontime-dot" />
+                <span className="tsd-ontime-text">{t('submissionDetails.statusOnTime')}</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Module Switcher Tabs if multiple modules exist */}
+      {submission.modules && submission.modules.length > 1 && (
+        <div className="tsd-module-tabs">
+          {submission.modules.map((m) => {
+            const isSelected = m.id === (activeModule?.id || selectedModuleId);
+            const label = m.skill || (isVi ? `Phần ${m.id}` : `Module ${m.id}`);
+            const isDone = isModuleGraded(m);
+            const maxSc = m.grading?.maxScoreSnapshot ?? (m.id === activeModule?.id ? dynamicMaxScore : 10);
+            const scoreDisplay = m.grading?.finalScore != null
+              ? ` (${m.grading.finalScore}/${maxSc})`
+              : '';
+            const hasDraft = Boolean(draftModuleIds[m.id]) && !isDone;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className={`tsd-module-tab ${isSelected ? 'active' : ''} ${isDone ? 'done' : ''} ${hasDraft ? 'has-draft' : ''}`}
+                onClick={() => handleSelectModule(m.id)}
+                title={isDone ? (isVi ? 'Phần này đã có điểm' : 'Module graded') : (isVi ? 'Chưa chấm điểm' : 'Pending grading')}
+              >
+                {label}{scoreDisplay} {isDone ? '✓' : ''}
+                {hasDraft && (
+                  <span className="tsd-module-tab-draft-badge" aria-hidden="true">
+                    {isVi ? 'Nháp' : 'Draft'}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Metrics Row (Only for non-speaking modules) */}
+      {!isSpeaking && (
+        <div className="tsd-metrics-grid">
+          {activeModule?.skill === 'WRITING' && (
+            <MetricCard
+              title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
+              value={aiSuggestion?.suggestedScore != null
+                ? String(aiSuggestion.suggestedScore)
+                : (gradingDetail?.aiFeedback || isAnalyzingAi ? (isVi ? 'Đang phân tích' : 'Analyzing') : '--')}
+              suffix={`/ ${dynamicMaxScore}`}
+            />
+          )}
+          {gradingDetail?.finalScore != null && (
+            <MetricCard
+              title={isVi ? 'Điểm giáo viên đã chấm' : 'Teacher Score'}
+              value={String(gradingDetail.finalScore)}
+              suffix={`/ ${dynamicMaxScore}`}
+            />
+          )}
+        </div>
+      )}
+
+      {isSpeaking ? (
+        /* Speaking Optimized Layout: Audio Hero Top + Balanced 2-Column Feedback Workspace (50% AI / 50% Teacher) */
+        <div className="tsd-speaking-container">
+          {/* Top Section: Audio Hero Card */}
+          <div className="tsd-speaking-hero-card">
+            <div className="tsd-speaking-hero-header">
+              <h3 className="tsd-speaking-hero-title flex items-center gap-2">
+                <Mic size={18} className="text-primary" />
+                <span>{isVi ? 'Bài nói của học viên' : 'Student Speaking Submission'}</span>
+              </h3>
+            </div>
+
+            <div className="tsd-speaking-hero-body">
+              <div className="tsd-prompt-label">
+                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
+              </div>
+              {moduleInstructions && (
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <strong className="text-slate-800">{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                    {parsedInstructions.minWords && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200">
+                        {isVi ? `Tối thiểu ${parsedInstructions.minWords} từ` : `Min ${parsedInstructions.minWords} words`}
+                      </span>
+                    )}
+                  </div>
+                  {parsedInstructions.diagramUrl && (
+                    <div className="mb-2 p-2 bg-white rounded-lg border border-slate-200 max-w-md">
+                      <img src={parsedInstructions.diagramUrl} alt="Diagram" className="max-h-60 object-contain rounded" />
+                    </div>
+                  )}
+                  <MarkdownView content={parsedInstructions.cleanInstructions || moduleInstructions} />
+                </div>
+              )}
+
+              <div className="tsd-speaking-audio-bar">
+                {isAudioLoading && !audioUrl ? (
+                  <div className="tsd-audio-empty">
+                    {isVi ? 'Đang tải audio bài nộp...' : 'Loading submission audio...'}
+                  </div>
+                ) : audioError ? (
+                    <div className="tsd-audio-error">
+                      <div className="tsd-audio-error-msg">
+                        <AlertCircle size={16} />
+                        <span>
+                          {isVi ? 'Không thể tải audio bài nộp. Vui lòng thử lại.' : 'Unable to load submission audio. Please try again.'}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={handleAudioRetry}
+                      >
+                        {isVi ? 'Thử lại' : 'Retry'}
+                      </Button>
+                    </div>
+                ) : audioUrl ? (
+                  <div className="tsd-speaking-audio-wrap">
+                    <audio
+                      ref={audioRef}
+                      controls
+                      src={audioUrl}
+                      preload="metadata"
+                      className="tsd-audio-player"
+                      onError={handleAudioError}
+                      onLoadedMetadata={handleAudioMetadata}
+                    >
+                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                    </audio>
+                  </div>
+                ) : (
+                  <div className="tsd-audio-empty">
+                    {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
+                  </div>
+                )}
+
+                {(audioUrl || audioStorageKey) && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={isDownloadingAudio}
+                    onClick={handleDownloadAudio}
+                    icon={Download}
+                  >
+                    {isVi ? 'Tải bản ghi âm' : 'Download Audio'}
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  loading={isAnalyzingAi}
+                  onClick={handleTriggerAiAnalyze}
+                  icon={Sparkles}
+                >
+                  {isAnalyzingAi
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...')
+                    : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
+                        ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
+                        : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
+                </Button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#F1F5F9', padding: '6px', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', border: '1px solid #E2E8F0', borderBottom: 'none', color: '#475569', fontSize: '12px' }}>
-                <button style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>B</button>
-                <button style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'none', cursor: 'pointer', fontStyle: 'italic', fontFamily: 'serif' }}>I</button>
-                <button style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'none', cursor: 'pointer', textDecoration: 'underline' }}>U</button>
-                <span style={{ width: '1px', height: '16px', backgroundColor: '#CBD5E1', margin: '0 4px' }}></span>
-                <button style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><List size={14} /></button>
-                <button style={{ padding: '4px', borderRadius: '4px', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><ListOrdered size={14} /></button>
-                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#94A3B8' }}>{t('submissionDetails.draftSaving')}</span>
+              {/* Spoken Audio Transcript for Teacher */}
+              <div className="tsd-speaking-transcript-wrap">
+                <div className="tsd-speaking-transcript-label">
+                  <FileText size={15} />
+                  <span>{isVi ? 'Bản ghi lời nói của học viên (AI Transcript):' : 'Student Audio Transcript (AI Transcribed):'}</span>
+                </div>
+                {transcriptText ? (
+                  <div className="tsd-speaking-transcript-text">
+                    {transcriptText}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted italic py-1">
+                    {isVi 
+                      ? 'Chưa có bản ghi âm tự động (Bấm "Chấm bài bằng AI" để trích xuất transcript lời nói của học viên).' 
+                      : 'No automated transcript available (Click "Grade with AI" to transcribe student audio).'}
+                  </div>
+                )}
               </div>
-              
-              <textarea 
-                style={{ 
-                  width: '100%', fontSize: '12px', color: '#1E293B', borderColor: '#E2E8F0', 
-                  borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', outline: 'none',
-                  padding: '12px', resize: 'none', lineHeight: 1.6, boxSizing: 'border-box'
-                }} 
-                placeholder={t('submissionDetails.feedbackPlaceholder')} 
-                rows={5}
-                defaultValue="Chào Alice, bài viết này em thể hiện vốn từ vựng học thuật rất tốt, đặc biệt là các thuật ngữ về môi trường & năng lượng tái tạo (TR & LR rất ấn tượng). Em duy trì phong độ này cho bài Task 1 tuần tới nhé! Cần lưu ý một chút về việc kiểm tra mạo từ hạn định (determiners) ở các câu phức."
-              ></textarea>
-              
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#94A3B8', paddingTop: '4px' }}>
-                <span>{t('submissionDetails.notificationHint')}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>238{t('submissionDetails.unitChars')}</span>
+            </div>
+          </div>
+
+          {/* Main 2-Column Workspace: Left 50% AI Feedback, Right 50% Teacher Evaluation */}
+          <div className="tsd-speaking-workspace">
+            {/* Left Column: AI Feedback with wide space for readability */}
+            <div className="tsd-speaking-ai-panel">
+              <div className="tsd-speaking-panel-header">
+                <span className="tsd-speaking-panel-title">
+                  {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
+                </span>
+                {aiSuggestion?.suggestedScore != null ? (
+                  <span className="tsd-speaking-ai-score">
+                    {isVi ? 'Điểm AI đề xuất: ' : 'AI Suggested: '}
+                    <strong>{String(aiSuggestion.suggestedScore)}</strong> / {dynamicMaxScore}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="tsd-speaking-ai-content">
+                <MarkdownView
+                  content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
+                  fallbackText={isVi
+                    ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.'
+                    : 'No AI feedback available. Click "Grade with AI" to analyze the submission.'}
+                  className="tsd-speaking-ai-markdown"
+                />
+                {renderAnnotationsSection()}
+              </div>
+            </div>
+
+            {/* Right Column: Teacher Official Evaluation & Feedback Studio */}
+            <div className="tsd-speaking-teacher-panel">
+              <div className="tsd-speaking-panel-header">
+                <span className="tsd-speaking-panel-title">
+                  {isVi ? 'Đánh giá của giáo viên' : 'Teacher Evaluation'}
+                </span>
+              </div>
+
+              <div className="tsd-speaking-score-row">
+                <label className="tsd-card-label">
+                  {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
+                </label>
+                <div className="tsd-score-input-wrap">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max={String(dynamicMaxScore)}
+                    placeholder="0.0"
+                    value={finalScoreInput}
+                    onChange={(e) => handleScoreChange(e.target.value)}
+                    className="tsd-score-input"
+                  />
+                  <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
+                </div>
+              </div>
+
+              <div className="tsd-speaking-feedback-wrap">
+                {renderFeedbackEditor(9)}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : activeModule?.skill === 'READING' || activeModule?.skill === 'LISTENING' ? (
+        /* Reading and Listening Layout: Passage/Audio + Question & Answer Review */
+        <div className="tsd-grading-grid">
+          {/* Left Column: Questions, Passage and Student Answers */}
+          <div className="tsd-answer-card">
+            <div className="tsd-answer-header">
+              <div className="tsd-answer-title">
+                {activeModule?.skill === 'READING' ? (
+                  <BookOpen size={18} className="text-primary" />
+                ) : (
+                  <Headphones size={18} className="text-primary" />
+                )}
+                <span>
+                  {activeModule?.skill === 'READING'
+                    ? (isVi ? 'Bài đọc & Kết quả làm bài' : 'Reading Passage & Results')
+                    : (isVi ? 'Bài nghe & Kết quả làm bài' : 'Listening Track & Results')}
+                </span>
+              </div>
+              <div className="tsd-answer-wordcount">
+                {questionsList.length} {isVi ? 'câu hỏi' : 'questions'}
+              </div>
+            </div>
 
-      <StickyActionBar 
+            <div className="tsd-answer-box">
+              {/* Listening Track Player */}
+              {activeModule?.skill === 'LISTENING' && (
+                <div className="tsd-listening-audio-box">
+                  <div className="flex items-center gap-2 mb-2 font-semibold text-sm text-slate-800">
+                    <Headphones size={16} className="text-primary" />
+                    <span>{isVi ? 'Tệp âm thanh bài nghe (Đề bài)' : 'Listening Audio Track'}</span>
+                  </div>
+                  {listeningAudioUrl ? (
+                    <audio controls className="w-full mt-1" src={listeningAudioUrl} preload="metadata">
+                      {isVi ? 'Trình duyệt không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                    </audio>
+                  ) : (
+                    <div className="text-xs text-muted italic py-1">
+                      {isVi ? 'Chưa tải được tệp âm thanh bài nghe của đề bài.' : 'Listening audio track is not available.'}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reading Passage if available */}
+              {activeModule?.skill === 'READING' && (parsedInstructions.readingBody || parsedInstructions.cleanInstructions) && (
+                <div className="tsd-passage-card">
+                  {parsedInstructions.readingTitle ? (
+                    <div className="tsd-passage-title">
+                      {parsedInstructions.readingTitle}
+                    </div>
+                  ) : (
+                    <div className="tsd-prompt-label mb-2">
+                      {isVi ? 'BÀI ĐỌC (READING PASSAGE)' : 'READING PASSAGE'}
+                    </div>
+                  )}
+                  <div className="tsd-passage-body">
+                    {parsedInstructions.readingBody || parsedInstructions.cleanInstructions}
+                  </div>
+                </div>
+              )}
+
+              {/* Questions & Student Answers Section */}
+              <div className="result-card p-4 rounded-xl border border-border/60 bg-white">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div className="result-mcq-header-title">
+                    <HelpCircle size={18} className="text-primary" />
+                    <h3 className="result-mcq-title-h3 text-sm">
+                      {isVi ? 'Chi tiết câu hỏi & đáp án' : 'Questions & Answers'} ({questionsList.length} {isVi ? 'câu' : 'questions'})
+                    </h3>
+                  </div>
+
+                  {questionsList.length > 0 && (
+                    <div className="result-mcq-filter-group">
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('all')}
+                      >
+                        {isVi ? 'Tất cả' : 'All'} ({questionsList.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'correct' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('correct')}
+                      >
+                        {isVi ? 'Đúng' : 'Correct'} ({questionsList.filter((q) => q.isCorrect === true).length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'incorrect' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('incorrect')}
+                      >
+                        {isVi ? 'Sai' : 'Incorrect'} ({questionsList.filter((q) => q.isCorrect === false).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {questionsList.length === 0 ? (
+                  <div className="result-empty-tab-content py-8 text-center text-muted">
+                    <HelpCircle size={28} className="mx-auto mb-2 text-slate-400" />
+                    <p className="text-sm">{isVi ? 'Không tìm thấy danh sách câu hỏi trong phần này.' : 'No questions found for this module.'}</p>
+                  </div>
+                ) : (
+                  <div className="result-mcq-list">
+                    {filteredQuestions.map((q) => (
+                      <div
+                        key={q.id}
+                        className={`result-mcq-card ${q.isCorrect === true ? 'is-correct' : q.isCorrect === false ? 'is-incorrect' : ''}`}
+                      >
+                        <div className="result-mcq-card-top">
+                          <span className="result-mcq-card-num">
+                            {isVi ? 'Câu' : 'Question'} {q.questionNumber}: {q.prompt}
+                          </span>
+                          {q.isCorrect !== undefined && (
+                            <span className={`result-mcq-status-badge ${q.isCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                              {q.isCorrect ? (isVi ? 'ĐÚNG' : 'CORRECT') : (isVi ? 'SAI' : 'INCORRECT')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="result-mcq-meta">
+                          <div>
+                            <span className="text-on-surface-variant">{isVi ? 'Học viên chọn' : 'Student answer'}: </span>
+                            <strong className={q.isCorrect === true ? 'result-mcq-answer-correct' : q.isCorrect === false ? 'result-mcq-answer-incorrect' : ''}>
+                              {q.studentAnswer}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-on-surface-variant">{isVi ? 'Đáp án đúng' : 'Correct answer'}: </span>
+                            <strong className="result-mcq-answer-correct">{q.correctAnswer}</strong>
+                          </div>
+                        </div>
+
+                        {q.options && q.options.length > 0 && (
+                          <div className="result-mcq-options-grid">
+                            {q.options.map((opt) => {
+                              const isStudentPick = q.studentAnswer.startsWith(opt.key);
+                              const isCorrectOption = q.correctAnswer.startsWith(opt.key);
+                              return (
+                                <div
+                                  key={opt.key}
+                                  className={`result-mcq-opt-item ${isCorrectOption ? 'is-correct' : isStudentPick && !q.isCorrect ? 'is-student-wrong' : ''}`}
+                                >
+                                  <span className={`result-mcq-opt-key ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                    {opt.key}
+                                  </span>
+                                  <span className={`result-mcq-opt-text ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                    {opt.text}
+                                  </span>
+                                  {isCorrectOption && (
+                                    <span className="result-mcq-tag-correct inline-flex items-center gap-1">
+                                      <CheckCircle2 size={12} />
+                                      <span>{isVi ? 'Đáp án đúng' : 'Correct'}</span>
+                                    </span>
+                                  )}
+                                  {isStudentPick && !isCorrectOption && (
+                                    <span className="result-mcq-tag-wrong inline-flex items-center gap-1">
+                                      <XCircle size={12} />
+                                      <span>{isVi ? 'Học viên chọn' : 'Student pick'}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Score & Feedback Studio (No AI clutter) */}
+          <div className="tsd-sidebar">
+            {/* Teacher Score Input */}
+            <div className="tsd-score-card">
+              <label className="tsd-card-label">
+                {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
+              </label>
+              <div className="tsd-score-input-wrap">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max={String(dynamicMaxScore)}
+                  placeholder="0.0"
+                  value={finalScoreInput}
+                  onChange={(e) => handleScoreChange(e.target.value)}
+                  className="tsd-score-input"
+                />
+                <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
+              </div>
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
+            </div>
+
+            {/* Feedback Editor with Markdown preview */}
+            <div className="tsd-feedback-card">
+              {renderFeedbackEditor(7)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Standard Two-Column Layout for Writing */
+        <div className="tsd-grading-grid">
+          {/* Left Column: Student Answer Viewer */}
+          <div className="tsd-answer-card">
+            <div className="tsd-answer-header">
+              <div className="tsd-answer-title">
+                <span className="tsd-answer-title-dot" />
+                <span>
+                  {isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}
+                </span>
+              </div>
+              <div className="tsd-answer-wordcount">
+                {wordCount > 0
+                  ? `${wordCount} ${isVi ? 'từ' : 'words'}`
+                  : (attachedDocAnswers.length > 0 ? (isVi ? 'Tệp đính kèm' : 'Attached file') : (isVi ? '0 từ' : '0 words'))}
+              </div>
+            </div>
+
+            <div className="tsd-answer-box">
+              <div className="tsd-prompt-label">
+                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
+              </div>
+              {moduleInstructions && (
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <strong className="text-slate-800">{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                    {parsedInstructions.minWords && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                        {isVi ? `Yêu cầu tối thiểu: ${parsedInstructions.minWords} từ` : `Min words: ${parsedInstructions.minWords}`}
+                      </span>
+                    )}
+                  </div>
+                  {parsedInstructions.diagramUrl && (
+                    <div className="mb-3 p-3 bg-white rounded-xl border border-slate-200 max-w-xl">
+                      <img
+                        src={parsedInstructions.diagramUrl}
+                        alt="Task Diagram"
+                        className="w-full max-h-80 object-contain rounded-lg"
+                      />
+                    </div>
+                  )}
+                  <MarkdownView content={parsedInstructions.cleanInstructions || moduleInstructions} />
+                </div>
+              )}
+
+              {/* Display attached document files if student uploaded file */}
+              {attachedDocAnswers.length > 0 && (
+                <div className="tsd-answer-attached-files">
+                  <div className="tsd-attached-files-label">
+                    <FileText size={15} />
+                    <span>{isVi ? 'Tệp bài làm của học viên:' : 'Student submission document:'}</span>
+                  </div>
+                  <div className="tsd-attached-files-list">
+                    {attachedDocAnswers.map((ans) => {
+                      const docKey = ans.docStorageKey || '';
+                      const isPdf = ans.docMimeType?.includes('pdf') || docKey.toLowerCase().endsWith('.pdf');
+                      const isTxt = ans.docMimeType?.includes('text/plain') || docKey.toLowerCase().endsWith('.txt');
+                      const extension = isPdf ? 'pdf' : isTxt ? 'txt' : 'docx';
+                      const fileName = getFileNameFromKey(docKey);
+
+                      return (
+                        <FileItem
+                          key={ans.id}
+                          name={fileName}
+                          extension={extension}
+                          size={isVi ? 'Tệp bài làm' : 'Submission file'}
+                          details={t('submissionDetails.submittedOn')}
+                          onView={() => handleViewDocument(docKey)}
+                          onDownload={() => handleDownloadDocument(docKey)}
+                          isDownloading={isDownloadingDoc}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Display text essay if available */}
+              {studentAnswerText ? (
+                <p className="tsd-essay-paragraph whitespace-pre-line">
+                  {studentAnswerText}
+                </p>
+              ) : attachedDocAnswers.length > 0 ? (
+                <div className="tsd-file-only-note">
+                  <p>{isVi ? 'Học viên đã nộp bài hoàn chỉnh qua tệp đính kèm ở trên. Hãy bấm "Xem" hoặc "Tải xuống" để kiểm tra bài làm.' : 'Student submitted their assignment via the attached document above. Click "View" or "Download" to review.'}</p>
+                </div>
+              ) : (
+                <p className="tsd-online-answer-note">
+                  {isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.'}
+                </p>
+              )}
+            </div>
+
+            <div className="tsd-answer-footer">
+              <div>
+                <span>{t('submissionDetails.wordCountPrefix')}<strong>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: AI Insights & Feedback Studio */}
+          <div className="tsd-sidebar">
+            {/* Teacher Score Input */}
+            <div className="tsd-score-card">
+              <label className="tsd-card-label">
+                {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
+              </label>
+              <div className="tsd-score-input-wrap">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max={String(dynamicMaxScore)}
+                  placeholder="0.0"
+                  value={finalScoreInput}
+                  onChange={(e) => handleScoreChange(e.target.value)}
+                  className="tsd-score-input"
+                />
+                <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
+              </div>
+            </div>
+
+            {/* AI Grading Insight with Grade with AI Button */}
+            <div className="tsd-ai-box">
+              <div className="tsd-ai-box-header">
+                <span className="tsd-ai-header-title">
+                  <Sparkles size={14} />
+                  {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
+                </span>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  loading={isAnalyzingAi}
+                  onClick={handleTriggerAiAnalyze}
+                  icon={Sparkles}
+                >
+                  {isAnalyzingAi
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...')
+                    : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
+                        ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
+                        : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
+                </Button>
+              </div>
+              <MarkdownView
+                content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
+                fallbackText={isVi
+                  ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.'
+                  : 'No AI feedback available. Click "Grade with AI" to generate AI insights.'}
+                className="tsd-ai-markdown"
+              />
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
+            </div>
+
+            {/* Feedback Editor with Markdown preview */}
+            <div className="tsd-feedback-card">
+              {renderFeedbackEditor(5)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Bắt buộc nhập lý do điều chỉnh điểm đã chấm (UC030 / AD30) */}
+      {showAuditReasonModal && pendingGradeAdjustment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full overflow-hidden animate-scale-up">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {isVi ? 'Lý do điều chỉnh điểm số' : 'Grade Adjustment Audit Reason'}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isVi ? 'Quy chuẩn kiểm toán điểm số yêu cầu ghi nhận lý do thay đổi điểm' : 'Audit policy requires recording the reason for changing grades'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label={isVi ? 'Đóng modal điều chỉnh điểm' : 'Close audit modal'}
+                onClick={() => {
+                  setShowAuditReasonModal(false);
+                  setPendingGradeAdjustment(null);
+                }}
+                className="p-1 rounded-lg text-muted-foreground hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                {isVi
+                  ? `Bài nộp này đã có điểm trước đó (${pendingGradeAdjustment.oldScore} điểm). Bạn đang điều chỉnh thành ${pendingGradeAdjustment.scoreNum} điểm. Vui lòng cung cấp lý do điều chỉnh để lưu vào lịch sử kiểm toán.`
+                  : `This submission was previously graded (${pendingGradeAdjustment.oldScore}). You are adjusting it to ${pendingGradeAdjustment.scoreNum}. Please provide an audit reason note.`}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={auditReasonNote}
+                  onChange={(e) => setAuditReasonNote(e.target.value)}
+                  placeholder={
+                    isVi
+                      ? 'Nhập lý do thay đổi điểm (ví dụ: Chấm lại theo phúc khảo, cộng điểm chuyên cần, điều chỉnh theo rubric...)'
+                      : 'Enter audit note explaining the score change...'
+                  }
+                  className="w-full p-3 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowAuditReasonModal(false);
+                  setPendingGradeAdjustment(null);
+                }}
+              >
+                {isVi ? 'Hủy bỏ' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmAuditGradeAdjustment}
+                disabled={!auditReasonNote.trim() || auditReasonNote.trim().length < 3 || isSubmittingGrade}
+                loading={isSubmittingGrade}
+              >
+                {isVi ? 'Xác nhận & Cập nhật điểm' : 'Confirm & Update Grade'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <StickyActionBar
         leftActions={
           <>
-            <button className="btn btn-secondary border-none" style={{ color: '#475569' }}>
-              {t('submissionDetails.btnDiscard')}
-            </button>
-            <button className="btn btn-secondary" style={{ backgroundColor: '#F1F5F9', color: '#334155' }}>
-              <Save size={14} color="#64748B" /> {t('submissionDetails.btnSaveDraft')}
-            </button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate(`/teacher/assignments/${id}`)}
+            >
+              {isVi ? 'Quay lại' : 'Back'}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={isSubmittingGrade}
+              onClick={() => handleSaveGrade(false)}
+              icon={Save}
+            >
+              {t('submissionDetails.btnSaveDraft')}
+            </Button>
           </>
         }
         rightActions={
-          <button className="btn btn-primary" style={{ fontWeight: 700 }}>
-            <Send size={16} /> {t('submissionDetails.btnSend')}
-          </button>
+          <>
+            {remainingUnfinishedModules.length > 0 && (
+              <Button
+                variant="secondary"
+                disabled={isSubmittingGrade}
+                onClick={() => handleSaveGrade(true, true)}
+                icon={ChevronRight}
+              >
+                {isVi ? 'Lưu & Chuyển phần tiếp' : 'Save & Grade Next'}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              disabled={isSubmittingGrade}
+              onClick={() => handleSaveGrade(true, false)}
+              icon={isSubmittingGrade ? RefreshCw : Send}
+            >
+              {isSubmittingGrade ? (isVi ? 'Đang lưu...' : 'Submitting...') : t('submissionDetails.btnSend')}
+            </Button>
+          </>
         }
       />
     </div>

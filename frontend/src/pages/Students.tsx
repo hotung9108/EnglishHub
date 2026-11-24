@@ -1,195 +1,154 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
-  FileSpreadsheet, CheckCircle2, Award
+  Loader2, AlertCircle
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useUsers } from '../hooks/useUsers';
+import { useDebounce } from '../hooks/useDebounce';
+import { userService } from '../api/services/user.service';
+import type { UserListItem } from '../api/services/user.service';
+import { Button, MetricCard, EmptyState, Pagination, ConfirmModal } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 
-interface StudentDirectoryItem {
-  id: string;
+interface StudentRow {
+  id: number;
   name: string;
-  avatar: string;
-  class: string;
-  entry: string;
-  target: string;
-  progress: string;
-  progressPct: number;
-  progressStatus: 'good' | 'warning';
+  code: string;
   email: string;
-  phone: string;
-  parentPhone: string;
-  dob: string;
+  status: 'ACTIVE' | 'LOCKED';
+  enrolledClasses: number;
 }
 
 export const Students: React.FC = () => {
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
   const isVi = language === 'vi';
+  const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [levelFilter, setLevelFilter] = useState<'All' | 'IELTS' | 'TOEIC'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
+  const [statusModalStudent, setStatusModalStudent] = useState<StudentRow | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
 
-  const studentsData: StudentDirectoryItem[] = [
-    {
-      id: 'HV-8801',
-      name: 'Alice Johnson',
-      avatar: 'AJ',
-      class: 'ENG-IELTS-6.5A',
-      entry: '5.5',
-      target: '7.0',
-      progress: '14/15 Bài',
-      progressPct: 93,
-      progressStatus: 'good',
-      email: 'alice.j@student.edu.vn',
-      phone: '0912 345 678',
-      parentPhone: '0988 776 655',
-      dob: '2005-08-14'
-    },
-    {
-      id: 'HV-8802',
-      name: 'David Pham',
-      avatar: 'DP',
-      class: 'ENG-IELTS-6.5A',
-      entry: '5.0',
-      target: '6.5',
-      progress: '8/15 Bài',
-      progressPct: 53,
-      progressStatus: 'warning',
-      email: 'david.p@student.edu.vn',
-      phone: '0933 111 222',
-      parentPhone: '0977 444 333',
-      dob: '2005-11-20'
-    },
-    {
-      id: 'HV-8803',
-      name: 'Lê Bảo Trâm',
-      avatar: 'BT',
-      class: 'ENG-TOEIC-750',
-      entry: '600',
-      target: '800',
-      progress: '12/12 Bài',
-      progressPct: 100,
-      progressStatus: 'good',
-      email: 'tram.lb@student.edu.vn',
-      phone: '0944 555 666',
-      parentPhone: '0911 222 333',
-      dob: '2004-03-05'
-    }
-  ];
-
-  const filtered = studentsData.filter(st => {
-    if (levelFilter === 'IELTS' && !st.class.includes('IELTS')) return false;
-    if (levelFilter === 'TOEIC' && !st.class.includes('TOEIC')) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        st.name.toLowerCase().includes(q) ||
-        st.id.toLowerCase().includes(q) ||
-        st.class.toLowerCase().includes(q)
-      );
-    }
-    return true;
+  const {
+    users,
+    pagination,
+    isLoading: loading,
+    error,
+    setQuery,
+    setPage,
+    setLimit,
+    refetch,
+  } = useUsers({
+    initialRole: 'STUDENT',
+    initialPage: 1,
+    initialLimit: 10,
   });
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
+  const isFirstSearchEffect = React.useRef(true);
+
+  useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      if (!debouncedSearchQuery.trim()) return;
+    }
+    setQuery(debouncedSearchQuery.trim());
+  }, [debouncedSearchQuery, setQuery]);
+
+  const studentsData = useMemo(() => {
+    return users.map((st: UserListItem) => ({
+      id: st.id,
+      name: st.fullName,
+      code: `HV-${String(st.id).padStart(4, '0')}`,
+      email: st.email,
+      status: (st.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE') as 'ACTIVE' | 'LOCKED',
+      enrolledClasses: 1
+    }));
+  }, [users]);
+
+  const displayedStudents = useMemo(() => {
+    if (statusFilter === 'All') return studentsData;
+    return studentsData.filter(st => st.status === statusFilter);
+  }, [studentsData, statusFilter]);
+
+  const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
+    setStatusFilter(status);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setLimit(size);
+  };
+
+  const totalEnrolled = pagination.total;
+  const activeCount = studentsData.filter(s => s.status === 'ACTIVE').length;
 
   return (
     <div className="adm-container">
       {/* Header */}
-      <div className="adm-header">
+      <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Users size={28} color="var(--primary)" />
             {t('students.title')}
-            <span className="adm-title-badge">{studentsData.length} {isVi ? 'học viên' : 'students'}</span>
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Danh bạ học viên toàn khóa, theo dõi mục tiêu điểm số và tiến độ hoàn thành bài tập.' 
-              : 'Student directory, target band attainment tracking, and exercise submission completion.'}
-          </p>
         </div>
 
-        <div className="adm-actions">
-          <button 
-            className="btn btn-secondary"
-            onClick={() => alert(isVi ? 'Đang mở hộp thoại nhập file Excel...' : 'Opening Excel file dialog...')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <FileSpreadsheet size={16} color="#16a34a" />
-            <span>{t('students.importExcel')}</span>
-          </button>
-          <button 
-            className="btn btn-primary"
+        <div className="adm-actions flex items-center gap-3">
+          <Button 
+            variant="primary"
+            icon={<UserPlus size={16} />}
             onClick={() => navigate('/admin/students/create')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <UserPlus size={16} />
-            <span>{t('students.addStudent')}</span>
-          </button>
+            {t('students.addStudent')}
+          </Button>
         </div>
       </div>
 
+      {error && (
+        <div className="adm-alert-error mb-6">
+          <AlertCircle size={18} />
+          <span>{error.message || (isVi ? 'Không thể tải danh sách học viên.' : 'Failed to fetch students.')}</span>
+        </div>
+      )}
+
       {/* KPI Stats Strip */}
-      <div className="adm-kpi-grid">
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'TỔNG SỐ HỌC VIÊN' : 'TOTAL COHORT'}</div>
-              <div className="adm-kpi-value">1,248</div>
-            </div>
-            <div className="adm-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
-              <Users size={22} />
-            </div>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">+12%</span>
-            <span className="text-on-surface-variant">{isVi ? 'tăng trưởng tháng này' : 'growth this month'}</span>
-          </div>
-        </div>
+      <div className="adm-kpi-grid mb-6">
+        <MetricCard
+          title={isVi ? 'TỔNG SỐ HỌC VIÊN' : 'TOTAL COHORT'}
+          value={totalEnrolled}
+          footerText={`${activeCount} ${isVi ? 'tài khoản đang hoạt động' : 'active accounts'}`}
+        />
 
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'TỶ LỆ NỘP ĐỦ BÀI TẬP' : 'HOMEWORK COMPLIANCE'}</div>
-              <div className="adm-kpi-value">94.2%</div>
-            </div>
-            <div className="adm-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-              <CheckCircle2 size={22} />
-            </div>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">92.6%</span>
-            <span className="text-on-surface-variant">{isVi ? 'nộp đúng hạn SLA' : 'on-time submissions'}</span>
-          </div>
-        </div>
+        <MetricCard
+          title={isVi ? 'TRẠNG THÁI HỆ THỐNG' : 'ACCOUNT STATUS'}
+          value={totalEnrolled > 0 ? `${Math.round((activeCount / Math.max(1, studentsData.length)) * 100)}%` : '100%'}
+          footerText={isVi ? 'Tỷ lệ kích hoạt' : 'Activation rate'}
+        />
 
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'TỶ LỆ ĐẠT TARGET' : 'TARGET ATTAINMENT'}</div>
-              <div className="adm-kpi-value">84.2%</div>
-            </div>
-            <div className="adm-kpi-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
-              <Award size={22} />
-            </div>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">+5.1%</span>
-            <span className="text-on-surface-variant">{isVi ? 'vượt chuẩn đầu ra' : 'above baseline'}</span>
-          </div>
-        </div>
+        <MetricCard
+          title={isVi ? 'TÀI KHOẢN TẠM KHÓA' : 'LOCKED USERS'}
+          value={studentsData.filter(s => s.status === 'LOCKED').length}
+          footerText={isVi ? 'Cần hỗ trợ học vụ' : 'Needs attention'}
+        />
       </div>
 
       {/* Filter Bar */}
-      <div className="adm-filter-bar">
+      <div className="adm-filter-bar mb-6">
         <div className="adm-pills">
-          {(['All', 'IELTS', 'TOEIC'] as const).map(lvl => (
+          {(['All', 'ACTIVE', 'LOCKED'] as const).map(st => (
             <button
-              key={lvl}
-              onClick={() => setLevelFilter(lvl)}
-              className={`adm-pill ${levelFilter === lvl ? 'active' : ''}`}
+              key={st}
+              type="button"
+              onClick={() => handleStatusFilterChange(st)}
+              className={`adm-pill ${statusFilter === st ? 'active' : ''}`}
             >
-              <span>{lvl === 'All' ? t('students.filterAllLevels') : lvl}</span>
+              <span>{st === 'All' ? (isVi ? 'Tất cả trạng thái' : 'All') : st === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}</span>
             </button>
           ))}
         </div>
@@ -201,62 +160,172 @@ export const Students: React.FC = () => {
             className="adm-search-input"
             placeholder={t('students.searchPlaceholder')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
 
       {/* Modern Student Directory Table */}
       <div className="adm-table-card">
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th>{t('students.colId')}</th>
-              <th>{t('students.colName')}</th>
-              <th>{t('students.colClass')}</th>
-              <th>{t('students.colTarget')}</th>
-              <th>{t('students.colProgress')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(st => (
-              <tr 
-                key={st.id} 
-                className="adm-table-row-clickable"
-                onClick={() => navigate(`/admin/students/${st.id}`)}
+        {loading ? (
+          <div className="p-8 text-center text-muted">
+            <Loader2 size={32} className="animate-spin mx-auto mb-3" />
+            <div>{isVi ? 'Đang tải danh sách học viên...' : 'Loading students...'}</div>
+          </div>
+        ) : displayedStudents.length === 0 ? (
+          <EmptyState
+            icon={<Users size={40} />}
+            title={isVi ? 'Không tìm thấy học viên nào' : 'No students found'}
+            description={searchQuery 
+              ? (isVi ? 'Thử tìm với từ khóa khác.' : 'Try adjusting your search criteria.')
+              : (isVi ? 'Chưa có tài khoản học viên nào trong hệ thống.' : 'No student accounts exist yet.')}
+            action={
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<UserPlus size={14} />}
+                onClick={() => navigate('/admin/students/create')}
               >
-                <td className="font-mono font-semibold text-primary">{st.id}</td>
-                <td>
-                  <div className="adm-avatar-info">
-                    <div className="adm-avatar-name">{st.name}</div>
-                    <div className="adm-avatar-meta">{st.email}</div>
-                  </div>
-                </td>
-                <td className="font-mono text-on-surface-variant">{st.class}</td>
-                <td>
-                  <span className="text-on-surface-variant">{st.entry}</span>
-                  <span className="adm-score-arrow">&rarr;</span>
-                  <strong className="text-primary font-bold">{st.target}</strong>
-                </td>
-                <td>
-                  <div className="adm-progress-cell">
-                    <div className="adm-progress-text-row">
-                      <span className="font-semibold">{st.progress}</span>
-                      <span className="text-on-surface-variant">{st.progressPct}%</span>
-                    </div>
-                    <div className="adm-progress-track">
-                      <div 
-                        className={st.progressStatus === 'good' ? 'adm-progress-fill-good' : 'adm-progress-fill-warning'}
-                        style={{ width: `${st.progressPct}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                {t('students.addStudent')}
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{t('students.colId')}</th>
+                  <th>{t('students.colName')}</th>
+                  <th>Email</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedStudents.map(st => (
+                  <tr 
+                    key={st.id} 
+                    className="adm-table-row-clickable cursor-pointer"
+                    onClick={() => navigate(`/admin/students/${st.id}`, {
+                      state: {
+                        studentId: st.id,
+                        fullName: st.name,
+                        email: st.email,
+                        studentCode: st.code,
+                      }
+                    })}
+                  >
+                    <td className="font-mono font-semibold text-primary">{st.code}</td>
+                    <td>
+                      <div className="font-semibold text-surface">{st.name}</div>
+                    </td>
+                    <td className="font-mono text-muted">{st.email}</td>
+                    <td>
+                      <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
+                        {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <div className="inline-flex gap-2 justify-end">
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setStatusModalStudent(st);
+                          }}
+                        >
+                          {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
+                        </Button>
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/students/${st.id}`, {
+                              state: {
+                                studentId: st.id,
+                                fullName: st.name,
+                                email: st.email,
+                                studentCode: st.code,
+                              }
+                            });
+                          }}
+                        >
+                          {t('students.actionViewDetails')}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              pageSize={pagination.limit}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={(page) => setPage(page)}
+              onPageSizeChange={handlePageSizeChange}
+              itemLabel={isVi ? 'học viên' : 'students'}
+              isVi={isVi}
+              variant="table"
+            />
+          </>
+        )}
       </div>
+
+      {/* Two-Step Confirmation Modal for Student Status Change */}
+      {statusModalStudent && (
+        <ConfirmModal
+          isOpen={Boolean(statusModalStudent)}
+          title={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi ? 'Xác nhận khóa tài khoản học viên' : 'Lock Student Account')
+              : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock Student Account')
+          }
+          message={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn khóa tài khoản học viên "${statusModalStudent.name}"? Học viên này sẽ không thể đăng nhập hoặc nộp bài tập.`
+                  : `Are you sure you want to lock student account "${statusModalStudent.name}"? The student will lose access to assignments and classes.`)
+              : (isVi
+                  ? `Khôi phục quyền truy cập cho học viên "${statusModalStudent.name}"?`
+                  : `Restore system access for student "${statusModalStudent.name}"?`)
+          }
+          confirmText={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+              : (isVi ? 'Mở khóa' : 'Unlock Account')
+          }
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant={statusModalStudent.status === 'ACTIVE' ? 'danger' : 'primary'}
+          isLoading={isUpdatingStatus}
+          onConfirm={async () => {
+            if (!statusModalStudent) return;
+            const nextStatus = statusModalStudent.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+            setIsUpdatingStatus(true);
+            try {
+              await userService.updateStatus(statusModalStudent.id, nextStatus);
+              await refetch();
+              toastSuccess(
+                isVi
+                  ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${statusModalStudent.name} thành công.`
+                  : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} student ${statusModalStudent.name}.`
+              );
+              setStatusModalStudent(null);
+            } catch {
+              toastError(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
+            } finally {
+              setIsUpdatingStatus(false);
+            }
+          }}
+          onCancel={() => setStatusModalStudent(null)}
+        />
+      )}
     </div>
   );
 };

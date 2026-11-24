@@ -1,5 +1,7 @@
 package com.english_hub.core.modules.classroom.infrastructure.adapter;
 
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepository;
@@ -15,8 +17,13 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.english_hub.core.common.config.CacheConfig;
 
 /** JPA adapter for the ClassMemberRepository domain port. */
 @Repository
@@ -56,12 +63,14 @@ public class ClassMemberJpaAdapter implements ClassMemberRepository {
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public ClassMember save(ClassMember entity) {
 		ClassMemberEntity saved = jpaRepository.save(mapper.toEntity(entity));
 		return mapper.toDomain(saved);
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public void deleteById(Long id) {
 		jpaRepository.deleteById(id);
 	}
@@ -109,5 +118,30 @@ public class ClassMemberJpaAdapter implements ClassMemberRepository {
 	@Override
 	public Optional<ClassMember> findByClassIdAndId(Long classId, Long memberId) {
 		return jpaRepository.findByClassIdAndId(classId, memberId).map(mapper::toDomain);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ClassCandidatePage findCandidateStudents(long classId, String query, int page, int limit) {
+		int normalizedPage = page <= 0 ? 1 : page;
+		int clampedLimit = limit <= 0 ? 100 : Math.min(limit, 100);
+		String normalizedQuery = query == null ? "" : query.trim();
+		Page<Object[]> paged = jpaRepository.findCandidateStudentsRaw(
+				classId,
+				normalizedQuery,
+				PageRequest.of(normalizedPage - 1, clampedLimit));
+		List<ClassCandidateStudent> candidates = paged.getContent().stream().map(row -> new ClassCandidateStudent(
+				((Number) row[0]).longValue(),
+				(String) row[1],
+				(String) row[2],
+				(String) row[3],
+				(String) row[4])).toList();
+		return new ClassCandidatePage(candidates, normalizedPage, clampedLimit, paged.getTotalElements());
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<ClassCandidateStudent> findCandidateStudents(long classId, String query, int limit) {
+		return findCandidateStudents(classId, query, 1, limit).candidates();
 	}
 }

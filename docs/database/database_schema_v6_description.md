@@ -199,7 +199,7 @@ Chứa câu trả lời của học viên cho từng câu hỏi hoặc từng b�
 | `audio_mime_type` | `varchar(50)` | | Loại MIME âm thanh[cite: 3] |
 | `audio_upload_status` | `enum upload_status` | | Trạng thái upload âm thanh[cite: 3] |
 | `doc_storage_key` | `varchar(255)` | | Key file tài liệu đính kèm[cite: 3] |
-| `doc_mime_type` | `varchar(50)` | | Loại MIME tài liệu[cite: 3] |
+| `doc_mime_type` | `varchar(255)` | | Loại MIME tài liệu[cite: 3] |
 | `doc_file_size_bytes` | `bigint` | | Dung lượng tài liệu[cite: 3] |
 | `doc_upload_status` | `enum upload_status` | | Trạng thái upload tài liệu[cite: 3] |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT `now()` | Thời gian tạo[cite: 3] |

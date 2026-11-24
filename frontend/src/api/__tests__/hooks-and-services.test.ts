@@ -5,6 +5,8 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { MemoryTokenStorage } from '../core/token-storage';
 import { TokenRefreshManager } from '../core/interceptors';
 import { AuthService } from '../services/auth.service';
+import { NotFoundError, parseApiError, RequestCanceledError, TimeoutError } from '../core/errors';
+import { environment } from '../../config/environment';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
 import { buildListParams, computePagination, pageAfterEmptyRefetch } from '../../hooks/useUsers.utils';
@@ -39,6 +41,62 @@ test('AuthService - login sets tokens and session, logout clears session', async
   // Logout
   mockHttp.mockResponse = { message: 'Logged out' };
   await auth.logout();
+  assert.strictEqual(storage.getAccessToken(), null);
+  assert.strictEqual(storage.getRefreshToken(), null);
+  assert.strictEqual(auth.isAuthenticated(), false);
+});
+
+test('AuthService - login HTTP 404 rejects without writing tokens or cached user', async (context) => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+  const failure = new NotFoundError('Tài khoản không tồn tại.');
+  mockHttp.mockError = failure;
+  const accessWrites = context.mock.method(storage, 'setAccessToken');
+  const refreshWrites = context.mock.method(storage, 'setRefreshToken');
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const cachedItems = new Map<string, string>();
+  const userWrites: string[] = [];
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => cachedItems.get(key) ?? null,
+    setItem: (key: string, value: string) => { userWrites.push(key); cachedItems.set(key, value); },
+    removeItem: (key: string) => { cachedItems.delete(key); },
+  } });
+  try {
+    await assert.rejects(auth.login({ email: 'teacher@englishhub.dev', password: 'SecretPassword' }),
+      (error: unknown) => error === failure);
+    assert.strictEqual(accessWrites.mock.callCount(), 0);
+    assert.strictEqual(refreshWrites.mock.callCount(), 0);
+    assert.strictEqual(storage.getAccessToken(), null);
+    assert.strictEqual(storage.getRefreshToken(), null);
+    assert.strictEqual(auth.getSavedUser(), null);
+    assert.strictEqual(cachedItems.has(environment.auth.userKey), false);
+    assert.strictEqual(userWrites.length, 0);
+    assert.deepStrictEqual(mockHttp.calls, [{ method: 'POST', url: '/auth/login',
+      data: { email: 'teacher@englishhub.dev', password: 'SecretPassword' }, options: { skipAuth: true } }]);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  }
+});
+
+test('AuthService - logout clears session even if backend call fails', async () => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+
+  storage.setAccessToken('access-test');
+  storage.setRefreshToken('refresh-test');
+  assert.strictEqual(auth.isAuthenticated(), true);
+
+  // Simulate network/backend 500 error
+  mockHttp.mockError = new Error('500 Internal Server Error');
+
+  await assert.rejects(async () => {
+    await auth.logout();
+  });
+
+  // Local tokens must still be completely wiped
   assert.strictEqual(storage.getAccessToken(), null);
   assert.strictEqual(storage.getRefreshToken(), null);
   assert.strictEqual(auth.isAuthenticated(), false);
@@ -134,6 +192,21 @@ test('UserService - uses admin create, update, and delete routes', async () => {
     ['PUT', '/admin/users/12'],
     ['DELETE', '/admin/users/12'],
   ]);
+});
+
+test('UserService - creates ADMIN role successfully', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const adminPayload = { fullName: 'Admin QA', email: 'admin@qa.test', password: 'AdminPassword1!', role: 'ADMIN' as const };
+  mockHttp.mockResponse = { message: 'created', user: { id: 99, email: adminPayload.email, role: 'ADMIN' } };
+  const res = await userSvc.createUser(adminPayload);
+  assert.strictEqual(res.user.role, 'ADMIN');
+  assert.deepStrictEqual(mockHttp.calls[0], {
+    method: 'POST',
+    url: '/admin/users',
+    data: adminPayload,
+    options: undefined,
+  });
 });
 
 test('buildListParams clamps pagination and omits blank filters', () => {
@@ -284,6 +357,45 @@ test('ClassService - member sub-resources unwrap the data envelope', async () =>
   assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members/202');
 });
 
+test('ClassService - candidate students endpoint unwraps data envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [
+      { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+    ],
+  };
+
+  const candidates = await classSvc.listCandidates(15, { q: 'Minh', limit: 50 });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/candidates');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { q: 'Minh', limit: 50 });
+  assert.deepStrictEqual(candidates, [
+    { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+  ]);
+});
+
+test('ClassService - listCandidatesPage supports pagination and returns envelope with metadata', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [
+      { id: 106, fullName: 'Linh Pham', email: 'linh@example.com', studentCode: 'HV0106', status: 'ACTIVE' },
+    ],
+    pagination: { page: 2, limit: 10, total: 106 },
+  };
+
+  const res = await classSvc.listCandidatesPage(15, { q: 'linh@example.com', page: 2, limit: 10 });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/candidates');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { q: 'linh@example.com', page: 2, limit: 10 });
+  assert.deepStrictEqual(res.pagination, { page: 2, limit: 10, total: 106 });
+  assert.strictEqual(res.data.length, 1);
+  assert.strictEqual(res.data[0].id, 106);
+});
+
 test('buildListParams passes through extra filters for non-user endpoints', () => {
   assert.deepStrictEqual(buildListParams({ page: 2, limit: 10 }, { status: 'ACTIVE' }), {
     page: 2,
@@ -414,6 +526,73 @@ test('AssignmentService - full CRUD with correct endpoints and params', async ()
   assert.strictEqual(mockHttp.calls[5].method, 'PATCH');
   assert.strictEqual(mockHttp.calls[5].url, '/assignments/42/status');
   assert.deepStrictEqual(mockHttp.calls[5].data, { status: 'CLOSED' });
+  assert.strictEqual(mockHttp.calls[5].options, undefined);
+});
+
+test('AssignmentService - reopen without a new deadline sends only status', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { reopen: {} });
+
+  assert.deepStrictEqual(mockHttp.calls, [{
+    method: 'PATCH',
+    url: '/assignments/42/status',
+    data: { status: 'PUBLISHED' },
+    options: {},
+  }]);
+});
+
+test('AssignmentService - preserves closeAt and forwards HTTP options without reopen', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+  const closeAt = '2026-11-25T16:59:59+07:00';
+  const signal = new AbortController().signal;
+
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { signal, timeout: 1234, reopen: { closeAt } });
+  await assignmentSvc.updateAssignmentStatus(42, 'CLOSED', { signal, timeout: 4321 });
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { reopen: { closeAt: '' } });
+
+  assert.deepStrictEqual(mockHttp.calls, [
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'PUBLISHED', closeAt }, options: { signal, timeout: 1234 } },
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'CLOSED' }, options: { signal, timeout: 4321 } },
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'PUBLISHED', closeAt: '' }, options: {} },
+  ]);
+  assert.strictEqual(mockHttp.calls[0].options?.signal, signal);
+  assert.strictEqual(mockHttp.calls[1].options?.signal, signal);
+});
+
+test('AssignmentService - rejects a supplied deadline for DRAFT and CLOSED before HTTP', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  for (const status of ['DRAFT', 'CLOSED'] as const) {
+    await assert.rejects(
+      assignmentSvc.updateAssignmentStatus(42, status, { reopen: { closeAt: '2026-11-25T16:59:59+00:00' } }),
+      TypeError,
+    );
+  }
+  assert.deepStrictEqual(mockHttp.calls, []);
+});
+
+test('AssignmentService - treats a browser XHR abort as unconfirmed and preserves explicit cancellation', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const service = new AssignmentService(mockHttp);
+  const browserAbort = new axios.AxiosError('Request aborted', axios.AxiosError.ECONNABORTED);
+  mockHttp.mockError = parseApiError(browserAbort);
+  assert.ok(mockHttp.mockError instanceof RequestCanceledError);
+  await assert.rejects(service.updateAssignmentStatus(42, 'PUBLISHED'),
+    error => error instanceof TimeoutError && error.rawError === browserAbort);
+  assert.equal(mockHttp.calls.length, 1);
+
+  const explicitCancel = parseApiError(new axios.CanceledError());
+  mockHttp.mockError = explicitCancel;
+  await assert.rejects(service.updateAssignmentStatus(42, 'CLOSED'), error => error === explicitCancel);
+  assert.equal(mockHttp.calls.length, 2);
 });
 
 test('AssignmentService - trims/clamps params and omits empty status', async () => {

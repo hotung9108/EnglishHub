@@ -1,298 +1,238 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  GraduationCap, Plus, Search, 
-  Archive, LayoutGrid, List,
-  Clock, User, ArrowRight
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Loader2, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-
-interface ClassItem {
-  code: string;
-  name: string;
-  level: string;
-  teacher: string;
-  teacherAvatar: string;
-  students: number;
-  maxStudents: number;
-  schedule: string;
-  room: string;
-  status: 'active' | 'completed';
-  assignedExercises: number;
-  avgScore: number;
-}
+import { classService } from '../api/services/class.service';
+import type { ClassSummary } from '../api/services/class.service';
+import { Button, EmptyState, Pagination, ConfirmModal, useToast } from '../components/common';
 
 export const Classes: React.FC = () => {
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
   const isVi = language === 'vi';
+  const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
-  const classesData: ClassItem[] = [
-    {
-      code: 'ENG-IELTS-6.5A',
-      name: 'IELTS Intensive Band 6.5 - 7.5 (Target Master)',
-      level: 'IELTS 6.5+',
-      teacher: 'Cô Trần Thị Mai Lan',
-      teacherAvatar: 'TL',
-      students: 24,
-      maxStudents: 25,
-      schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
-      room: 'Online Room #04 (Zoom HD)',
-      status: 'active',
-      assignedExercises: 15,
-      avgScore: 7.2
-    },
-    {
-      code: 'ENG-TOEIC-750',
-      name: 'Luyện thi TOEIC Cấp tốc Mục tiêu 750+',
-      level: 'TOEIC 750+',
-      teacher: 'Cô Nguyễn Thu Trang',
-      teacherAvatar: 'TT',
-      students: 18,
-      maxStudents: 20,
-      schedule: 'T3 - T5 - T7 (19:30 - 21:00)',
-      room: 'Phòng 202 - Tòa A2',
-      status: 'active',
-      assignedExercises: 12,
-      avgScore: 7.8
-    },
-    {
-      code: 'ENG-COMM-B2',
-      name: 'Tiếng Anh Giao tiếp & Thuyết trình Chuyên sâu B2',
-      level: 'CEFR B2',
-      teacher: 'Thầy Mark Reynolds',
-      teacherAvatar: 'MR',
-      students: 12,
-      maxStudents: 15,
-      schedule: 'T7 - CN (09:00 - 11:30)',
-      room: 'Online Room #02 (Teams)',
-      status: 'active',
-      assignedExercises: 8,
-      avgScore: 8.0
-    },
-    {
-      code: 'ENG-IELTS-5.0',
-      name: 'IELTS Pre-Intermediate Khóa 12',
-      level: 'IELTS 5.0',
-      teacher: 'Thầy Hoàng Minh Đức',
-      teacherAvatar: 'MD',
-      students: 20,
-      maxStudents: 20,
-      schedule: 'Đã hoàn thành 30/30 buổi',
-      room: 'Phòng 101 - Tòa B1',
-      status: 'completed',
-      assignedExercises: 20,
-      avgScore: 7.5
-    }
-  ];
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const filtered = classesData.filter(cls => {
-    if (statusFilter !== 'all' && cls.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        cls.code.toLowerCase().includes(q) ||
-        cls.name.toLowerCase().includes(q) ||
-        cls.teacher.toLowerCase().includes(q)
+  const [classesData, setClassesData] = useState<Array<{
+    id: number;
+    name: string;
+    code: string;
+    teacher: string;
+    status: 'active' | 'completed' | 'cancelled';
+    level: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [classToChangeStatus, setClassToChangeStatus] = useState<{ id: number; name: string; action: 'close' | 'reopen' } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchClasses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await classService.list({ page: 1, limit: 100 });
+        if (!isMounted) return;
+
+        const mapped = (res.data || []).map((c: ClassSummary) => {
+          const rawStatus = (c.status || '').toUpperCase();
+          let status: 'active' | 'completed' | 'cancelled' = 'active';
+          if (rawStatus === 'COMPLETED' || rawStatus === 'INACTIVE') {
+            status = 'completed';
+          } else if (rawStatus === 'CANCELLED') {
+            status = 'cancelled';
+          }
+
+          return {
+            id: c.id,
+            name: c.name,
+            code: `ENG-${c.id}`,
+            teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
+            status,
+            level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'
+          };
+        });
+
+        setClassesData(mapped);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách lớp học.' : 'Failed to fetch classes.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchClasses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi]);
+
+  const handleStatusFilterChange = (status: 'all' | 'active' | 'completed' | 'cancelled') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleUpdateClassStatus = async () => {
+    if (!classToChangeStatus) return;
+    setIsUpdatingStatus(true);
+    const targetStatus = classToChangeStatus.action === 'close' ? 'COMPLETED' : 'ACTIVE';
+    try {
+      await classService.update(classToChangeStatus.id, { status: targetStatus });
+      setClassesData(prev => prev.map(c => {
+        if (c.id === classToChangeStatus.id) {
+          return {
+            ...c,
+            status: targetStatus === 'COMPLETED' ? 'completed' : 'active'
+          };
+        }
+        return c;
+      }));
+      toastSuccess(
+        classToChangeStatus.action === 'close'
+          ? (isVi ? 'Đóng lớp học thành công.' : 'Class closed successfully.')
+          : (isVi ? 'Mở lại lớp học thành công.' : 'Class reopened successfully.')
       );
+      setClassToChangeStatus(null);
+    } catch (err: unknown) {
+      toastError(
+        err instanceof Error
+          ? err.message
+          : (isVi ? 'Không thể cập nhật trạng thái lớp.' : 'Failed to update class status.')
+      );
+    } finally {
+      setIsUpdatingStatus(false);
     }
-    return true;
-  });
+  };
+
+  const filtered = useMemo(() => {
+    return classesData.filter(cls => {
+      if (statusFilter !== 'all' && cls.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          cls.name.toLowerCase().includes(q) ||
+          cls.code.toLowerCase().includes(q) ||
+          cls.teacher.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [classesData, statusFilter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
 
   return (
     <div className="adm-container">
       {/* Header */}
-      <div className="adm-header">
+      <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <GraduationCap size={28} color="var(--primary)" />
             {t('adminClasses.title')}
-            <span className="adm-title-badge">{classesData.length} {isVi ? 'lớp học' : 'classes'}</span>
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Quản lý thông tin khóa học, phân công giảng viên, sĩ số phòng học và tiến độ đào tạo.' 
-              : 'Cohort management, instructor assignments, student capacity, and course syllabus progress.'}
-          </p>
         </div>
 
-        <div className="adm-actions">
-          <Link 
-            to="/admin/classes/archive" 
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        <div className="adm-actions flex items-center gap-3">
+          <Button 
+            variant="secondary"
+            onClick={() => navigate('/admin/classes/archive')}
           >
-            <Archive size={16} />
-            <span>{t('classArchive.title')}</span>
-          </Link>
-          <Link 
-            to="/admin/classes/create" 
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            {t('classArchive.title')}
+          </Button>
+          <Button 
+            variant="primary"
+            onClick={() => navigate('/admin/classes/create')}
           >
-            <Plus size={16} />
-            <span>{t('adminClasses.createClass')}</span>
-          </Link>
+            {t('adminClasses.createClass')}
+          </Button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="adm-filter-bar">
+      <div className="adm-filter-bar mb-6">
         {/* Status Pills */}
         <div className="adm-pills">
           {(
             [
-              { key: 'all', label: isVi ? 'Tất cả lớp học' : 'All Classes', count: classesData.length },
-              { key: 'active', label: isVi ? 'Đang mở (Active)' : 'Active', count: classesData.filter(c => c.status === 'active').length },
-              { key: 'completed', label: isVi ? 'Đã hoàn thành' : 'Completed', count: classesData.filter(c => c.status === 'completed').length },
+              { key: 'all', label: isVi ? 'Tất cả lớp học' : 'All Classes' },
+              { key: 'active', label: isVi ? 'Đang mở' : 'Active' },
+              { key: 'completed', label: isVi ? 'Đã hoàn thành' : 'Completed' },
+              { key: 'cancelled', label: isVi ? 'Đã hủy' : 'Cancelled' },
             ] as const
           ).map(p => (
             <button
               key={p.key}
-              onClick={() => setStatusFilter(p.key)}
+              type="button"
+              onClick={() => handleStatusFilterChange(p.key)}
               className={`adm-pill ${statusFilter === p.key ? 'active' : ''}`}
             >
               <span>{p.label}</span>
-              <span className="adm-pill-badge">{p.count}</span>
             </button>
           ))}
         </div>
 
-        {/* Search & View Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="adm-search-wrap">
-            <Search size={16} className="adm-search-icon" />
-            <input 
-              type="text" 
-              className="adm-search-input"
-              placeholder={isVi ? 'Tìm tên lớp, mã lớp, giảng viên...' : 'Search classes...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div style={{ display: 'flex', border: '1px solid var(--outline-variant)', borderRadius: '8px', overflow: 'hidden' }}>
-            <button
-              onClick={() => setViewMode('grid')}
-              style={{
-                padding: '6px 10px',
-                border: 'none',
-                background: viewMode === 'grid' ? 'var(--primary)' : 'var(--surface)',
-                color: viewMode === 'grid' ? '#ffffff' : 'var(--on-surface-variant)',
-                cursor: 'pointer'
-              }}
-              title="Grid View"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '6px 10px',
-                border: 'none',
-                background: viewMode === 'list' ? 'var(--primary)' : 'var(--surface)',
-                color: viewMode === 'list' ? '#ffffff' : 'var(--on-surface-variant)',
-                cursor: 'pointer'
-              }}
-              title="Table View"
-            >
-              <List size={16} />
-            </button>
-          </div>
+        {/* Search */}
+        <div className="adm-search-wrap">
+          <Search size={16} className="adm-search-icon" />
+          <input 
+            type="text" 
+            className="adm-search-input"
+            placeholder={isVi ? 'Tìm tên lớp, mã lớp, giảng viên...' : 'Search classes...'}
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+          />
         </div>
       </div>
 
-      {/* Grid View Mode */}
-      {viewMode === 'grid' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '22px' }}>
-          {filtered.map(cls => {
-            const occupancyPct = Math.round((cls.students / cls.maxStudents) * 100);
-            return (
-              <div 
-                key={cls.code} 
-                className="card"
-                style={{ 
-                  padding: '22px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between', 
-                  gap: '16px',
-                  transition: 'all 0.25s ease',
-                  border: '1px solid var(--outline-variant)'
-                }}
-              >
-                <div>
-                  {/* Top Badges */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <span className="badge badge-primary font-mono">{cls.code}</span>
-                      <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', fontSize: '11.5px' }}>{cls.level}</span>
-                    </div>
-                    <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                      {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '16.5px', fontWeight: 700, margin: '0 0 12px 0', lineHeight: 1.4 }}>
-                    {cls.name}
-                  </h3>
-
-                  {/* Instructor & Meta */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <User size={15} color="var(--primary)" />
-                      <span>{t('adminClasses.teacherPrefix')}<strong>{cls.teacher}</strong></span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Clock size={15} />
-                      <span>{cls.schedule}</span>
-                    </div>
-                  </div>
-
-                  {/* Enrollment Progress Bar */}
-                  <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: '6px' }}>
-                      <span className="text-on-surface-variant">
-                        {isVi ? 'Sĩ số lấp đầy' : 'Class Capacity'}: <strong>{cls.students}/{cls.maxStudents}</strong>
-                      </span>
-                      <span className="font-semibold text-primary">{occupancyPct}%</span>
-                    </div>
-                    <div style={{ height: '6px', backgroundColor: 'var(--surface-container-high)', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div 
-                        style={{ 
-                          width: `${occupancyPct}%`, 
-                          height: '100%', 
-                          backgroundColor: occupancyPct > 90 ? '#2563eb' : '#059669', 
-                          borderRadius: '3px' 
-                        }} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Action */}
-                <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--outline-variant)', paddingTop: '14px' }}>
-                  <button
-                    onClick={() => navigate(`/admin/classes/${cls.code}`)}
-                    className="btn btn-secondary flex-1"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
-                  >
-                    <span>{t('adminClasses.manageClass')}</span>
-                    <ArrowRight size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      {error && (
+        <div className="adm-alert-error mb-6">
+          <AlertCircle size={18} />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Table View Mode */}
-      {viewMode === 'list' && (
+      {loading ? (
+        <div className="p-8 text-center text-muted">
+          <Loader2 size={32} className="animate-spin mx-auto mb-3" />
+          <div>{isVi ? 'Đang tải danh sách lớp học...' : 'Loading classes...'}</div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={isVi ? 'Không tìm thấy lớp học nào' : 'No classes found'}
+          description={searchQuery 
+            ? (isVi ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.' : 'No classes match your search query.')
+            : (isVi ? 'Chưa có lớp học nào được tạo trên hệ thống.' : 'No classes created yet.')}
+          action={
+            <Button 
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/admin/classes/create')}
+            >
+              {t('adminClasses.createClass')}
+            </Button>
+          }
+        />
+      ) : (
         <div className="adm-table-card">
           <table className="adm-table">
             <thead>
@@ -300,45 +240,111 @@ export const Classes: React.FC = () => {
                 <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
                 <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
                 <th>{isVi ? 'GIẢNG VIÊN' : 'INSTRUCTOR'}</th>
-                <th>{isVi ? 'SĨ SỐ' : 'ENROLLED'}</th>
-                <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
+                <th>{isVi ? 'TRÌNH ĐỘ' : 'LEVEL'}</th>
                 <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(cls => (
-                <tr key={cls.code} onClick={() => navigate(`/admin/classes/${cls.code}`)} style={{ cursor: 'pointer' }}>
+              {paginatedClasses.map(cls => (
+                <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
                   <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                  <td className="font-medium">{cls.name}</td>
+                  <td className="font-medium text-surface">{cls.name}</td>
                   <td>{cls.teacher}</td>
+                  <td className="text-muted">{cls.level}</td>
                   <td>
-                    <span className="font-semibold">{cls.students}/{cls.maxStudents}</span>
-                    <span className="label-md text-on-surface-variant"> ({Math.round((cls.students / cls.maxStudents) * 100)}%)</span>
+                    {cls.status === 'active' 
+                      ? (isVi ? 'Đang mở' : 'Active') 
+                      : cls.status === 'completed' 
+                      ? (isVi ? 'Đã hoàn thành' : 'Completed') 
+                      : (isVi ? 'Đã hủy' : 'Cancelled')}
                   </td>
-                  <td className="text-on-surface-variant">{cls.schedule}</td>
-                  <td>
-                    <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                      {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/admin/classes/${cls.code}`);
-                      }}
-                    >
-                      {t('adminClasses.viewDetails')}
-                    </button>
+                  <td className="text-right">
+                    <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                      <Button 
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/classes/${cls.id}`);
+                        }}
+                      >
+                        {t('adminClasses.viewDetails')}
+                      </Button>
+                      {cls.status === 'active' ? (
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'close' });
+                          }}
+                        >
+                          {isVi ? 'Đóng lớp' : 'Close Class'}
+                        </Button>
+                      ) : cls.status === 'completed' ? (
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'reopen' });
+                          }}
+                        >
+                          {isVi ? 'Mở lại lớp' : 'Reopen Class'}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+            itemLabel={isVi ? 'lớp học' : 'classes'}
+            isVi={isVi}
+            variant="table"
+          />
         </div>
       )}
+
+      {/* Modal xác nhận Đóng / Mở lại lớp học (UC008 / Issue #367) */}
+      <ConfirmModal
+        isOpen={Boolean(classToChangeStatus)}
+        title={
+          classToChangeStatus?.action === 'close'
+            ? (isVi ? 'Đóng lớp học' : 'Close Class')
+            : (isVi ? 'Mở lại lớp học' : 'Reopen Class')
+        }
+        message={
+          classToChangeStatus
+            ? classToChangeStatus.action === 'close'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn đóng lớp học "${classToChangeStatus.name}" không?`
+                  : `Are you sure you want to close class "${classToChangeStatus.name}"?`)
+              : (isVi
+                  ? `Bạn có chắc chắn muốn mở lại lớp học "${classToChangeStatus.name}" không?`
+                  : `Are you sure you want to reopen class "${classToChangeStatus.name}"?`)
+            : ''
+        }
+        confirmText={isVi ? 'Xác nhận' : 'Confirm'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant={classToChangeStatus?.action === 'close' ? 'warning' : 'primary'}
+        isLoading={isUpdatingStatus}
+        onConfirm={handleUpdateClassStatus}
+        onCancel={() => setClassToChangeStatus(null)}
+      />
     </div>
   );
 };

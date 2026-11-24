@@ -1,0 +1,176 @@
+{
+  "status": "review-only",
+  "entries": [
+    {
+      "id": "LEGACY-EDGE-01",
+      "group": "**Common (Auth)**",
+      "legacyRequirements": "UC01, UC02",
+      "scenario": "Email có khoảng trắng đầu/cuối (`\" user@test.com \"`)",
+      "legacyExpected": "Tự động trim khoảng trắng hoặc báo lỗi validation, không gây 400 bất thường",
+      "legacyIssueReferences": "Bug #262",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-02",
+      "group": "**Common (Auth)**",
+      "legacyRequirements": "UC01",
+      "scenario": "Đăng nhập dồn dập (Double click nút Submit)",
+      "legacyExpected": "Debounce hoặc disable nút, chỉ gửi duy nhất 1 request mạng",
+      "legacyIssueReferences": "Bug #216",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-03",
+      "group": "**Common (Auth)**",
+      "legacyRequirements": "UC02",
+      "scenario": "Tài khoản bị xóa mềm nhưng token cũ còn hạn",
+      "legacyExpected": "Backend từ chối 401 Unauthorized ngay lập tức",
+      "legacyIssueReferences": "Issue #222",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-04",
+      "group": "**Common (Profile)**",
+      "legacyRequirements": "UC03",
+      "scenario": "Nhập số điện thoại vượt quá 20 ký tự",
+      "legacyExpected": "Form validation chặn submit, báo lỗi độ dài",
+      "legacyIssueReferences": "Issue #228",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-05",
+      "group": "**Teacher (Assignment)**",
+      "legacyRequirements": "UC12, UC13",
+      "scenario": "Đặt `closeDate` trước hoặc bằng `openDate`",
+      "legacyExpected": "Form chặn submit và hiển thị cảnh báo ngày đóng phải sau ngày mở",
+      "legacyIssueReferences": "Bug #210",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-06",
+      "group": "**Teacher (Assignment)**",
+      "legacyRequirements": "UC12",
+      "scenario": "Lệch múi giờ UTC/Local trên `datetime-local`",
+      "legacyExpected": "Hiển thị đúng theo múi giờ địa phương GMT+7",
+      "legacyIssueReferences": "Bug #211",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-07",
+      "group": "**Teacher (Assignment)**",
+      "legacyRequirements": "UC12",
+      "scenario": "Tạo module con lỗi nhưng vẫn bấm Publish bài cha",
+      "legacyExpected": "Không cho phép phát hành bài tập không toàn vẹn",
+      "legacyIssueReferences": "Bug #209",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-08",
+      "group": "**Teacher (Grading)**",
+      "legacyRequirements": "UC24",
+      "scenario": "Nhập điểm âm, điểm > 10, hoặc bước chia điểm lẻ",
+      "legacyExpected": "Chặn nhập điểm không hợp lệ (thang điểm 0–10)",
+      "legacyIssueReferences": "Bug #215",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-09",
+      "group": "**Teacher (Grading)**",
+      "legacyRequirements": "UC24",
+      "scenario": "Bấm nút \"Lưu nháp\" điểm",
+      "legacyExpected": "Giữ trạng thái DRAFT, không chuyển nhầm thành COMPLETED",
+      "legacyIssueReferences": "Bug #212",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-10",
+      "group": "**Teacher (Grading)**",
+      "legacyRequirements": "UC25",
+      "scenario": "Yêu cầu AI chấm bài trắc nghiệm Reading/Listening",
+      "legacyExpected": "Backend từ chối 400 Bad Request theo quy định BE-19",
+      "legacyIssueReferences": "Quy tắc BE-19",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-11",
+      "group": "**Student (Taking)**",
+      "legacyRequirements": "UC16",
+      "scenario": "Bài luận Writing rỗng (0 từ) hoặc toàn ký tự trắng",
+      "legacyExpected": "Vô hiệu hóa nút nộp bài, yêu cầu nhập nội dung",
+      "legacyIssueReferences": "Bug #174",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-12",
+      "group": "**Student (Taking)**",
+      "legacyRequirements": "UC16",
+      "scenario": "Nộp bài luận đính kèm file DOCX",
+      "legacyExpected": "Không làm sập server (500) do MIME type overflow",
+      "legacyIssueReferences": "Bug #205",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-13",
+      "group": "**Student (Taking)**",
+      "legacyRequirements": "UC17",
+      "scenario": "Nộp bài Nói nhưng file ghi âm 0 byte hoặc mic tắt",
+      "legacyExpected": "Báo lỗi mic và chặn nộp bài rỗng",
+      "legacyIssueReferences": "Bug #176",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-14",
+      "group": "**Student (Taking)**",
+      "legacyRequirements": "UC15",
+      "scenario": "Truy cập URL bài tập với ID không tồn tại",
+      "legacyExpected": "Điều hướng về trang 404, không âm thầm tải bài ID=1",
+      "legacyIssueReferences": "Bug #213",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-15",
+      "group": "**Student (Submission)**",
+      "legacyRequirements": "UC21",
+      "scenario": "Mất kết nối mạng khi đang nộp bài",
+      "legacyExpected": "KHÔNG báo thành công giả, bảo lưu nguyên vẹn nháp",
+      "legacyIssueReferences": "Bug #207, #208",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-16",
+      "group": "**Admin (Account)**",
+      "legacyRequirements": "UC05",
+      "scenario": "Tạo tài khoản vai trò Admin",
+      "legacyExpected": "Hệ thống gán đúng vai trò Admin, không bị gán thành Student",
+      "legacyIssueReferences": "Bug #195",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-17",
+      "group": "**Admin (Account)**",
+      "legacyRequirements": "UC06, UC07",
+      "scenario": "Tìm kiếm học viên/giáo viên có dấu tiếng Việt",
+      "legacyExpected": "Kết quả tìm kiếm chính xác không phụ thuộc dấu và hoa/thường",
+      "legacyIssueReferences": "Bug #189, #190",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-18",
+      "group": "**Admin (Account)**",
+      "legacyRequirements": "UC07",
+      "scenario": "Bấm mở hồ sơ chi tiết học viên",
+      "legacyExpected": "URL và dữ liệu hồ sơ hiển thị đồng nhất, không hiển thị người khác",
+      "legacyIssueReferences": "Bug #191",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    },
+    {
+      "id": "LEGACY-EDGE-19",
+      "group": "**Admin (Classes)**",
+      "legacyRequirements": "UC08, UC09",
+      "scenario": "Truy cập bài tập của lớp khác giáo viên quản lý",
+      "legacyExpected": "Trả lỗi 403 Forbidden đúng quyền thay vì báo lớp rỗng",
+      "legacyIssueReferences": "Bug #192, #194",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW"
+    }
+  ]
+}

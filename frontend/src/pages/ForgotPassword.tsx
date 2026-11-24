@@ -592,8 +592,8 @@ export const ForgotPassword: React.FC = () => {
 
               <p className="fp-success-desc">
                 {isVi 
-                  ? 'Mật khẩu tài khoản của bạn đã được cập nhật thành công. Tất cả các phiên đăng nhập cũ trên các thiết bị khác đã được đăng xuất an toàn.' 
-                  : 'Your account password has been updated securely. All legacy sessions on other devices have been safely revoked.'}
+                  ? 'Mật khẩu tài khoản của bạn đã được cập nhật thành công. Vui lòng đăng nhập lại với mật khẩu mới.' 
+                  : 'Your account password has been updated successfully. Please sign in with your new password.'}
               </p>
 
               <div className="fp-redirect-bar-track">

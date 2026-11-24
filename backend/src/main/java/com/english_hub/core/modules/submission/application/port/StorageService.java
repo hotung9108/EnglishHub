@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.submission.application.port;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 
 /**
@@ -17,11 +18,31 @@ public interface StorageService {
 	PresignedUpload generatePresignedPutUrl(String storageKey, String contentType);
 
 	/**
+	 * Generates a presigned PUT URL for {@code storageKey} with an optional expected
+	 * content length in bytes signed into the request for strict upload size enforcement.
+	 */
+	default PresignedUpload generatePresignedPutUrl(String storageKey, String contentType, Long expectedContentLength) {
+		return generatePresignedPutUrl(storageKey, contentType);
+	}
+
+	/**
 	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
 	 * authenticated read access (e.g. for AI analysis microservice).
 	 */
 	default String generatePresignedGetUrl(String storageKey) {
 		return null;
+	}
+
+	/**
+	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
+	 * authenticated read access with customizable duration and optional content disposition.
+	 */
+	default PresignedDownload generatePresignedDownload(String storageKey, Duration duration, String responseContentDisposition) {
+		return null;
+	}
+
+	default PresignedDownload generatePresignedDownload(String storageKey, Duration duration) {
+		return generatePresignedDownload(storageKey, duration, null);
 	}
 
 	/**
@@ -36,6 +57,22 @@ public interface StorageService {
 	 */
 	boolean objectExists(String storageKey);
 
+	/**
+	 * Returns the size in bytes of the object at {@code storageKey}, or {@code null} if missing.
+	 */
+	default Long getObjectSize(String storageKey) {
+		return null;
+	}
+
+	/**
+	 * Deletes the object at {@code storageKey}. Idempotent: deleting a missing
+	 * key is a no-op.
+	 */
+	void deleteObject(String storageKey);
+
 	record PresignedUpload(String uploadUrl, String storageKey, OffsetDateTime expiresAt) {
+	}
+
+	record PresignedDownload(String downloadUrl, String storageKey, OffsetDateTime expiresAt) {
 	}
 }

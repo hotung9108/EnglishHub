@@ -4,6 +4,9 @@ export interface ApiRequestOptions extends Omit<AxiosRequestConfig, 'url' | 'met
   skipAuth?: boolean;
   skipErrorToast?: boolean;
   retryOn401?: boolean;
+  useCache?: boolean;
+  cacheTtlMs?: number;
+  skipCache?: boolean;
 }
 
 export interface IHttpClient {

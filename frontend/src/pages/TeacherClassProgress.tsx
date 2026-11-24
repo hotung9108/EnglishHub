@@ -1,485 +1,746 @@
-import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { 
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
-  CheckCircle2, AlertCircle, Users, Calendar, 
-  MapPin, Plus, Download, Sparkles, X, 
-  ArrowUpRight, Clock, Award, FileText, Send, Eye
+  AlertCircle, Users, Calendar, 
+  Plus, Download, X, 
+  ArrowUpRight, Award, FileText, Send, Eye,
+  Sparkles, RefreshCw, BarChart3,
+  ArrowRightLeft, Trash2, UserPlus, Edit3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService, type ClassSummary, type ClassDetail, type ClassMember } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { studentEvaluationService } from '../api/services/student-evaluation.service';
+import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
+import { Pagination, LoadingState, Button, ConfirmModal, useToast } from '../components/common';
+import { DateRangeFilter } from '../components/classes/DateRangeFilter';
+import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
+import { StudentEvaluationAvailabilityNotice } from '../components/classes/StudentEvaluationAvailabilityNotice';
+import { TransferStudentModal } from '../components/classes/TransferStudentModal';
+import { parseApiError } from '../api';
 import type { 
-  ClassDetailItem, 
+  ClassSkill, 
   StudentGradeRow, 
   ClassAssignmentItem, 
-  SkillAnalyticsItem, 
-  SyllabusLessonItem 
+  SkillAnalyticsItem
 } from '../types/teacher-class.types';
+import {
+  filterGradebookSubmissions, getGradebookDateRangeStatus, type GradebookDateRange,
+} from '../utils/gradebookDateRange.utils';
 import '../styles/teacher-class-details.css';
+
+interface GradebookData {
+  members: ClassMember[];
+  rawAssignments: AssignmentSummary[];
+  submissions: SubmissionListItem[] | null;
+  loadedAt: number;
+}
+
+const normalizeSkillName = (s: string): ClassSkill => {
+  const lower = s.toLowerCase();
+  if (lower.includes('speak') || lower.includes('nói') || lower.includes('recording') || lower.includes('part 1') || lower.includes('part 2')) return 'speaking';
+  if (lower.includes('read') || lower.includes('đọc') || lower.includes('passage') || lower.includes('quiz')) return 'reading';
+  if (lower.includes('listen') || lower.includes('nghe') || lower.includes('audio')) return 'listening';
+  return 'writing';
+};
+
+const detectAllSkills = (a: AssignmentSummary, subs: SubmissionListItem[]): ClassSkill[] => {
+  const skillsSet = new Set<ClassSkill>();
+  // 1. From a.skills (API backend array)
+  if (Array.isArray(a.skills) && a.skills.length > 0) {
+    for (const sk of a.skills) {
+      skillsSet.add(normalizeSkillName(sk));
+    }
+  }
+  // 2. From student submission modules of this assignment
+  for (const sub of subs) {
+    for (const mod of sub.modules || []) {
+      if (mod.skill) {
+        skillsSet.add(normalizeSkillName(mod.skill));
+      }
+    }
+  }
+  // 3. Fallback to title keywords if none detected
+  if (skillsSet.size === 0) {
+    skillsSet.add(normalizeSkillName(a.title));
+  }
+  return Array.from(skillsSet);
+};
 
 export const TeacherClassProgress: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
-  // Available classes map for switcher
-  const availableClasses: Record<string, ClassDetailItem> = useMemo(() => ({
-    'ENG-IELTS-6.5A': {
-      id: '1',
-      code: 'ENG-IELTS-6.5A',
-      name: 'IELTS Intensive Band 6.5 - 7.5 (Target Master)',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Online Room #04 (Zoom HD)',
-      schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
-      status: 'active',
-      targetBand: 'Band 6.5 - 7.5',
-      currentLesson: 14,
-      totalLessons: 24,
-      enrolledStudents: 24,
-      stats: {
-        completionRate: 88.3,
-        onTimeRate: 91.5,
-        avgScore: 7.1,
-        targetAttainment: 87.5,
-        assignedCount: 15,
-        pendingGrading: 6
-      }
-    },
-    'ENG-GRAM-ADV': {
-      id: '2',
-      code: 'ENG-GRAM-ADV',
-      name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Phòng 202 - Tòa A2',
-      schedule: 'T3 - T5 - T7 (19:30 - 21:00)',
-      status: 'active',
-      targetBand: 'C1 Academic',
-      currentLesson: 10,
-      totalLessons: 20,
-      enrolledStudents: 18,
-      stats: {
-        completionRate: 82.5,
-        onTimeRate: 88.0,
-        avgScore: 6.8,
-        targetAttainment: 83.3,
-        assignedCount: 12,
-        pendingGrading: 4
-      }
-    },
-    'ENG-TOEIC-750': {
-      id: '3',
-      code: 'ENG-TOEIC-750',
-      name: 'Luyện thi TOEIC 4 kỹ năng Mục tiêu 750+',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Online Room #02',
-      schedule: 'T4 - T6 - CN (18:00 - 19:30)',
-      status: 'active',
-      targetBand: 'TOEIC 750+',
-      currentLesson: 18,
-      totalLessons: 24,
-      enrolledStudents: 26,
-      stats: {
-        completionRate: 94.0,
-        onTimeRate: 95.2,
-        avgScore: 7.5,
-        targetAttainment: 92.3,
-        assignedCount: 16,
-        pendingGrading: 5
-      }
-    },
-    'ENG-SPEAK-PRO': {
-      id: '4',
-      code: 'ENG-SPEAK-PRO',
-      name: 'Luyện phát âm & Phản xạ giao tiếp Quốc tế',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Phòng 301 - Tòa B1',
-      schedule: 'T3 - T5 (19:30 - 21:00)',
-      status: 'active',
-      targetBand: 'IELTS 7.0+',
-      currentLesson: 8,
-      totalLessons: 16,
-      enrolledStudents: 18,
-      stats: {
-        completionRate: 85.0,
-        onTimeRate: 89.0,
-        avgScore: 7.0,
-        targetAttainment: 85.0,
-        assignedCount: 10,
-        pendingGrading: 3
-      }
-    }
-  }), []);
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
 
-  // Normalize current class from ID or code parameter
-  const currentClassCode = useMemo(() => {
-    if (!id) return 'ENG-IELTS-6.5A';
-    if (availableClasses[id]) return id;
-    if (id === '1') return 'ENG-IELTS-6.5A';
-    if (id === '2') return 'ENG-GRAM-ADV';
-    if (id === '3') return 'ENG-TOEIC-750';
-    if (id === '4') return 'ENG-SPEAK-PRO';
-    return 'ENG-IELTS-6.5A';
-  }, [id, availableClasses]);
+  // Available classes & current class
+  const [classesList, setClassesList] = useState<ClassSummary[]>([]);
+  const [currentClass, setCurrentClass] = useState<ClassDetail | null>(null);
 
-  const currentClass = availableClasses[currentClassCode] || availableClasses['ENG-IELTS-6.5A'];
+  // Enriched Class Data
+  const [enrolledMembers, setEnrolledMembers] = useState<ClassMember[]>([]);
+  const [gradebookData, setGradebookData] = useState<GradebookData>({
+    members: [], rawAssignments: [], submissions: null, loadedAt: 0,
+  });
+  const [dateRange, setDateRange] = useState<GradebookDateRange>({ from: '', to: '' });
+  const dateRangeStatus = getGradebookDateRangeStatus(dateRange);
+  const hasDateFilter = dateRangeStatus === 'active';
 
-  // State
-  const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'analytics' | 'syllabus'>('roster');
+  // Tab State
+  const initialTab = searchParams.get('tab') === 'members' ? 'members' : 'roster';
+  const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'analytics' | 'members'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'exceed' | 'ontime' | 'support'>('all');
-  const [selectedStudent, setSelectedStudent] = useState<StudentGradeRow | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  // Member Management State (FE-87 / UC009)
+  const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: number; name: string } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [studentToTransfer, setStudentToTransfer] = useState<{ studentId: number; fullName: string; studentCode?: string; currentMemberId: number } | null>(null);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberPageSize, setMemberPageSize] = useState(10);
+
+  // Grade Adjustment State with Audit Reason (FE-90 / UC030 / UC031)
+  const [studentToAdjustGrade, setStudentToAdjustGrade] = useState<StudentGradeRow | null>(null);
+  const [adjustedScores, setAdjustedScores] = useState<Partial<Record<string, StudentGradeRow['scores']>>>({});
+  const [adjustGradeSkill, setAdjustGradeSkill] = useState<'overall' | 'writing' | 'speaking' | 'reading' | 'listening'>('overall');
+  const [newAdjustedScore, setNewAdjustedScore] = useState<string>('8.0');
+  const [auditReasonNote, setAuditReasonNote] = useState<string>('');
+  const [adjustGradeError, setAdjustGradeError] = useState<string | null>(null);
+
+  // Pagination for students roster table
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const handleTabChange = (tab: 'roster' | 'assignments' | 'analytics' | 'members') => {
+    setActiveTab(tab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'members') {
+        next.set('tab', 'members');
+      } else {
+        next.delete('tab');
+      }
+      return next;
+    });
   };
 
-  // Mock Students Roster Data (24 students)
-  const studentsList: StudentGradeRow[] = useMemo(() => [
-    {
-      id: 'std-01',
-      code: 'HV-2024-0891',
-      name: 'Alice Johnson',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      email: 'alice.johnson@example.com',
-      attendance: 100,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 8.0, speaking: 8.5, reading: 8.5, listening: 8.0, overall: 8.2 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '15 phút trước' : '15m ago',
-      recentFeedback: 'Vốn từ vựng C1/C2 xuất sắc, triển khai ý tưởng Task 2 chặt chẽ và mạch lạc.'
-    },
-    {
-      id: 'std-02',
-      code: 'HV-2024-0712',
-      name: 'David Phạm',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      email: 'david.pham@example.com',
-      attendance: 95,
-      assignmentsCompleted: 9,
-      totalAssignments: 10,
-      scores: { writing: 6.5, speaking: 7.0, reading: 7.0, listening: 6.5, overall: 6.7 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '2 giờ trước' : '2h ago',
-      recentFeedback: 'Phát âm tự nhiên, cần cải thiện sự liên kết đoạn trong bài viết Writing Task 1.'
-    },
-    {
-      id: 'std-03',
-      code: 'HV-2024-0419',
-      name: 'Trần Hoàng Long',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-      email: 'hoanglong.tran@example.com',
-      attendance: 75,
-      assignmentsCompleted: 6,
-      totalAssignments: 10,
-      scores: { writing: 5.0, speaking: 5.5, reading: 5.5, listening: 5.0, overall: 5.3 },
-      status: 'support',
-      statusLabel: isVi ? 'Cần hỗ trợ' : 'Needs Support',
-      lastActive: isVi ? '1 ngày trước' : '1d ago',
-      recentFeedback: 'Bỏ sót 4 bài tập tuần trước. Cần phụ đạo thêm cấu trúc câu phức và ngữ pháp cơ bản.'
-    },
-    {
-      id: 'std-04',
-      code: 'HV-2024-0552',
-      name: 'Nguyễn Phương Thảo',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      email: 'phuongthao.ng@example.com',
-      attendance: 98,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 7.5, speaking: 7.5, reading: 8.0, listening: 8.5, overall: 7.9 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '30 phút trước' : '30m ago',
-      recentFeedback: 'Khả năng bắt từ khóa (Keywords) trong Listening cực kỳ nhạy bén.'
-    },
-    {
-      id: 'std-05',
-      code: 'HV-2024-0628',
-      name: 'Phạm Đức Duy',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=100&auto=format&fit=crop&q=80',
-      email: 'ducduy.pham@example.com',
-      attendance: 90,
-      assignmentsCompleted: 9,
-      totalAssignments: 10,
-      scores: { writing: 6.5, speaking: 6.5, reading: 7.5, listening: 7.0, overall: 6.9 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '4 giờ trước' : '4h ago',
-      recentFeedback: 'Tiến bộ rõ rệt trong kỹ năng Skimming & Scanning bài đọc Passage 2.'
-    },
-    {
-      id: 'std-06',
-      code: 'HV-2024-0331',
-      name: 'Đặng Mai Phương',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-      email: 'maiphuong.dang@example.com',
-      attendance: 96,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 7.0, speaking: 7.5, reading: 7.5, listening: 7.5, overall: 7.4 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '1 giờ trước' : '1h ago',
-      recentFeedback: 'Ngữ điệu tự nhiên, phản xạ nói Part 3 lưu loát với lập luận phong phú.'
-    },
-    {
-      id: 'std-07',
-      code: 'HV-2024-0210',
-      name: 'Vũ Thị Hương',
-      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
-      email: 'huong.vu@example.com',
-      attendance: 80,
-      assignmentsCompleted: 7,
-      totalAssignments: 10,
-      scores: { writing: 5.5, speaking: 5.5, reading: 6.0, listening: 5.5, overall: 5.6 },
-      status: 'support',
-      statusLabel: isVi ? 'Cần hỗ trợ' : 'Needs Support',
-      lastActive: isVi ? '2 ngày trước' : '2d ago',
-      recentFeedback: 'Gặp khó khăn với bài tập nghe Section 3 nhiều người nói. Cần rèn luyện thêm chính tả.'
-    },
-    {
-      id: 'std-08',
-      code: 'HV-2024-0985',
-      name: 'Lê Hoàng Nam',
-      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&auto=format&fit=crop&q=80',
-      email: 'hoangnam.le@example.com',
-      attendance: 100,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 8.0, speaking: 8.0, reading: 8.5, listening: 8.0, overall: 8.1 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '10 phút trước' : '10m ago',
-      recentFeedback: 'Bài làm luôn nộp sớm và đạt chuẩn điểm cao, là hạt nhân tích cực trong lớp.'
-    }
-  ], [isVi]);
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setCurrentPage(1);
+  };
 
-  // Filtered Students List
-  const filteredStudents = useMemo(() => {
-    return studentsList.filter(std => {
-      const matchSearch = 
-        std.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        std.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        std.email.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchStatus = statusFilter === 'all' || std.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [studentsList, searchQuery, statusFilter]);
+  const handleStatusFilterChange = (filter: 'all' | 'exceed' | 'ontime' | 'support') => {
+    setStatusFilter(filter);
+    setCurrentPage(1);
+  };
 
-  // Class Assignments Data
-  const classAssignments: ClassAssignmentItem[] = useMemo(() => [
-    {
-      id: '1',
-      code: 'HW-01',
-      title: 'IELTS Writing Task 2: Artificial Intelligence & Workforce Evolution',
-      skill: 'writing',
-      dueDate: '2026-03-22 23:59',
-      daysLeft: 2,
-      submittedCount: 22,
-      totalStudents: 24,
-      pendingGrading: 2,
-      avgScore: 7.2,
-      status: 'open'
-    },
-    {
-      id: '2',
-      code: 'HW-02',
-      title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-      skill: 'speaking',
-      dueDate: '2026-03-20 23:59',
-      daysLeft: 0,
-      submittedCount: 24,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.4,
-      status: 'closed'
-    },
-    {
-      id: '3',
-      code: 'HW-03',
-      title: 'Reading Test: Deep Sea Microbial Life & Biosphere (Passage 2)',
-      skill: 'reading',
-      dueDate: '2026-03-18 23:59',
-      daysLeft: 0,
-      submittedCount: 24,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.8,
-      status: 'closed'
-    },
-    {
-      id: '4',
-      code: 'HW-04',
-      title: 'Listening Practice: University Library Induction & Campus Facilities',
-      skill: 'listening',
-      dueDate: '2026-03-15 23:59',
-      daysLeft: 0,
-      submittedCount: 23,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.5,
-      status: 'closed'
-    },
-    {
-      id: '5',
-      code: 'HW-05',
-      title: 'Writing Task 1: Academic Line Graph on Global Energy Transition',
-      skill: 'writing',
-      dueDate: '2026-03-28 23:59',
-      daysLeft: 8,
-      submittedCount: 4,
-      totalStudents: 24,
-      pendingGrading: 4,
-      avgScore: 0,
-      status: 'upcoming'
-    }
-  ], []);
+  const handleDateRangeChange = (range: GradebookDateRange) => {
+    setDateRange(range);
+    if (getGradebookDateRangeStatus(range) === 'active') setStudentToAdjustGrade(null);
+  };
 
-  // 4-Skill Analytics Data
-  const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => [
-    {
-      skill: 'writing',
-      name: 'Writing',
-      avgScore: 6.8,
-      targetScore: 7.0,
-      completionRate: 92,
-      strengths: ['Bố cục 4 đoạn chuẩn mực', 'Dẫn chứng thực tế phong phú', 'Khả năng paraphrase mở bài'],
-      weaknesses: ['Lỗi chia thì ở các mệnh đề quan hệ', 'Thiếu Collocations học thuật C1', 'Quá thời gian Task 2'],
-      aiRecommendation: 'Cần tăng cường bài tập luyện collocation chủ đề Công nghệ & Môi trường, đồng thời bấm giờ 40 phút cho mỗi bài Task 2.'
-    },
-    {
-      skill: 'speaking',
-      name: 'Speaking',
-      avgScore: 7.2,
-      targetScore: 7.0,
-      completionRate: 88,
-      strengths: ['Phản xạ nhanh Part 1', 'Ngữ điệu tự nhiên', 'Biết cách tự sửa lỗi khi nói'],
-      weaknesses: ['Ngắt quãng ở Part 2 khi thiếu ý', 'Lỗi âm cuối /s/, /t/, /d/', 'Lặp từ vựng trong Part 3'],
-      aiRecommendation: 'Tập trung luyện kỹ thuật mở rộng ý bằng phương pháp P.E.E.L (Point - Explain - Example - Link) cho Part 3.'
-    },
-    {
-      skill: 'reading',
-      name: 'Reading',
-      avgScore: 7.5,
-      targetScore: 7.0,
-      completionRate: 98,
-      strengths: ['Kỹ năng Skimming cực tốt', 'Làm chính xác dạng Gap Fill', 'Tốc độ đọc trung bình 220 wpm'],
-      weaknesses: ['Dễ nhầm lẫn dạng True/False/Not Given', 'Mất nhiều thời gian ở Matching Headings'],
-      aiRecommendation: 'Củng cố chiến lược phân biệt rõ giữa "False" (trái ngược thông tin) và "Not Given" (thông tin không đề cập).'
-    },
-    {
-      skill: 'listening',
-      name: 'Listening',
-      avgScore: 7.4,
-      targetScore: 7.0,
-      completionRate: 96,
-      strengths: ['Nghe số điện thoại, tên riêng chính xác', 'Bắt từ khóa Section 1, 2 nhạy bén'],
-      weaknesses: ['Bị đánh lừa bởi từ bẫy (Distractors)', 'Dạng trắc nghiệm Section 3 dài'],
-      aiRecommendation: 'Rèn luyện thói quen đọc trước đáp án và gạch chân từ khóa then chốt trước khi đoạn băng phát 30 giây.'
-    }
-  ], []);
+  const [selectedStudent, setSelectedStudent] = useState<StudentGradeRow | null>(null);
+  const [directMessageText, setDirectMessageText] = useState('');
+  const [evaluationHistory, setEvaluationHistory] = useState<StudentEvaluationListItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSendingEvaluation, setIsSendingEvaluation] = useState(false);
+  const toast = useToast();
 
-  // Syllabus Lessons
-  const syllabusLessons: SyllabusLessonItem[] = useMemo(() => [
-    {
-      session: 1,
-      title: 'Tổng quan format IELTS Academic & Đánh giá năng lực đầu khóa',
-      date: '2026-02-02',
-      focusSkill: 'mock_test',
-      status: 'completed',
-      materialsCount: 4,
-      homeworkAttached: 'Diagnostic Mini-Test'
-    },
-    {
-      session: 13,
-      title: 'Speaking Part 2: Chiến lược ghi chú Cue Card trong 1 phút',
-      date: '2026-03-18',
-      focusSkill: 'speaking',
-      status: 'completed',
-      materialsCount: 3,
-      homeworkAttached: 'HW-02 Speaking Part 2'
-    },
-    {
-      session: 14,
-      title: 'Writing Task 2: Cấu trúc bài luận Problem - Solution & Discussion',
-      date: '2026-03-20',
-      focusSkill: 'writing',
-      status: 'current',
-      materialsCount: 5,
-      homeworkAttached: 'HW-01 Writing Task 2'
-    },
-    {
-      session: 15,
-      title: 'Reading Passage 3: Kỹ thuật xử lý dạng bài Multiple Choice phức tạp',
-      date: '2026-03-23',
-      focusSkill: 'reading',
-      status: 'upcoming',
-      materialsCount: 4,
-      homeworkAttached: 'HW-06 Reading Test'
-    },
-    {
-      session: 16,
-      title: 'Listening Section 4: Chiến thuật nghe bài giảng học thuật (Academic Lectures)',
-      date: '2026-03-25',
-      focusSkill: 'listening',
-      status: 'upcoming',
-      materialsCount: 3
+  const handleCloseStudentModal = () => {
+    setSelectedStudent(null);
+    setEvaluationHistory([]);
+    setDirectMessageText('');
+  };
+
+  const handleOpenStudentDetail = (std: StudentGradeRow) => {
+    setSelectedStudent(std);
+    setIsLoadingHistory(true);
+    setEvaluationHistory([]);
+    setDirectMessageText('');
+    const studentIdNum = Number(std.id.replace('std-', ''));
+    if (studentIdNum && currentClass?.id) {
+      studentEvaluationService.list(studentIdNum, { classId: currentClass.id, page: 1, limit: 20 })
+        .then((res) => {
+          setEvaluationHistory(res.data || []);
+        })
+        .catch((err) => {
+          console.error('Failed to load student evaluation history:', err);
+          setEvaluationHistory([]);
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
+        });
+    } else {
+      setIsLoadingHistory(false);
     }
-  ], []);
+  };
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
+  };
 
   // Helper score color
   const getScoreClass = (score: number) => {
     if (score >= 7.5) return 'high';
     if (score >= 6.5) return 'medium';
-    return 'low';
+    if (score > 0) return 'low';
+    return 'none';
   };
 
-  const handleClassChange = (newCode: string) => {
-    navigate(`/teacher/classes/${newCode}/progress`);
+  const parsedCapacity = currentClass?.description ? currentClass.description.match(/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*(\d+)/i) : null;
+  const maxCapacity = parsedCapacity ? parseInt(parsedCapacity[1], 10) : 25;
+
+  const refreshMembers = async () => {
+    if (!currentClass?.id) return;
+    try {
+      const updated = await classService.listMembers(currentClass.id);
+      setEnrolledMembers(updated);
+    } catch {
+      // Keep existing
+    }
   };
+
+  const executeRemoveMember = async () => {
+    if (!memberToRemove || !currentClass?.id) return;
+    try {
+      setIsRemovingMember(true);
+      await classService.removeMember(currentClass.id, memberToRemove.id);
+      setEnrolledMembers((prev) => prev.filter((m) => m.memberId !== memberToRemove.id));
+      showToast(isVi ? `Đã xóa học viên ${memberToRemove.name} khỏi lớp.` : `Removed student ${memberToRemove.name}.`);
+      setMemberToRemove(null);
+    } catch (err: unknown) {
+      const apiErr = parseApiError(err);
+      showToast(apiErr.message || (isVi ? 'Không thể xóa học viên khỏi lớp.' : 'Failed to remove member.'));
+    } finally {
+      setIsRemovingMember(false);
+    }
+  };
+
+  const handleOpenAdjustGrade = (std: StudentGradeRow) => {
+    setStudentToAdjustGrade(std);
+    setAdjustGradeSkill('overall');
+    setNewAdjustedScore(std.scores.overall > 0 ? String(std.scores.overall) : '8.0');
+    setAuditReasonNote('');
+    setAdjustGradeError(null);
+  };
+
+  // Filtered members for Tab 4
+  const filteredEnrolledMembers = useMemo(() => {
+    if (!memberSearchQuery.trim()) return enrolledMembers;
+    const q = memberSearchQuery.toLowerCase().trim();
+    return enrolledMembers.filter((m) =>
+      m.fullName.toLowerCase().includes(q) ||
+      (m.studentCode && m.studentCode.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q))
+    );
+  }, [enrolledMembers, memberSearchQuery]);
+
+  const memberTotalPages = Math.ceil(filteredEnrolledMembers.length / memberPageSize) || 1;
+  const safeMemberPage = Math.min(memberPage, memberTotalPages);
+  const paginatedEnrolledMembers = useMemo(() => {
+    const start = (safeMemberPage - 1) * memberPageSize;
+    return filteredEnrolledMembers.slice(start, start + memberPageSize);
+  }, [filteredEnrolledMembers, safeMemberPage, memberPageSize]);
+
+  // Load live class data
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchClassProgressData = async () => {
+      setError(null);
+      try {
+        // 1. Fetch all classes
+        const classRes = await classService.list({ limit: 100 });
+        if (!isMounted) return;
+        const allClasses: ClassSummary[] = classRes.data || [];
+        setClassesList(allClasses);
+
+        if (allClasses.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Resolve target class
+        let targetClassSummary: ClassSummary | undefined = undefined;
+        if (id) {
+          const idNum = Number(id);
+          if (!Number.isNaN(idNum)) {
+            targetClassSummary = allClasses.find((c) => c.id === idNum);
+          }
+          if (!targetClassSummary) {
+            targetClassSummary = allClasses.find((c) => c.name.toLowerCase().includes(id.toLowerCase()));
+          }
+        }
+
+        if (!targetClassSummary) {
+          targetClassSummary = allClasses[0];
+        }
+
+        // 3-6. Fetch class detail, enrolled members, assignments, and submissions in parallel
+        const [detailRes, membersRes, assignmentsRes, subsRes] = await Promise.allSettled([
+          classService.getDetail(targetClassSummary.id),
+          classService.listMembers(targetClassSummary.id),
+          assignmentService.listAssignments(targetClassSummary.id, { limit: 100 }),
+          submissionService.listAllSubmissions({ classId: targetClassSummary.id })
+        ]);
+
+        if (!isMounted) return;
+
+        const classDetail: ClassDetail = detailRes.status === 'fulfilled' ? detailRes.value : targetClassSummary;
+        setCurrentClass(classDetail);
+
+        const members: ClassMember[] = membersRes.status === 'fulfilled' ? membersRes.value : [];
+        setEnrolledMembers(members);
+
+        setGradebookData({
+          members,
+          rawAssignments: assignmentsRes.status === 'fulfilled' ? assignmentsRes.value.data || [] : [],
+          submissions: subsRes.status === 'fulfilled' ? subsRes.value : null,
+          loadedAt: Date.now(),
+        });
+        setAdjustedScores({});
+      } catch (err) {
+        console.error('Failed to load class progress data:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải dữ liệu tiến độ lớp học. Vui lòng thử lại.' : 'Failed to load class progress. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchClassProgressData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isVi, reloadKey]);
+
+  const { classAssignments, rosterRows } = useMemo(() => {
+    const { members, rawAssignments, submissions, loadedAt } = gradebookData;
+    const assignmentIds = new Set(rawAssignments.map((assignment) => assignment.id));
+    const allSubmissions = filterGradebookSubmissions(submissions ?? [], dateRange)
+      .filter(submission => assignmentIds.has(submission.assignmentId));
+    const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
+    for (const submission of allSubmissions) {
+      (allSubmissionsByAssignId[submission.assignmentId] ??= []).push(submission);
+    }
+
+    // Map class assignments items (clean, real fields)
+    const mappedAssignments: ClassAssignmentItem[] = rawAssignments.map((a) => {
+      const subs = allSubmissionsByAssignId[a.id] || [];
+      const distinctStudentIds = new Set(subs.map((s) => s.studentId));
+      const submittedCount = distinctStudentIds.size;
+      const pendingStudentIds = new Set(
+        subs
+          .filter((s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
+          .map((s) => s.studentId)
+      );
+      const pendingGrading = pendingStudentIds.size;
+
+      const gradedScores = subs
+        .flatMap((s) => s.modules)
+        .map((m) => m.grading?.finalScore)
+        .filter((sc): sc is number => sc !== null && sc !== undefined);
+
+      const avgScore = gradedScores.length > 0
+        ? Math.round((gradedScores.reduce((x, y) => x + y, 0) / gradedScores.length) * 10) / 10
+        : 0;
+
+      const closeDate = a.closeAt ? new Date(a.closeAt) : null;
+      let daysLeft = 0;
+      let status: 'open' | 'closed' | 'upcoming' = 'open';
+
+      if (closeDate) {
+        const diffMs = closeDate.getTime() - loadedAt;
+        daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        if (diffMs < 0) status = 'closed';
+        else if (a.status === 'DRAFT') status = 'upcoming';
+        else status = 'open';
+      }
+
+      const detectedSkills = detectAllSkills(a, subs);
+      const primarySkill = detectedSkills[0] || 'writing';
+
+      return {
+        id: String(a.id),
+        title: a.title,
+        skill: primarySkill,
+        skills: detectedSkills,
+        dueDate: closeDate ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '—',
+        daysLeft,
+        submittedCount,
+        totalStudents: Math.max(1, members.length),
+        pendingGrading,
+        avgScore,
+        status
+      };
+    });
+
+    const rosterRows: StudentGradeRow[] = members.map((member) => {
+      const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
+      const distinctCompletedAssignIds = new Set(studentSubs.map((s) => s.assignmentId));
+      const completedCount = distinctCompletedAssignIds.size;
+
+      const writingScores: number[] = [];
+      const speakingScores: number[] = [];
+      const readingScores: number[] = [];
+      const listeningScores: number[] = [];
+
+      for (const sub of studentSubs) {
+        for (const mod of sub.modules) {
+          const score = mod.grading?.finalScore;
+          if (score !== null && score !== undefined) {
+            const skill = normalizeSkillName(mod.skill || 'writing');
+            if (skill === 'writing') writingScores.push(score);
+            else if (skill === 'speaking') speakingScores.push(score);
+            else if (skill === 'reading') readingScores.push(score);
+            else if (skill === 'listening') listeningScores.push(score);
+          }
+        }
+      }
+
+      const avgOf = (arr: number[]) => {
+        if (arr.length === 0) return 0;
+        return Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10;
+      };
+
+      const w = avgOf(writingScores);
+      const sp = avgOf(speakingScores);
+      const r = avgOf(readingScores);
+      const l = avgOf(listeningScores);
+      const scoredSkills = [w, sp, r, l].filter((sc) => sc > 0);
+      const overall = scoredSkills.length > 0
+        ? Math.round((scoredSkills.reduce((x, y) => x + y, 0) / scoredSkills.length) * 10) / 10
+        : 0;
+
+      let status: 'exceed' | 'ontime' | 'support' = 'ontime';
+      let statusLabel = isVi ? 'Đạt chuẩn' : 'On-track';
+
+      if (overall >= 8.0 && completedCount >= rawAssignments.length * 0.8) {
+        status = 'exceed';
+        statusLabel = isVi ? 'Vượt trội' : 'Exceeding';
+      } else if ((overall > 0 && overall < 6.0) || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
+        status = 'support';
+        statusLabel = isVi ? 'Cần hỗ trợ' : 'Needs Support';
+      }
+
+      const sortedSubs = [...studentSubs].sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+      const latestSub = sortedSubs[0];
+      const lastActive = latestSub?.submittedAt
+        ? new Date(latestSub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
+        : '—';
+
+      const recentFeedback = completedCount > 0
+        ? (isVi ? `Đã hoàn thành ${completedCount} bài nộp.` : `Submitted ${completedCount} assignments.`)
+        : (isVi ? 'Chưa có bài nộp nào.' : 'No submissions yet.');
+
+      return {
+        id: `std-${member.studentId}`,
+        code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
+        name: member.fullName,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.fullName)}`,
+        assignmentsCompleted: completedCount,
+        totalAssignments: rawAssignments.length,
+        scores: {
+          writing: w,
+          speaking: sp,
+          reading: r,
+          listening: l,
+          overall
+        },
+        status,
+        statusLabel,
+        lastActive,
+        recentFeedback
+      };
+    });
+
+
+    return { classAssignments: mappedAssignments, rosterRows };
+  }, [gradebookData, dateRange, isVi]);
+
+  const studentsRoster = useMemo(() => rosterRows.map(row => {
+    const scores = hasDateFilter ? undefined : adjustedScores[row.id];
+    return scores ? { ...row, scores } : row;
+  }), [rosterRows, hasDateFilter, adjustedScores]);
+
+  const handleSaveGradeAdjustment = () => {
+    if (!studentToAdjustGrade) return;
+    const scoreNum = parseFloat(newAdjustedScore.trim().replace(',', '.'));
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
+      setAdjustGradeError(isVi ? 'Điểm số phải nằm trong khoảng từ 0 đến 10.' : 'Score must be between 0 and 10.');
+      return;
+    }
+    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
+      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán).' : 'Please enter an audit reason note (mandatory per audit policy).');
+      return;
+    }
+
+    const row = studentsRoster.find(student => student.id === studentToAdjustGrade.id);
+    if (row) {
+      const updatedScores = { ...row.scores };
+      updatedScores[adjustGradeSkill] = Math.round(scoreNum * 10) / 10;
+      if (adjustGradeSkill !== 'overall') {
+        const validScores = [
+          updatedScores.writing,
+          updatedScores.speaking,
+          updatedScores.reading,
+          updatedScores.listening,
+        ].filter((s) => s > 0);
+        if (validScores.length > 0) {
+          updatedScores.overall = Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10;
+        }
+      }
+      setAdjustedScores(previous => ({ ...previous, [row.id]: updatedScores }));
+    }
+
+    const skillLabel = adjustGradeSkill === 'overall' ? (isVi ? 'Điểm trung bình (Overall)' : 'Overall Score') : adjustGradeSkill.toUpperCase();
+    showToast(
+      isVi
+        ? `Đã điều chỉnh ${skillLabel} cho ${studentToAdjustGrade.name} thành ${scoreNum} (Lý do: ${auditReasonNote.trim()})`
+        : `Updated ${skillLabel} for ${studentToAdjustGrade.name} to ${scoreNum} (Reason: ${auditReasonNote.trim()})`
+    );
+
+    setStudentToAdjustGrade(null);
+  };
+
+  // Overall Class KPI Metrics (clean, real calculations)
+  const classKpis = useMemo(() => {
+    const totalStudents = enrolledMembers.length;
+    const totalAssignmentsCount = classAssignments.length;
+    const totalPossibleSubs = totalStudents * totalAssignmentsCount;
+
+    const totalActualSubs = classAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+    const completionRate = totalPossibleSubs > 0 
+      ? Math.min(100, Math.round((totalActualSubs / totalPossibleSubs) * 100)) 
+      : 0;
+
+    const scores = studentsRoster.map((s) => s.scores.overall).filter((sc) => sc > 0);
+    const avgScore = scores.length > 0 
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+      : '0.0';
+
+    const gradedSubsCount = classAssignments.reduce((sum, a) => sum + Math.max(0, a.submittedCount - a.pendingGrading), 0);
+    const supportCount = studentsRoster.filter((s) => s.status === 'support').length;
+
+    return {
+      totalStudents,
+      completionRate,
+      avgScore,
+      supportCount,
+      totalPossibleSubs,
+      totalActualSubs,
+      gradedSubsCount
+    };
+  }, [enrolledMembers, classAssignments, studentsRoster]);
+
+  // Filtered Students List
+  const filteredStudents = useMemo(() => {
+    return studentsRoster.filter((std) => {
+      const matchSearch = 
+        std.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        std.code.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchStatus = statusFilter === 'all' || std.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [studentsRoster, searchQuery, statusFilter]);
+
+  const totalPages = Math.ceil(filteredStudents.length / pageSize) || 1;
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, safeCurrentPage, pageSize]);
+
+  // 4-Skill Analytics Data calculated from submissions & assignments
+  const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => {
+    const skills: { skill: ClassSkill; name: string }[] = [
+      { skill: 'writing', name: 'Writing' },
+      { skill: 'speaking', name: 'Speaking' },
+      { skill: 'reading', name: 'Reading' },
+      { skill: 'listening', name: 'Listening' }
+    ];
+
+    return skills.map(({ skill, name }) => {
+      // 1. Find all assignments in this class that contain this skill
+      const skillAssignments = classAssignments.filter((a) => (a.skills || [a.skill]).includes(skill));
+
+      // 2. Scores from student roster for this skill
+      const scoredStudents = studentsRoster.map((s) => s.scores[skill]).filter((v) => v > 0);
+      const gradedCount = scoredStudents.length;
+
+      // 3. Accurate average score
+      // Only show score if there are assignments or graded submissions for this skill
+      const avgScore = (skillAssignments.length > 0 || scoredStudents.length > 0) && scoredStudents.length > 0
+        ? Math.round((scoredStudents.reduce((a, b) => a + b, 0) / scoredStudents.length) * 10) / 10
+        : 0;
+
+      // 4. Accurate completion rate
+      let completionRate = 0;
+      if (skillAssignments.length > 0 && enrolledMembers.length > 0) {
+        const possible = skillAssignments.length * enrolledMembers.length;
+        const actual = skillAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+        completionRate = Math.min(100, Math.round((actual / possible) * 100));
+      } else if (gradedCount > 0 && enrolledMembers.length > 0) {
+        completionRate = Math.min(100, Math.round((gradedCount / enrolledMembers.length) * 100));
+      }
+
+      // If there are graded submissions for this skill, assignment count must be at least 1
+      const assignmentCount = Math.max(skillAssignments.length, gradedCount > 0 ? 1 : 0);
+
+      return {
+        skill,
+        name,
+        avgScore,
+        completionRate,
+        assignmentCount,
+        gradedCount
+      };
+    });
+  }, [studentsRoster, classAssignments, enrolledMembers]);
+
+  const handleClassChange = (newClassId: string) => {
+    navigate(`/teacher/classes/${newClassId}/progress`);
+  };
+
+  const handleSendDirectEvaluation = async () => {
+    if (!selectedStudent || !currentClass) return;
+    const trimmed = directMessageText.trim();
+    if (!trimmed) {
+      showToast(isVi ? 'Vui lòng nhập nội dung nhận xét.' : 'Please enter evaluation content.');
+      return;
+    }
+    setIsSendingEvaluation(true);
+    try {
+      const studentIdNum = Number(selectedStudent.id.replace('std-', ''));
+      const res = await studentEvaluationService.create(studentIdNum, {
+        classId: currentClass.id,
+        content: trimmed
+      });
+      const newItem: StudentEvaluationListItem = {
+        id: res.id || Date.now(),
+        classId: currentClass.id,
+        teacherName: currentClass.teacher?.fullName || (isVi ? 'Giáo viên' : 'Teacher'),
+        content: trimmed,
+        createdAt: new Date().toISOString()
+      };
+      setEvaluationHistory((prev) => [newItem, ...prev]);
+      setDirectMessageText('');
+      showToast(isVi ? `Đã lưu nhận xét cho ${selectedStudent.name}!` : `Evaluation saved for ${selectedStudent.name}!`);
+    } catch (err) {
+      console.error('Failed to send evaluation:', err);
+      showToast(isVi ? 'Không thể lưu nhận xét lúc này. Vui lòng thử lại.' : 'Failed to save evaluation. Please retry.');
+    } finally {
+      setIsSendingEvaluation(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (studentsRoster.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu học viên để xuất file.' : 'No data to export.');
+      return;
+    }
+    const headers = [
+      isVi ? 'Mã học viên' : 'Student Code',
+      isVi ? 'Họ và tên' : 'Full Name',
+      isVi ? 'Bài nộp' : 'Submissions',
+      'Writing',
+      'Speaking',
+      'Reading',
+      'Listening',
+      isVi ? 'Điểm trung bình' : 'Average Score',
+      isVi ? 'Trạng thái' : 'Status'
+    ];
+    const rows = studentsRoster.map((s) => [
+      s.code,
+      `"${s.name}"`,
+      `${s.assignmentsCompleted}/${s.totalAssignments}`,
+      s.scores.writing > 0 ? s.scores.writing : '',
+      s.scores.speaking > 0 ? s.scores.speaking : '',
+      s.scores.reading > 0 ? s.scores.reading : '',
+      s.scores.listening > 0 ? s.scores.listening : '',
+      s.scores.overall > 0 ? s.scores.overall : '',
+      `"${s.statusLabel}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Bang_Diem_${currentClass?.name || 'Class'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(isVi ? 'Đã xuất file bảng điểm thành công!' : 'Gradebook exported successfully!');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="tcd-container py-6">
+        <LoadingState 
+          title={isVi ? 'Đang tải dữ liệu tiến độ lớp học...' : 'Loading class progress...'}
+          description={isVi ? 'Đang đồng bộ sổ điểm, kết quả 4 kỹ năng và danh sách học viên.' : 'Syncing gradebook, 4-skill evaluation, and student roster.'}
+        />
+      </div>
+    );
+  }
+
+  if (error || !currentClass) {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <AlertCircle size={24} color="#dc2626" />
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>
+            {error || (isVi ? 'Không tìm thấy lớp học này.' : 'Class not found.')}
+          </h3>
+        </div>
+        <button 
+          className="tcd-btn-secondary"
+          onClick={handleRetry}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <RefreshCw size={14} />
+          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="tcd-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          backgroundColor: '#0f172a',
-          color: '#ffffff',
-          padding: '12px 20px',
-          borderRadius: '10px',
-          fontSize: '13px',
-          fontWeight: 600,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <CheckCircle2 size={16} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* 1. Breadcrumbs */}
       <nav className="tcd-breadcrumbs">
         <Link to="/teacher/classes" className="tcd-breadcrumb-link">
           {isVi ? 'Lớp học của tôi' : 'My Classes'}
         </Link>
         <ChevronRight size={14} />
-        <span className="tcd-breadcrumb-active">{currentClass.code}</span>
+        <span className="tcd-breadcrumb-active">{currentClass.name}</span>
         <ChevronRight size={14} />
         <span className="tcd-breadcrumb-active">
-          {isVi ? 'Chi tiết & Bảng điểm' : 'Details & Gradebook'}
+          {isVi ? 'Tiến độ học tập' : 'Class Progress'}
         </span>
       </nav>
 
@@ -487,192 +748,171 @@ export const TeacherClassProgress: React.FC = () => {
       <section className="tcd-hero-card">
         <div className="tcd-hero-top">
           <div className="tcd-hero-main-info">
-            <div className="tcd-badge-group">
-              <span className="tcd-class-code-badge">{currentClass.code}</span>
-              <span className="tcd-target-band-badge">
-                <Award size={13} />
-                <span>{currentClass.targetBand}</span>
-              </span>
-              <span className="tcd-status-badge-active">
-                <CheckCircle2 size={13} />
-                <span>{isVi ? 'Đang hoạt động' : 'Active Class'}</span>
-              </span>
-            </div>
+            <span className={`tcd-status-badge ${currentClass.status === 'ACTIVE' ? 'active' : 'completed'}`}>
+              {currentClass.status === 'ACTIVE' 
+                ? (isVi ? 'Đang hoạt động' : 'Active') 
+                : (isVi ? 'Đã hoàn thành' : 'Completed')}
+            </span>
 
             <h1 className="tcd-class-title">{currentClass.name}</h1>
+
+            {currentClass.description && (
+              <p className="tcd-class-desc">{currentClass.description}</p>
+            )}
 
             <div className="tcd-meta-row">
               <span className="tcd-meta-item">
                 <Users size={14} />
-                <span><strong>{currentClass.enrolledStudents}</strong> {isVi ? 'học viên' : 'students'}</span>
+                <span><strong>{enrolledMembers.length}</strong> {isVi ? 'học viên' : 'students'}</span>
               </span>
-              <span className="tcd-meta-item">
-                <Calendar size={14} />
-                <span>{currentClass.schedule}</span>
-              </span>
-              <span className="tcd-meta-item">
-                <MapPin size={14} />
-                <span>{currentClass.room}</span>
-              </span>
+
+              {currentClass.level && (
+                <span className="tcd-meta-item">
+                  <Award size={14} />
+                  <span>{currentClass.level}</span>
+                </span>
+              )}
+
+              {(currentClass.startDate || currentClass.endDate) && (
+                <span className="tcd-meta-item">
+                  <Calendar size={14} />
+                  <span>
+                    {currentClass.startDate ? new Date(currentClass.startDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : ''}
+                    {currentClass.endDate ? ` - ${new Date(currentClass.endDate).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')}` : ''}
+                  </span>
+                </span>
+              )}
+
+              {currentClass.teacher?.fullName && (
+                <span className="tcd-meta-item">
+                  <BookOpen size={14} />
+                  <span>{currentClass.teacher.fullName}</span>
+                </span>
+              )}
             </div>
           </div>
 
           {/* Header Actions */}
           <div className="tcd-hero-actions">
             {/* Quick Class Switcher */}
-            <select
-              className="tcd-class-select"
-              value={currentClassCode}
-              onChange={(e) => handleClassChange(e.target.value)}
-              title={isVi ? 'Đổi lớp nhanh' : 'Switch Class'}
-            >
-              {Object.values(availableClasses).map((c) => (
-                <option key={c.code} value={c.code}>
-                  [{c.code}] {c.name.slice(0, 32)}...
-                </option>
-              ))}
-            </select>
+            {classesList.length > 1 && (
+              <select
+                className="tcd-class-select"
+                value={String(currentClass.id)}
+                onChange={(e) => handleClassChange(e.target.value)}
+                title={isVi ? 'Đổi lớp nhanh' : 'Switch Class'}
+              >
+                {classesList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <button 
               className="tcd-btn-secondary"
-              onClick={() => showToast(isVi ? 'Đang xuất bảng điểm Excel của lớp...' : 'Exporting Excel gradebook...')}
+              onClick={handleExportCsv}
             >
               <Download size={14} />
-              <span>{isVi ? 'Xuất Excel' : 'Export'}</span>
+              <span>{isVi ? 'Xuất CSV' : 'Export CSV'}</span>
             </button>
 
             <button 
               className="tcd-btn-primary"
-              onClick={() => navigate(`/teacher/assignments/create?class=${currentClass.code}`)}
+              onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
             >
               <Plus size={15} />
-              <span>{isVi ? 'Giao bài cho lớp' : 'Assign Homework'}</span>
+              <span>{isVi ? 'Giao bài tập' : 'Assign Homework'}</span>
             </button>
-          </div>
-        </div>
-
-        {/* Syllabus Progress Bar */}
-        <div className="tcd-lesson-progress-wrap">
-          <div className="tcd-lesson-progress-meta">
-            <span>
-              {isVi ? 'Tiến độ lộ trình học phần:' : 'Syllabus Progress:'} Buổi {currentClass.currentLesson} / {currentClass.totalLessons}
-            </span>
-            <span>
-              {Math.round((currentClass.currentLesson / currentClass.totalLessons) * 100)}% {isVi ? 'hoàn thành' : 'completed'}
-            </span>
-          </div>
-          <div className="tcd-lesson-track">
-            <div 
-              className="tcd-lesson-bar" 
-              style={{ width: `${(currentClass.currentLesson / currentClass.totalLessons) * 100}%` }}
-            />
           </div>
         </div>
       </section>
 
+      <DateRangeFilter
+        range={dateRange}
+        reversed={dateRangeStatus === 'reversed'}
+        onChange={handleDateRangeChange}
+      />
+
       {/* 3. 4 KPI Metrics */}
       <section className="tcd-kpi-grid">
-        {/* KPI 1 */}
+        {/* KPI 1: Enrolled Students */}
         <div className="tcd-kpi-card">
           <div className="tcd-kpi-head">
-            <div className="tcd-kpi-icon blue">
-              <TrendingUp size={20} />
+            <span className="tcd-kpi-label">{isVi ? 'Tổng số học viên' : 'Enrolled Students'}</span>
+            <div className="tcd-kpi-icon">
+              <Users size={18} />
             </div>
-            <span className="tcd-kpi-chip info">
-              {currentClass.stats.completionRate}%
-            </span>
           </div>
-          <div>
-            <div className="tcd-kpi-value">{currentClass.stats.completionRate}%</div>
-            <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ hoàn thành bài tập' : 'Assignment Completion'}</div>
-          </div>
-          <div className="tcd-mini-progress">
-            <div 
-              className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.completionRate}%`, backgroundColor: '#2563eb' }}
-            />
+          <div className="tcd-kpi-value-wrap">
+            <span className="tcd-kpi-value">{classKpis.totalStudents}</span>
+            <span className="tcd-kpi-suffix">{isVi ? 'học viên' : 'students'}</span>
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>212 / 240 {isVi ? 'bài đã nộp' : 'submitted'}</span>
-            <span style={{ color: '#2563eb', fontWeight: 600 }}>28 {isVi ? 'bài tồn' : 'pending'}</span>
+            <span>{classAssignments.length} {isVi ? 'bài tập đã giao' : 'assignments created'}</span>
           </div>
         </div>
 
-        {/* KPI 2 */}
+        {/* KPI 2: Completion Rate */}
         <div className="tcd-kpi-card">
           <div className="tcd-kpi-head">
-            <div className="tcd-kpi-icon green">
-              <CheckCircle2 size={20} />
+            <span className="tcd-kpi-label">{isVi ? 'Tỷ lệ hoàn thành' : 'Completion Rate'}</span>
+            <div className="tcd-kpi-icon">
+              <TrendingUp size={18} />
             </div>
-            <span className="tcd-kpi-chip success">
-              +2.3% {isVi ? 'tuần này' : 'this week'}
-            </span>
           </div>
-          <div>
-            <div className="tcd-kpi-value">{currentClass.stats.onTimeRate}%</div>
-            <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ nộp bài đúng hạn' : 'On-time Submission Rate'}</div>
+          <div className="tcd-kpi-value-wrap">
+            <span className="tcd-kpi-value">{classKpis.completionRate}%</span>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.onTimeRate}%`, backgroundColor: '#16a34a' }}
+              style={{ width: `${classKpis.completionRate}%`, backgroundColor: 'var(--primary, #1b4d3e)' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>194 {isVi ? 'đúng hạn' : 'on-time'}</span>
-            <span style={{ color: '#16a34a', fontWeight: 600 }}>{isVi ? 'Xuất sắc' : 'Excellent'}</span>
+            <span>{classKpis.totalActualSubs} / {classKpis.totalPossibleSubs} {isVi ? 'lượt nộp bài' : 'submissions'}</span>
           </div>
         </div>
 
-        {/* KPI 3 */}
+        {/* KPI 3: Average Score */}
         <div className="tcd-kpi-card">
           <div className="tcd-kpi-head">
-            <div className="tcd-kpi-icon purple">
-              <Award size={20} />
+            <span className="tcd-kpi-label">{isVi ? 'Điểm trung bình lớp' : 'Class Average Score'}</span>
+            <div className="tcd-kpi-icon">
+              <Award size={18} />
             </div>
-            <span className="tcd-kpi-chip info">
-              +0.3 Band
-            </span>
           </div>
-          <div>
-            <div className="tcd-kpi-value">Band {currentClass.stats.avgScore}</div>
-            <div className="tcd-kpi-label">{isVi ? 'Điểm trung bình cả lớp' : 'Overall Class Band Avg'}</div>
+          <div className="tcd-kpi-value-wrap">
+            <span className="tcd-kpi-value">{classKpis.avgScore}</span>
+            <span className="tcd-kpi-suffix">/ 10</span>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${(currentClass.stats.avgScore / 9.0) * 100}%`, backgroundColor: '#7e22ce' }}
+              style={{ width: `${Math.min(100, (parseFloat(classKpis.avgScore) / 10.0) * 100)}%`, backgroundColor: 'var(--primary, #1b4d3e)' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>{isVi ? 'Mục tiêu:' : 'Target:'} {currentClass.targetBand}</span>
-            <span style={{ color: '#7e22ce', fontWeight: 600 }}>{isVi ? 'Đạt chuẩn' : 'Target Met'}</span>
+            <span>{classKpis.gradedSubsCount} {isVi ? 'bài đã chấm điểm' : 'graded submissions'}</span>
           </div>
         </div>
 
-        {/* KPI 4 */}
+        {/* KPI 4: Students Needing Support */}
         <div className="tcd-kpi-card">
           <div className="tcd-kpi-head">
-            <div className="tcd-kpi-icon amber">
-              <AlertCircle size={20} />
+            <span className="tcd-kpi-label">{isVi ? 'Cần theo dõi & hỗ trợ' : 'Needs Support'}</span>
+            <div className="tcd-kpi-icon warning">
+              <AlertCircle size={18} />
             </div>
-            <span className="tcd-kpi-chip warning">
-              3 {isVi ? 'em cần phụ đạo' : 'need support'}
-            </span>
           </div>
-          <div>
-            <div className="tcd-kpi-value">{currentClass.stats.targetAttainment}%</div>
-            <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ đạt chuẩn mục tiêu' : 'Target Attainment Rate'}</div>
-          </div>
-          <div className="tcd-mini-progress">
-            <div 
-              className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.targetAttainment}%`, backgroundColor: '#d97706' }}
-            />
+          <div className="tcd-kpi-value-wrap">
+            <span className="tcd-kpi-value">{classKpis.supportCount}</span>
+            <span className="tcd-kpi-suffix">{isVi ? 'học viên' : 'students'}</span>
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>21 / 24 {isVi ? 'học viên đạt & vượt' : 'achieved'}</span>
-            <span style={{ color: '#dc2626', fontWeight: 600 }}>3 {isVi ? 'nguy cơ tụt' : 'at risk'}</span>
+            <span>{isVi ? 'Điểm TB < 6.0 hoặc nộp < 60%' : 'Avg < 6.0 or turnout < 60%'}</span>
           </div>
         </div>
       </section>
@@ -681,41 +921,41 @@ export const TeacherClassProgress: React.FC = () => {
       <div className="tcd-tabs-bar">
         <button 
           className={`tcd-tab-item ${activeTab === 'roster' ? 'active' : ''}`}
-          onClick={() => setActiveTab('roster')}
+          onClick={() => handleTabChange('roster')}
         >
           <Users size={16} />
-          <span>{isVi ? 'Bảng điểm & Học viên' : 'Gradebook & Students'}</span>
-          <span className="tcd-tab-count">{studentsList.length}</span>
+          <span>{isVi ? 'Sổ điểm & Học viên' : 'Gradebook & Students'}</span>
+          <span className="tcd-tab-count">{studentsRoster.length}</span>
         </button>
 
         <button 
           className={`tcd-tab-item ${activeTab === 'assignments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('assignments')}
+          onClick={() => handleTabChange('assignments')}
         >
           <FileText size={16} />
-          <span>{isVi ? 'Danh sách Bài tập lớp' : 'Class Assignments'}</span>
+          <span>{isVi ? 'Danh sách Bài tập' : 'Class Assignments'}</span>
           <span className="tcd-tab-count">{classAssignments.length}</span>
         </button>
 
         <button 
           className={`tcd-tab-item ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
+          onClick={() => handleTabChange('analytics')}
         >
-          <Sparkles size={16} />
-          <span>{isVi ? 'Phân tích 4KN & AI Insights' : '4-Skill Analytics & AI'}</span>
+          <BarChart3 size={16} />
+          <span>{isVi ? 'Đánh giá 4 kỹ năng' : '4-Skill Performance'}</span>
         </button>
 
         <button 
-          className={`tcd-tab-item ${activeTab === 'syllabus' ? 'active' : ''}`}
-          onClick={() => setActiveTab('syllabus')}
+          className={`tcd-tab-item ${activeTab === 'members' ? 'active' : ''}`}
+          onClick={() => handleTabChange('members')}
         >
-          <Clock size={16} />
-          <span>{isVi ? 'Lộ trình & Buổi học' : 'Syllabus & Sessions'}</span>
-          <span className="tcd-tab-count">{currentClass.totalLessons}</span>
+          <Users size={16} />
+          <span>{isVi ? 'Quản lý thành viên' : 'Class Members'}</span>
+          <span className="tcd-tab-count">{enrolledMembers.length}</span>
         </button>
       </div>
 
-      {/* 5. TAB 1: Bảng điểm & Học viên */}
+      {/* 5. TAB 1: Sổ điểm & Học viên */}
       {activeTab === 'roster' && (
         <section className="tcd-card-section">
           {/* Toolbar */}
@@ -725,36 +965,36 @@ export const TeacherClassProgress: React.FC = () => {
               <input 
                 type="text" 
                 className="tcd-search-input"
-                placeholder={isVi ? 'Tìm kiếm học viên theo tên, mã HV...' : 'Search student by name, ID...'}
+                placeholder={isVi ? 'Tìm kiếm theo tên hoặc mã HV...' : 'Search by name or student ID...'}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
 
             <div className="tcd-filter-pills">
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('all')}
+                onClick={() => handleStatusFilterChange('all')}
               >
-                {isVi ? 'Tất cả' : 'All'} ({studentsList.length})
+                {isVi ? 'Tất cả' : 'All'} ({studentsRoster.length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'exceed' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('exceed')}
+                onClick={() => handleStatusFilterChange('exceed')}
               >
-                {isVi ? 'Vượt trội' : 'Exceeding'} (3)
+                {isVi ? 'Vượt trội' : 'Exceeding'} ({studentsRoster.filter(s => s.status === 'exceed').length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'ontime' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('ontime')}
+                onClick={() => handleStatusFilterChange('ontime')}
               >
-                {isVi ? 'Đạt chuẩn' : 'On-track'} (18)
+                {isVi ? 'Đạt chuẩn' : 'On-track'} ({studentsRoster.filter(s => s.status === 'ontime').length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'support' ? 'active' : ''}`}
-                onClick={() => setStatusFilter('support')}
+                onClick={() => handleStatusFilterChange('support')}
               >
-                {isVi ? 'Cần hỗ trợ' : 'Needs Support'} (3)
+                {isVi ? 'Cần hỗ trợ' : 'Needs Support'} ({studentsRoster.filter(s => s.status === 'support').length})
               </button>
             </div>
           </div>
@@ -765,19 +1005,18 @@ export const TeacherClassProgress: React.FC = () => {
               <thead>
                 <tr>
                   <th>{isVi ? 'Học viên' : 'Student'}</th>
-                  <th style={{ textAlign: 'center' }}>{isVi ? 'Chuyên cần' : 'Attendance'}</th>
-                  <th>{isVi ? 'Tiến độ nộp' : 'Assignments'}</th>
-                  <th style={{ textAlign: 'center' }}>Writing</th>
-                  <th style={{ textAlign: 'center' }}>Speaking</th>
-                  <th style={{ textAlign: 'center' }}>Reading</th>
-                  <th style={{ textAlign: 'center' }}>Listening</th>
-                  <th style={{ textAlign: 'center' }}>Overall</th>
+                  <th>{isVi ? 'Tiến độ nộp' : 'Submissions'}</th>
+                  <th className="text-center">Writing</th>
+                  <th className="text-center">Speaking</th>
+                  <th className="text-center">Reading</th>
+                  <th className="text-center">Listening</th>
+                  <th className="text-center">{isVi ? 'Điểm TB' : 'Overall'}</th>
                   <th>{isVi ? 'Trạng thái' : 'Status'}</th>
-                  <th style={{ textAlign: 'right' }}>{isVi ? 'Chi tiết' : 'Actions'}</th>
+                  <th className="text-right">{isVi ? 'Chi tiết' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((std) => (
+                {paginatedStudents.map((std) => (
                   <tr 
                     key={std.id} 
                     className={std.status === 'support' ? 'row-support' : ''}
@@ -792,99 +1031,129 @@ export const TeacherClassProgress: React.FC = () => {
                       </div>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
-                      <span style={{ fontWeight: 600, color: std.attendance < 85 ? '#dc2626' : '#334155' }}>
-                        {std.attendance}%
-                      </span>
-                    </td>
-
                     <td>
-                      <div style={{ width: '120px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px' }}>
+                      <div className="tcd-submission-col">
+                        <div className="flex justify-between text-xs mb-1">
                           <span>{std.assignmentsCompleted}/{std.totalAssignments}</span>
-                          <span style={{ fontWeight: 600 }}>{Math.round((std.assignmentsCompleted / std.totalAssignments) * 100)}%</span>
+                          <span className="font-semibold">
+                            {std.totalAssignments > 0 ? Math.round((std.assignmentsCompleted / std.totalAssignments) * 100) : 0}%
+                          </span>
                         </div>
                         <div className="tcd-mini-progress">
                           <div 
                             className="tcd-mini-progress-fill" 
                             style={{ 
-                              width: `${(std.assignmentsCompleted / std.totalAssignments) * 100}%`,
-                              backgroundColor: std.assignmentsCompleted < 8 ? '#dc2626' : '#2563eb'
+                              width: `${std.totalAssignments > 0 ? (std.assignmentsCompleted / std.totalAssignments) * 100 : 0}%`,
+                              backgroundColor: std.assignmentsCompleted < Math.ceil(std.totalAssignments * 0.5) && std.totalAssignments > 0
+                                ? '#dc2626' 
+                                : 'var(--primary, #1b4d3e)'
                             }}
                           />
                         </div>
                       </div>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="text-center">
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.writing)}`}>
-                        {std.scores.writing}
+                        {std.scores.writing > 0 ? std.scores.writing : '—'}
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="text-center">
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.speaking)}`}>
-                        {std.scores.speaking}
+                        {std.scores.speaking > 0 ? std.scores.speaking : '—'}
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="text-center">
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.reading)}`}>
-                        {std.scores.reading}
+                        {std.scores.reading > 0 ? std.scores.reading : '—'}
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="text-center">
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.listening)}`}>
-                        {std.scores.listening}
+                        {std.scores.listening > 0 ? std.scores.listening : '—'}
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
-                      <span className="tcd-overall-score">{std.scores.overall}</span>
+                    <td className="text-center">
+                      <span className="tcd-overall-score">{std.scores.overall > 0 ? std.scores.overall : '—'}</span>
                     </td>
 
                     <td>
                       <span className={`tcd-status-chip ${std.status}`}>
-                        {std.status === 'exceed' && <Sparkles size={11} />}
-                        {std.status === 'ontime' && <CheckCircle2 size={11} />}
-                        {std.status === 'support' && <AlertCircle size={11} />}
-                        <span>{std.statusLabel}</span>
+                        {std.statusLabel}
                       </span>
                     </td>
 
-                    <td style={{ textAlign: 'right' }}>
-                      <button 
-                        className="tcd-btn-action-icon"
-                        title={isVi ? 'Xem chi tiết học viên' : 'View Profile'}
-                        onClick={() => setSelectedStudent(std)}
-                      >
-                        <Eye size={15} />
-                      </button>
+                    <td className="text-right">
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <button 
+                          className="tcd-btn-action-icon"
+                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán)' : 'Adjust Grade (Audit note)'}
+                          disabled={hasDateFilter}
+                          onClick={() => handleOpenAdjustGrade(std)}
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                        <button 
+                          className="tcd-btn-action-icon"
+                          title={isVi ? 'Xem chi tiết học viên' : 'View Student'}
+                          onClick={() => handleOpenStudentDetail(std)}
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
+
+                {filteredStudents.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="text-center p-6 text-muted text-sm">
+                      {isVi ? 'Không có học viên nào khớp với bộ lọc tìm kiếm.' : 'No students match your criteria.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+
+            {filteredStudents.length > 0 && (
+              <Pagination
+                currentPage={safeCurrentPage}
+                totalPages={totalPages}
+                totalItems={filteredStudents.length}
+                itemLabel={isVi ? 'học viên' : 'students'}
+                isVi={isVi}
+                onPageChange={setCurrentPage}
+                pageSize={pageSize}
+                onPageSizeChange={(newSize) => {
+                  setPageSize(newSize);
+                  setCurrentPage(1);
+                }}
+                pageSizeOptions={[5, 10, 20]}
+                variant="table"
+              />
+            )}
           </div>
         </section>
       )}
 
-      {/* 6. TAB 2: Danh sách Bài tập lớp */}
-      {activeTab === 'assignments' && (
+
+
+      {/* 6. TAB 2: Danh sách Bài tập */}
+            {activeTab === 'assignments' && (
         <section className="tcd-card-section">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                {isVi ? 'Bài tập đã giao cho lớp này' : 'Assignments for this Class'}
+              <h2 className="text-base font-bold text-main m-0">
+                {isVi ? 'Bài tập đã giao cho lớp' : 'Assignments for this Class'}
               </h2>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-                {isVi ? 'Quản lý hạn nộp, tỷ lệ hoàn thành và duyệt chấm bài tập của học viên.' : 'Monitor due dates, submission rates and grading queue.'}
-              </p>
             </div>
             <button 
               className="tcd-btn-primary"
-              onClick={() => navigate(`/teacher/assignments/create?class=${currentClass.code}`)}
+              onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
             >
               <Plus size={15} />
               <span>{isVi ? 'Giao bài tập mới' : 'New Assignment'}</span>
@@ -895,40 +1164,56 @@ export const TeacherClassProgress: React.FC = () => {
             {classAssignments.map((hw) => (
               <div key={hw.id} className="tcd-assignment-card">
                 <div className="tcd-assignment-card-header">
-                  <div>
-                    <span className="tcd-class-code-badge" style={{ backgroundColor: '#2563eb' }}>
-                      {hw.code}
-                    </span>
-                    <h3 className="tcd-assignment-title" style={{ marginTop: '8px' }}>
-                      {hw.title}
-                    </h3>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(hw.skills && hw.skills.length === 4) ? (
+                      <span className="tcd-skill-badge all-skills">
+                        <Sparkles size={11} />
+                        <span>{isVi ? '4 Kỹ năng' : '4 Skills'}</span>
+                      </span>
+                    ) : (hw.skills && hw.skills.length > 1) ? (
+                      hw.skills.map((sk) => (
+                        <span key={sk} className={`tcd-skill-badge ${sk}`}>
+                          {sk}
+                        </span>
+                      ))
+                    ) : (
+                      <span className={`tcd-skill-badge ${hw.skill}`}>
+                        {hw.skill}
+                      </span>
+                    )}
                   </div>
+                  <span className={`tcd-status-chip ${hw.status === 'open' ? 'ontime' : 'support'}`}>
+                    {hw.status === 'open' ? (isVi ? 'Đang mở' : 'Open') : (isVi ? 'Đã đóng' : 'Closed')}
+                  </span>
                 </div>
 
+                <h3 className="tcd-assignment-title">
+                  {hw.title}
+                </h3>
+
                 <div className="tcd-assignment-meta">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span className="flex items-center gap-1">
                     <Calendar size={13} /> {hw.dueDate}
                   </span>
-                  <span style={{ 
-                    fontWeight: 600, 
-                    color: hw.daysLeft === 0 ? '#dc2626' : '#2563eb' 
-                  }}>
-                    {hw.daysLeft === 0 ? (isVi ? 'Hết hạn hôm nay' : 'Due today') : `${hw.daysLeft} ${isVi ? 'ngày nữa' : 'days left'}`}
-                  </span>
+                  {hw.status === 'open' && (
+                    <span className={`font-semibold ${hw.daysLeft === 0 ? 'text-danger' : 'text-primary'}`}>
+                      {hw.daysLeft === 0 ? (isVi ? 'Hạn hôm nay' : 'Due today') : `${hw.daysLeft} ${isVi ? 'ngày nữa' : 'days left'}`}
+                    </span>
+                  )}
                 </div>
 
                 {/* Progress bar */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' }}>
-                    <span>{isVi ? 'Đã nộp:' : 'Submitted:'} <strong>{hw.submittedCount}/{hw.totalStudents}</strong></span>
-                    <span style={{ fontWeight: 600 }}>{Math.round((hw.submittedCount / hw.totalStudents) * 100)}%</span>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>{isVi ? 'Đã nộp:' : 'Turnout:'} <strong>{hw.submittedCount}/{hw.totalStudents}</strong></span>
+                    <span className="font-semibold">{Math.round((hw.submittedCount / hw.totalStudents) * 100)}%</span>
                   </div>
                   <div className="tcd-mini-progress">
                     <div 
-                      className="tcd-mini-progress-fill"
+                      className="tcd-mini-progress-fill" 
                       style={{ 
-                        width: `${(hw.submittedCount / hw.totalStudents) * 100}%`,
-                        backgroundColor: '#2563eb'
+                        width: `${Math.min(100, (hw.submittedCount / hw.totalStudents) * 100)}%`,
+                        backgroundColor: 'var(--primary, #1b4d3e)'
                       }}
                     />
                   </div>
@@ -936,39 +1221,58 @@ export const TeacherClassProgress: React.FC = () => {
 
                 <div className="tcd-assignment-stat-row">
                   <span>
-                    {isVi ? 'Chờ chấm:' : 'To Grade:'} <strong style={{ color: hw.pendingGrading > 0 ? '#dc2626' : '#16a34a' }}>{hw.pendingGrading} bài</strong>
+                    {isVi ? 'Chờ chấm:' : 'To Grade:'} <strong className={hw.pendingGrading > 0 ? 'text-danger' : 'text-success'}>{hw.pendingGrading}</strong>
                   </span>
-                  {hw.avgScore > 0 && (
-                    <span>{isVi ? 'Điểm TB:' : 'Avg:'} <strong>Band {hw.avgScore}</strong></span>
+                  {hw.avgScore > 0 ? (
+                    <span>{isVi ? 'Điểm TB:' : 'Avg:'} <strong>{hw.avgScore} / 10</strong></span>
+                  ) : (
+                    <span className="text-muted">{isVi ? 'Chưa chấm' : 'Not graded'}</span>
                   )}
                 </div>
 
                 <div className="tcd-assignment-actions">
                   <button 
-                    className="tcd-btn-primary"
-                    style={{ flex: 1, justifyContent: 'center' }}
+                    className="tcd-btn-primary flex-1 justify-center"
                     onClick={() => navigate(`/teacher/assignments/${hw.id}`)}
                   >
-                    <span>{isVi ? 'Chấm & Quản lý bài' : 'Review & Grade'}</span>
+                    <span>{isVi ? 'Chấm bài & Quản lý' : 'Grade & Manage'}</span>
                     <ArrowUpRight size={14} />
                   </button>
                 </div>
               </div>
             ))}
+
+            {classAssignments.length === 0 && (
+              <div className="col-span-full text-center p-6 bg-surface-low rounded-xl border-dashed border-subtle">
+                <FileText size={36} className="m-auto mb-2 block text-muted" />
+                <h4 className="m-0 text-base font-bold text-main">
+                  {isVi ? 'Lớp này chưa có bài tập nào' : 'No assignments created yet'}
+                </h4>
+                <p className="mt-1 mb-4 text-xs text-muted">
+                  {isVi ? 'Tạo bài tập đầu tiên để bắt đầu theo dõi tiến độ của học viên.' : 'Create first assignment to start tracking student progress.'}
+                </p>
+                <button 
+                  className="tcd-btn-primary"
+                  onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
+                >
+                  <Plus size={14} />
+                  <span>{isVi ? 'Giao bài tập mới' : 'Create Assignment'}</span>
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {/* 7. TAB 3: Phân tích 4 Kỹ năng & AI Insights */}
-      {activeTab === 'analytics' && (
+
+
+      {/* 7. TAB 3: Đánh giá 4 kỹ năng */}
+            {activeTab === 'analytics' && (
         <section className="tcd-card-section">
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-              {isVi ? 'Đánh giá Năng lực 4 Kỹ năng & AI Insights' : '4-Skill Analytics & AI Diagnostic'}
+            <h2 className="text-base font-bold text-main m-0">
+              {isVi ? 'Đánh giá Năng lực 4 Kỹ năng' : '4-Skill Performance Summary'}
             </h2>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Báo cáo tổng hợp từ công cụ AI Grading Engine dựa trên 240 bài nộp trong học kỳ.' : 'Synthesized diagnosis from AI Grading Engine across 240 semester submissions.'}
-            </p>
           </div>
 
           <div className="tcd-analytics-grid">
@@ -976,198 +1280,233 @@ export const TeacherClassProgress: React.FC = () => {
               <div key={sk.skill} className="tcd-analytics-skill-card">
                 <div className="tcd-skill-card-top">
                   <span className="tcd-skill-tag-name">
-                    {sk.skill === 'writing' && <PenTool size={16} color="#2563eb" />}
-                    {sk.skill === 'speaking' && <Mic size={16} color="#9333ea" />}
-                    {sk.skill === 'reading' && <BookOpen size={16} color="#16a34a" />}
-                    {sk.skill === 'listening' && <Headphones size={16} color="#0d9488" />}
+                    {sk.skill === 'writing' && <PenTool size={16} color="var(--skill-writing, #8C5E14)" />}
+                    {sk.skill === 'speaking' && <Mic size={16} color="var(--skill-speaking, #5B21B6)" />}
+                    {sk.skill === 'reading' && <BookOpen size={16} color="var(--skill-reading, #16533D)" />}
+                    {sk.skill === 'listening' && <Headphones size={16} color="var(--skill-listening, #1E3A8A)" />}
                     <span>{sk.name}</span>
                   </span>
 
                   <div className="tcd-skill-score-box">
-                    <span className="tcd-skill-avg-score">{sk.avgScore}</span>
-                    <span className="tcd-skill-target-score">/ {sk.targetScore}</span>
+                    <span className="tcd-skill-avg-score">{sk.avgScore > 0 ? sk.avgScore : '—'}</span>
+                    {sk.avgScore > 0 && <span style={{ fontSize: '12px', color: '#64748b' }}>/ 10</span>}
                   </div>
                 </div>
 
                 <div className="tcd-mini-progress">
                   <div 
-                    className="tcd-mini-progress-fill"
+                    className="tcd-mini-progress-fill" 
                     style={{ 
-                      width: `${(sk.avgScore / 9.0) * 100}%`,
-                      backgroundColor: sk.skill === 'writing' ? '#2563eb' : sk.skill === 'speaking' ? '#9333ea' : sk.skill === 'reading' ? '#16a34a' : '#0d9488'
+                      width: `${Math.min(100, Math.round((sk.avgScore / 10.0) * 100))}%`,
+                      backgroundColor: sk.skill === 'writing' ? 'var(--skill-writing, #8C5E14)' : sk.skill === 'speaking' ? 'var(--skill-speaking, #5B21B6)' : sk.skill === 'reading' ? 'var(--skill-reading, #16533D)' : 'var(--skill-listening, #1E3A8A)'
                     }}
                   />
                 </div>
 
-                {/* Strengths */}
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', marginBottom: '6px' }}>
-                    {isVi ? '✓ Điểm mạnh của lớp:' : '✓ Class Strengths:'}
+                <div className="tcd-skill-stats-list">
+                  <div className="tcd-skill-stat-item">
+                    <span>{isVi ? 'Tỷ lệ hoàn thành:' : 'Completion Rate:'}</span>
+                    <strong>{sk.completionRate}%</strong>
                   </div>
-                  <div className="tcd-tags-list">
-                    {sk.strengths.map((str, idx) => (
-                      <span key={idx} className="tcd-tag-item strength">{str}</span>
-                    ))}
+                  <div className="tcd-skill-stat-item">
+                    <span>{isVi ? 'Bài tập trong lớp:' : 'Assignments:'}</span>
+                    <strong>{sk.assignmentCount} {isVi ? 'bài' : 'items'}</strong>
                   </div>
-                </div>
-
-                {/* Weaknesses */}
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626', marginBottom: '6px' }}>
-                    {isVi ? '⚠ Điểm yếu cần khắc phục:' : '⚠ Common Weaknesses:'}
+                  <div className="tcd-skill-stat-item">
+                    <span>{isVi ? 'Bài đã chấm điểm:' : 'Graded Submissions:'}</span>
+                    <strong>{sk.gradedCount} {isVi ? 'bài' : 'items'}</strong>
                   </div>
-                  <div className="tcd-tags-list">
-                    {sk.weaknesses.map((wk, idx) => (
-                      <span key={idx} className="tcd-tag-item weakness">{wk}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* AI Recommendation */}
-                <div className="tcd-ai-block">
-                  <div className="tcd-ai-header">
-                    <Sparkles size={14} />
-                    <span>{isVi ? 'Đề xuất can thiệp từ AI' : 'AI Recommendation'}</span>
-                  </div>
-                  <p className="tcd-ai-text">{sk.aiRecommendation}</p>
                 </div>
               </div>
             ))}
           </div>
+        </section>
+      )}
 
-          {/* Intervention Alert Banner */}
-          <div style={{ 
-            backgroundColor: '#fffbeb', 
-            border: '1px solid #fde68a', 
-            borderRadius: '14px', 
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '16px'
-          }}>
-            <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#92400e' }}>
-                {isVi ? 'Cảnh báo 3 học viên có nguy cơ không đạt Target Band' : 'Intervention Alert: 3 students at risk'}
+      {/* 6. TAB 4: Quản lý thành viên lớp học (FE-87 / UC009) */}
+      {activeTab === 'members' && (
+        <section className="tcd-card-section">
+          {/* Header & Capacity */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 mb-4 rounded-xl bg-surface border border-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                <Users size={22} />
               </div>
-              <p style={{ fontSize: '13px', color: '#b45309', margin: '4px 0 10px 0' }}>
-                {isVi 
-                  ? 'Học viên Trần Hoàng Long, Vũ Thị Hương, và Đỗ Minh Quân đang có điểm số trung bình dưới Band 6.0 và tỷ lệ nộp bài chậm. Đề xuất xếp lịch 1-on-1 tutoring trước buổi học số 16.' 
-                  : 'Students are currently performing under Band 6.0 with overdue assignments. Recommended to schedule 1-on-1 tutoring before lesson 16.'}
-              </p>
-              <button 
-                className="tcd-btn-primary"
-                style={{ backgroundColor: '#d97706', fontSize: '12.5px', padding: '6px 14px' }}
-                onClick={() => showToast(isVi ? 'Đã gửi lời mời phụ đạo 1-on-1 tới 3 học viên' : 'Sent 1-on-1 tutoring invites')}
-              >
-                <Send size={13} />
-                <span>{isVi ? 'Gửi lời mời phụ đạo 1-on-1' : 'Send Tutoring Invite'}</span>
-              </button>
+              <div>
+                <h3 className="m-0 text-base font-bold text-main">
+                  {isVi ? 'Danh sách học viên đang theo học' : 'Enrolled Class Members'}
+                </h3>
+                <p className="m-0 text-xs text-muted mt-0.5">
+                  {isVi ? 'Sĩ số hiện tại:' : 'Current roster:'}{' '}
+                  <strong>{enrolledMembers.length} / {maxCapacity}</strong>{' '}
+                  ({Math.max(0, maxCapacity - enrolledMembers.length)} {isVi ? 'chỗ trống' : 'vacancies'})
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              icon={UserPlus}
+              onClick={() => setShowSelectStudentsModal(true)}
+              disabled={enrolledMembers.length >= maxCapacity}
+              title={enrolledMembers.length >= maxCapacity ? (isVi ? 'Lớp đã đủ sĩ số tối đa' : 'Class is at max capacity') : undefined}
+            >
+              {isVi ? 'Thêm học viên vào lớp' : 'Add Students to Class'}
+            </Button>
+          </div>
+
+          {/* Search Toolbar */}
+          <div className="tcd-toolbar">
+            <div className="tcd-search-wrap">
+              <Search size={15} className="tcd-search-icon" />
+              <input
+                type="text"
+                className="tcd-search-input"
+                placeholder={isVi ? 'Tìm kiếm học viên theo tên, mã HV hoặc email...' : 'Search student by name, ID or email...'}
+                value={memberSearchQuery}
+                onChange={(e) => {
+                  setMemberSearchQuery(e.target.value);
+                  setMemberPage(1);
+                }}
+              />
+            </div>
+            <div className="text-xs text-muted">
+              {isVi ? 'Hiển thị' : 'Showing'} {filteredEnrolledMembers.length} {isVi ? 'học viên' : 'students'}
             </div>
           </div>
+
+          {/* Members Table */}
+          <div className="tcd-table-wrap">
+            <table className="tcd-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ HV' : 'STUDENT CODE'}</th>
+                  <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
+                  <th>{isVi ? 'EMAIL' : 'EMAIL'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedEnrolledMembers.map((m) => {
+                  const initials = m.fullName.trim().split(/\s+/).map((n) => n[0]).slice(-2).join('').toUpperCase();
+                  const code = m.studentCode || `HV-${m.studentId}`;
+
+                  return (
+                    <tr key={m.memberId}>
+                      <td className="font-mono font-semibold text-primary">{code}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--primary, #1b4d3e)',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                            }}
+                          >
+                            {initials}
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 600, color: 'var(--color-main, #1e293b)' }}>{m.fullName}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-muted">{m.email || '—'}</td>
+                      <td className="text-right">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={ArrowRightLeft}
+                            onClick={() =>
+                              setStudentToTransfer({
+                                studentId: m.studentId,
+                                fullName: m.fullName,
+                                studentCode: m.studentCode,
+                                currentMemberId: m.memberId,
+                              })
+                            }
+                            title={isVi ? 'Chuyển học viên sang lớp khác' : 'Transfer to another class'}
+                          >
+                            {isVi ? 'Chuyển lớp' : 'Transfer'}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="text-error"
+                            icon={Trash2}
+                            onClick={() => setMemberToRemove({ id: m.memberId, name: m.fullName })}
+                            title={isVi ? 'Xóa học viên khỏi lớp' : 'Remove from class'}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filteredEnrolledMembers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center p-6 text-muted text-sm">
+                      {isVi ? 'Không tìm thấy học viên nào phù hợp.' : 'No members found.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {filteredEnrolledMembers.length > 0 && (
+              <Pagination
+                currentPage={safeMemberPage}
+                totalPages={memberTotalPages}
+                totalItems={filteredEnrolledMembers.length}
+                itemLabel={isVi ? 'thành viên' : 'members'}
+                isVi={isVi}
+                onPageChange={setMemberPage}
+                pageSize={memberPageSize}
+                onPageSizeChange={(newSize) => {
+                  setMemberPageSize(newSize);
+                  setMemberPage(1);
+                }}
+              />
+            )}
+          </div>
         </section>
       )}
 
-      {/* 8. TAB 4: Lộ trình & Thông tin buổi học */}
-      {activeTab === 'syllabus' && (
-        <section className="tcd-card-section">
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-              {isVi ? 'Lộ trình chi tiết 24 Buổi học' : '24-Session Syllabus & Timeline'}
-            </h2>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Theo dõi nội dung giảng dạy, tài liệu đính kèm và bài tập về nhà theo từng buổi.' : 'Monitor lesson plans, attached slide decks and homework per session.'}
-            </p>
-          </div>
-
-          <div className="tcd-syllabus-timeline">
-            {syllabusLessons.map((les) => (
-              <div 
-                key={les.session} 
-                className={`tcd-syllabus-item ${les.status === 'current' ? 'current' : les.status === 'completed' ? 'completed' : ''}`}
-              >
-                <div className="tcd-syllabus-left">
-                  <div className="tcd-session-badge">
-                    #{les.session}
-                  </div>
-                  <div>
-                    <div className="tcd-syllabus-title-text">{les.title}</div>
-                    <div className="tcd-syllabus-date">
-                      <Calendar size={12} style={{ display: 'inline', marginRight: 4 }} />
-                      {les.date} • {les.materialsCount} {isVi ? 'tài liệu đính kèm' : 'materials'}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {les.homeworkAttached && (
-                    <span style={{ 
-                      fontSize: '11.5px', 
-                      fontWeight: 600, 
-                      padding: '3px 8px', 
-                      borderRadius: '6px',
-                      backgroundColor: '#eff6ff',
-                      color: '#2563eb'
-                    }}>
-                      {les.homeworkAttached}
-                    </span>
-                  )}
-                  {les.status === 'completed' && (
-                    <span className="tcd-status-chip ontime">
-                      <CheckCircle2 size={12} /> {isVi ? 'Đã hoàn tất' : 'Completed'}
-                    </span>
-                  )}
-                  {les.status === 'current' && (
-                    <span className="tcd-status-chip exceed">
-                      <Clock size={12} /> {isVi ? 'Đang diễn ra' : 'Current Session'}
-                    </span>
-                  )}
-                  {les.status === 'upcoming' && (
-                    <span className="tcd-status-chip" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                      {isVi ? 'Sắp diễn ra' : 'Upcoming'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 9. Student Detail Drawer (Modal) */}
+      {/* 8. Student Detail Drawer (Modal) */}
       {selectedStudent && (
-        <div className="tcd-drawer-overlay" onClick={() => setSelectedStudent(null)}>
+        <div className="tcd-drawer-overlay" onClick={handleCloseStudentModal}>
           <div className="tcd-drawer-box" onClick={(e) => e.stopPropagation()}>
             <div className="tcd-drawer-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src={selectedStudent.avatar} alt={selectedStudent.name} className="tcd-avatar" style={{ width: 44, height: 44 }} />
+              <div className="flex items-center gap-3">
+                <img src={selectedStudent.avatar} alt={selectedStudent.name} className="tcd-avatar tcd-drawer-avatar" />
                 <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#0f172a' }}>{selectedStudent.name}</h3>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>{selectedStudent.code} • {selectedStudent.email}</div>
+                  <h3 className="m-0 text-base font-bold text-main">{selectedStudent.name}</h3>
+                  <div className="text-xs text-muted mt-1">{selectedStudent.code}</div>
                 </div>
               </div>
               <button 
                 className="tcd-btn-action-icon"
-                onClick={() => setSelectedStudent(null)}
+                onClick={handleCloseStudentModal}
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="tcd-drawer-body">
-              {/* Overall Band Banner */}
-              <div style={{ 
-                backgroundColor: '#f8fafc', 
-                border: '1px solid #e2e8f0', 
-                borderRadius: '12px', 
-                padding: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
+              {/* Overall Score Box */}
+              <div className="tcd-drawer-overall-box">
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{isVi ? 'Điểm trung bình (Overall)' : 'Overall Band'}</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>Band {selectedStudent.scores.overall}</div>
+                  <div className="text-xs text-muted font-semibold">{isVi ? 'Điểm trung bình (Overall)' : 'Overall Average'}</div>
+                  <div className="text-2xl font-bold text-main">
+                    {selectedStudent.scores.overall > 0 ? `${selectedStudent.scores.overall} / 10` : '—'}
+                  </div>
                 </div>
                 <span className={`tcd-status-chip ${selectedStudent.status}`}>
                   {selectedStudent.statusLabel}
@@ -1176,92 +1515,277 @@ export const TeacherClassProgress: React.FC = () => {
 
               {/* 4 Skills Breakdown */}
               <div>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 10px 0', color: '#0f172a' }}>
+                <h4 className="text-sm font-bold text-main mb-2 mt-0">
                   {isVi ? 'Chi tiết 4 Kỹ năng' : '4-Skill Performance'}
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>Writing</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>Band {selectedStudent.scores.writing}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="tcd-skill-stat-card-writing">
+                    <div style={{ fontSize: '11.5px', color: '#8c5e14', fontWeight: 600 }}>Writing</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#8c5e14', marginTop: '2px' }}>
+                      {selectedStudent.scores.writing > 0 ? `${selectedStudent.scores.writing} / 10` : '—'}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#faf5ff', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#9333ea', fontWeight: 600 }}>Speaking</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>Band {selectedStudent.scores.speaking}</div>
+                  <div className="tcd-skill-stat-card-speaking">
+                    <div style={{ fontSize: '11.5px', color: '#5b21b6', fontWeight: 600 }}>Speaking</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#5b21b6', marginTop: '2px' }}>
+                      {selectedStudent.scores.speaking > 0 ? `${selectedStudent.scores.speaking} / 10` : '—'}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Reading</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>Band {selectedStudent.scores.reading}</div>
+                  <div className="tcd-skill-stat-card-reading">
+                    <div style={{ fontSize: '11.5px', color: '#16533d', fontWeight: 600 }}>Reading</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#16533d', marginTop: '2px' }}>
+                      {selectedStudent.scores.reading > 0 ? `${selectedStudent.scores.reading} / 10` : '—'}
+                    </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#f0fdfa', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#0d9488', fontWeight: 600 }}>Listening</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>Band {selectedStudent.scores.listening}</div>
+                  <div className="tcd-skill-stat-card-listening">
+                    <div style={{ fontSize: '11.5px', color: '#1e3a8a', fontWeight: 600 }}>Listening</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e3a8a', marginTop: '2px' }}>
+                      {selectedStudent.scores.listening > 0 ? `${selectedStudent.scores.listening} / 10` : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Attendance & Completion */}
+              {/* Submissions & Activity */}
               <div>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 10px 0', color: '#0f172a' }}>
-                  {isVi ? 'Chuyên cần & Bài nộp' : 'Attendance & Homework'}
+                <h4 className="text-sm font-bold text-main mb-2 mt-0">
+                  {isVi ? 'Tiến độ làm bài' : 'Assignment Progress'}
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>{isVi ? 'Tỷ lệ điểm danh:' : 'Attendance Rate:'}</span>
-                    <strong>{selectedStudent.attendance}%</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>{isVi ? 'Bài tập hoàn thành:' : 'Completed Assignments:'}</span>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted">{isVi ? 'Bài tập hoàn thành:' : 'Completed Assignments:'}</span>
                     <strong>{selectedStudent.assignmentsCompleted} / {selectedStudent.totalAssignments}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>{isVi ? 'Hoạt động gần nhất:' : 'Last Active:'}</span>
-                    <span>{selectedStudent.lastActive}</span>
+                  <div className="flex justify-between">
+                    <span className="text-muted">{isVi ? 'Hoạt động gần nhất:' : 'Last Active:'}</span>
+                    <strong>{selectedStudent.lastActive}</strong>
                   </div>
                 </div>
               </div>
 
-              {/* Recent Feedback */}
-              {selectedStudent.recentFeedback && (
-                <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 8px 0', color: '#0f172a' }}>
-                    {isVi ? 'Nhận xét gần nhất của giáo viên' : 'Latest Teacher Feedback'}
-                  </h4>
-                  <p style={{ 
-                    fontSize: '13px', 
-                    lineHeight: 1.6, 
-                    color: '#475569', 
-                    backgroundColor: '#f8fafc', 
-                    padding: '12px 14px', 
-                    borderRadius: '8px',
-                    margin: 0,
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    "{selectedStudent.recentFeedback}"
-                  </p>
-                </div>
-              )}
+              {/* Direct Feedback & History */}
+              <div>
+                <h4 className="text-sm font-bold text-main mb-2 mt-0">
+                  {isVi ? 'Lịch sử đánh giá & nhận xét' : 'Evaluation History'}
+                </h4>
+                {isLoadingHistory ? (
+                  <div className="flex items-center gap-2 text-xs text-muted py-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isVi ? 'Đang tải lịch sử nhận xét...' : 'Loading evaluation history...'}</span>
+                  </div>
+                ) : evaluationHistory.length === 0 ? (
+                  <div className="tcd-eval-history-empty">
+                    {isVi ? 'Chưa có nhận xét nào trước đây.' : 'No evaluations recorded yet.'}
+                  </div>
+                ) : (
+                  <div className="tcd-eval-history-list">
+                    {evaluationHistory.map((item) => (
+                      <div key={item.id} className="tcd-eval-history-item">
+                        <div className="tcd-eval-history-meta">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {item.teacherName || (isVi ? 'Giáo viên' : 'Teacher')}
+                          </span>
+                          <span>
+                            {item.createdAt ? new Date(item.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-US') : ''}
+                          </span>
+                        </div>
+                        <div className="tcd-eval-history-content">{item.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <h4 className="text-sm font-bold text-main mb-2 mt-3">
+                  {isVi ? 'Nhận xét mới cho học viên' : 'New Evaluation'}
+                </h4>
+                <StudentEvaluationAvailabilityNotice
+                  submissions={gradebookData.submissions}
+                  studentId={Number(selectedStudent.id.replace('std-', ''))}
+                />
+                <textarea
+                  className="tcd-drawer-eval-input"
+                  rows={3}
+                  placeholder={isVi ? 'Nhập nhận xét hoặc hướng dẫn ôn tập cho học viên này...' : 'Enter evaluation for this student...'}
+                  value={directMessageText}
+                  onChange={(e) => setDirectMessageText(e.target.value)}
+                  disabled={isSendingEvaluation}
+                />
+              </div>
             </div>
 
             <div className="tcd-drawer-footer">
               <button 
                 className="tcd-btn-secondary"
-                onClick={() => setSelectedStudent(null)}
+                onClick={handleCloseStudentModal}
               >
                 {isVi ? 'Đóng' : 'Close'}
               </button>
               <button 
                 className="tcd-btn-primary"
-                onClick={() => {
-                  showToast(isVi ? `Đã gửi tin nhắn nhắc nhở tới ${selectedStudent.name}` : `Message sent to ${selectedStudent.name}`);
-                  setSelectedStudent(null);
-                }}
+                onClick={handleSendDirectEvaluation}
+                disabled={isSendingEvaluation || !directMessageText.trim()}
               >
-                <Send size={13} />
-                <span>{isVi ? 'Gửi tin nhắn cho học viên' : 'Send Direct Message'}</span>
+                {isSendingEvaluation ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+                <span>{isSendingEvaluation ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu đánh giá' : 'Save Evaluation')}</span>
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* 9. Modal Điều chỉnh điểm kèm Audit reason note (FE-90 / UC030 / UC031) */}
+      {studentToAdjustGrade && !hasDateFilter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <Edit3 size={18} />
+                </div>
+                <div>
+                  <h3 className="m-0 text-base font-bold text-foreground">
+                    {isVi ? 'Điều chỉnh điểm số học viên' : 'Adjust Student Grade'}
+                  </h3>
+                  <p className="m-0 text-xs text-muted-foreground mt-0.5">
+                    {studentToAdjustGrade.name} ({studentToAdjustGrade.code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudentToAdjustGrade(null)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {adjustGradeError && (
+                <div className="p-3 text-xs text-error bg-error/10 rounded-lg flex items-center gap-2 border border-error/20">
+                  <AlertCircle size={15} />
+                  <span>{adjustGradeError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Hạng mục điểm điều chỉnh' : 'Score Category'}
+                </label>
+                <select
+                  value={adjustGradeSkill}
+                  onChange={(e) => {
+                    const sk = e.target.value as 'overall' | 'writing' | 'speaking' | 'reading' | 'listening';
+                    setAdjustGradeSkill(sk);
+                    const currentScore = sk === 'overall' ? studentToAdjustGrade.scores.overall : studentToAdjustGrade.scores[sk];
+                    setNewAdjustedScore(currentScore > 0 ? String(currentScore) : '8.0');
+                  }}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="overall">{isVi ? 'Điểm trung bình (Overall)' : 'Overall Average'}</option>
+                  <option value="writing">Writing ({studentToAdjustGrade.scores.writing > 0 ? studentToAdjustGrade.scores.writing : '—'})</option>
+                  <option value="speaking">Speaking ({studentToAdjustGrade.scores.speaking > 0 ? studentToAdjustGrade.scores.speaking : '—'})</option>
+                  <option value="reading">Reading ({studentToAdjustGrade.scores.reading > 0 ? studentToAdjustGrade.scores.reading : '—'})</option>
+                  <option value="listening">Listening ({studentToAdjustGrade.scores.listening > 0 ? studentToAdjustGrade.scores.listening : '—'})</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Điểm số mới (Thang điểm 10)' : 'New Grade (Scale 10)'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={newAdjustedScore}
+                  onChange={(e) => setNewAdjustedScore(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-semibold text-primary"
+                  placeholder="e.g. 8.5"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={auditReasonNote}
+                  onChange={(e) => setAuditReasonNote(e.target.value)}
+                  placeholder={
+                    isVi
+                      ? 'Nhập lý do điều chỉnh điểm (ví dụ: Xem xét lại phần nói do tạp âm, cộng điểm chuyên cần, phúc khảo bài tập...)'
+                      : 'Enter audit note explaining the score change...'
+                  }
+                  className="w-full p-3 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <Button
+                variant="secondary"
+                onClick={() => setStudentToAdjustGrade(null)}
+              >
+                {isVi ? 'Hủy bỏ' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveGradeAdjustment}
+                disabled={!auditReasonNote.trim()}
+              >
+                {isVi ? 'Lưu điều chỉnh điểm' : 'Save Grade Adjustment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. Modal: Chọn học viên đã có vào lớp (FE-87 / UC009) */}
+      {showSelectStudentsModal && currentClass && (
+        <SelectExistingStudentsModal
+          isOpen={showSelectStudentsModal}
+          onClose={() => setShowSelectStudentsModal(false)}
+          classId={currentClass.id}
+          classNameTitle={currentClass.name}
+          maxCapacity={maxCapacity}
+          enrolledCount={enrolledMembers.length}
+          enrolledStudentIds={enrolledMembers.map((m) => m.studentId)}
+          onSuccess={refreshMembers}
+        />
+      )}
+
+      {/* 11. Modal: Xác nhận xóa học viên khỏi lớp */}
+      <ConfirmModal
+        isOpen={Boolean(memberToRemove)}
+        title={isVi ? 'Xóa học viên khỏi lớp' : 'Remove Student from Class'}
+        message={
+          memberToRemove
+            ? isVi
+              ? `Xác nhận xóa học viên ${memberToRemove.name} khỏi lớp này?`
+              : `Confirm removing student ${memberToRemove.name} from this class?`
+            : ''
+        }
+        confirmText={isVi ? 'Xóa khỏi lớp' : 'Remove'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant="danger"
+        isLoading={isRemovingMember}
+        onConfirm={executeRemoveMember}
+        onCancel={() => setMemberToRemove(null)}
+      />
+
+      {/* 12. Modal: Điều chuyển học viên sang lớp khác (FE-87 / FE-88 / UC009) */}
+      {studentToTransfer && currentClass && (
+        <TransferStudentModal
+          isOpen={Boolean(studentToTransfer)}
+          onClose={() => setStudentToTransfer(null)}
+          currentClassId={currentClass.id}
+          currentClassName={currentClass.name}
+          student={studentToTransfer}
+          onSuccess={refreshMembers}
+        />
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionFileDownloadUrlResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionModuleDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
@@ -49,13 +50,14 @@ public class SubmissionController {
 
 	@GetMapping("/submissions")
 	public ResponseEntity<SubmissionListResponse> listSubmissions(
+			@RequestParam(required = false) Long classId,
 			@RequestParam(required = false) Long assignmentId,
 			@RequestParam(required = false) Long studentId,
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
 		return ResponseEntity.ok(
-				SubmissionListResponse.from(submissionService.list(assignmentId, studentId, status, page, limit)));
+				SubmissionListResponse.from(submissionService.list(classId, assignmentId, studentId, status, page, limit)));
 	}
 
 	@PostMapping("/submission-modules/{id}/submit")
@@ -86,13 +88,34 @@ public class SubmissionController {
 	public ResponseEntity<UploadUrlResponse> getAudioUploadUrl(
 			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
 		String mimeType = request == null ? null : request.mimeType();
-		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getAudioUploadUrl(id, mimeType)));
+		Long fileSizeBytes = request == null ? null : request.fileSizeBytes();
+		var result = fileSizeBytes != null
+				? submissionService.getAudioUploadUrl(id, mimeType, fileSizeBytes)
+				: submissionService.getAudioUploadUrl(id, mimeType);
+		return ResponseEntity.ok(UploadUrlResponse.from(result));
 	}
 
 	@PostMapping("/submission-modules/{id}/document-upload-url")
 	public ResponseEntity<UploadUrlResponse> getDocumentUploadUrl(
 			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
 		String mimeType = request == null ? null : request.mimeType();
-		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getDocumentUploadUrl(id, mimeType)));
+		Long fileSizeBytes = request == null ? null : request.fileSizeBytes();
+		var result = fileSizeBytes != null
+				? submissionService.getDocumentUploadUrl(id, mimeType, fileSizeBytes)
+				: submissionService.getDocumentUploadUrl(id, mimeType);
+		return ResponseEntity.ok(UploadUrlResponse.from(result));
+	}
+
+	@GetMapping("/submission-modules/{id}/audio-download-url")
+	public ResponseEntity<SubmissionFileDownloadUrlResponse> getSubmissionAudioDownloadUrl(@PathVariable long id) {
+		return ResponseEntity.ok(
+				SubmissionFileDownloadUrlResponse.from(submissionService.generateSubmissionAudioDownloadUrl(id)));
+	}
+
+	@GetMapping("/submission-modules/{id}/document-download-url")
+	public ResponseEntity<SubmissionFileDownloadUrlResponse> getSubmissionDocumentDownloadUrl(
+			@PathVariable long id, @RequestParam(value = "mode", required = false) String mode) {
+		return ResponseEntity.ok(
+				SubmissionFileDownloadUrlResponse.from(submissionService.generateSubmissionDocumentDownloadUrl(id, mode)));
 	}
 }

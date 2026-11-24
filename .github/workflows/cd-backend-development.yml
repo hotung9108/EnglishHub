@@ -1,31 +1,73 @@
-name: Deploy development Backend to VPS/Home-Server
+name: CD-Backend-Staging
 
-# Chỉ chạy khi workflow "Backend CI" hoàn tất trên nhánh staging (event workflow_run).
-# Vì "Backend CI" chỉ chạy khi có thay đổi trong backend/**,
-# workflow CD này cũng chỉ chạy khi code của Backend thay đổi.
+# CD cho Backend (development/staging) trên nhánh staging.
 #
-# Job "wait-ai-service" đảm bảo thứ tự deploy:
-#   CI Backend xong (điều kiện kích hoạt) → CI + CD của AI service xong (nếu push có thay đổi ai-service/**) → Deploy Backend.
+# Trigger: push vào staging có thay đổi backend/** (cùng paths filter với Backend CI),
+# nên CD chạy đúng lúc code Backend thay đổi và không phụ thuộc event workflow_run.
+#
+# Thứ tự deploy do 2 job chờ (chạy song song), deploy cần cả hai:
+#   wait-for-backend-ci : poll "Backend CI" cho tới khi hoàn tất thành công
+#                         tại commit này (cơ chế giống job wait-ai-service).
+#   wait-ai-service     : chờ AI Service CI + "Deploy AI Service" hoàn tất
+#                         (nếu push này có thay đổi ai-service/**).
 on:
-  workflow_run:
-    workflows:
-      - Backend CI
-    types:
-      - completed
+  push:
     branches:
       - staging
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-backend.yml'
 
 env:
   IMAGE_NAME: ghcr.io/hotung9108/english-hub-backend
 
 jobs:
+  wait-for-backend-ci:
+    name: Wait for Backend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    permissions:
+      actions: read
+
+    steps:
+      - name: Wait for Backend CI when backend was changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CI_WORKFLOW: ci-backend.yml
+        run: |
+          set -euo pipefail
+
+          POLL_INTERVAL=15
+          DEADLINE=$((SECONDS + 1500)) # 25 phút
+
+          echo "Waiting for Backend CI ($SHA) ..."
+          ci_conclusion=""
+          while [ -z "$ci_conclusion" ]; do
+            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&event=push&per_page=5" \
+              --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
+            if [ -z "$ci_conclusion" ]; then
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "::error::Timed out waiting for Backend CI ($SHA)"
+                exit 1
+              fi
+              sleep "$POLL_INTERVAL"
+            fi
+          done
+
+          if [ "$ci_conclusion" != "success" ]; then
+            echo "::error::Backend CI concluded '$ci_conclusion' for $SHA — blocking backend deploy."
+            exit 1
+          fi
+
+          echo "Backend CI passed ($SHA)."
+
   wait-ai-service:
     name: Wait for AI Service CI & CD
     runs-on: ubuntu-latest
-
-    # Chỉ tiếp tục khi Backend CI thành công (failed/cancelled → skip, deploy không chạy)
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     permissions:
       actions: read
@@ -35,7 +77,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -46,7 +88,7 @@ jobs:
 
           # "AI Service CI" chỉ chạy khi push có thay đổi trong ai-service/**,
           # nên nếu không có run nào tại commit này = không thay đổi AI service = không cần chờ.
-          ai_ci_count=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&per_page=1" \
+          ai_ci_count=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&event=push&per_page=1" \
             --jq '.total_count' 2>/dev/null || echo 0)
 
           if [ "$ai_ci_count" = "0" ]; then
@@ -57,7 +99,7 @@ jobs:
           echo "ai-service was changed in this push. Waiting for AI Service CI ($SHA) ..."
           ai_ci_conclusion=""
           while [ -z "$ai_ci_conclusion" ]; do
-            ai_ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&status=completed&per_page=5" \
+            ai_ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&status=completed&event=push&per_page=5" \
               --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
             if [ -z "$ai_ci_conclusion" ]; then
               if [ "$SECONDS" -ge "$DEADLINE" ]; then
@@ -76,7 +118,7 @@ jobs:
           echo "AI Service CI passed. Waiting for 'Deploy AI Service' ($SHA) ..."
           ai_cd_conclusion=""
           while [ -z "$ai_cd_conclusion" ]; do
-            ai_cd_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CD/runs?head_sha=$SHA&status=completed&per_page=5" \
+            ai_cd_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CD/runs?head_sha=$SHA&status=completed&event=push&per_page=5" \
               --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
             if [ -z "$ai_cd_conclusion" ]; then
               if [ "$SECONDS" -ge "$DEADLINE" ]; then
@@ -96,7 +138,9 @@ jobs:
 
   deploy:
     name: Build & Deploy Backend
-    needs: wait-ai-service
+    needs:
+      - wait-for-backend-ci
+      - wait-ai-service
     runs-on: ubuntu-latest
 
     permissions:
@@ -104,9 +148,8 @@ jobs:
       packages: write
 
     env:
-      # workflow_run không set github.sha theo commit của lần chạy CI,
-      # nên phải lấy head_sha của lần chạy CI đã kích hoạt workflow này
-      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      # Push event: github.sha chính là commit được push (= commit CI vừa test)
+      DEPLOY_SHA: ${{ github.sha }}
 
     steps:
       - name: Checkout code
@@ -116,10 +159,12 @@ jobs:
 
       - name: Connect to Tailscale
         id: tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: --accept-dns=false
+          timeout: 10m
+          retry: 3
         continue-on-error: true
 
       - name: Show Tailscale diagnostics
@@ -135,6 +180,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       # context trỏ vào thư mục backend/ nơi có Dockerfile
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -144,6 +192,8 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ env.DEPLOY_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -152,6 +202,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_NAME,DEPLOY_SHA
+          timeout: 2m
+          command_timeout: 120m
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
@@ -177,3 +229,48 @@ jobs:
 
             # Xóa image cũ không dùng nữa
             docker image prune -f
+
+      - name: Wait for Staging Backend Health
+        run: |
+          echo "Checking staging backend health at https://api-staging.hotung9108.me/actuator/health ..."
+          for i in {1..24}; do
+            status=$(curl -s https://api-staging.hotung9108.me/actuator/health | grep -o '"status":"UP"' || true)
+            if [ -n "$status" ]; then
+              echo "Staging backend is healthy ($status)!"
+              break
+            fi
+            echo "Waiting for backend health check ($i/24)..."
+            sleep 5
+          done
+
+      - name: Audio Smoke Test [OPS-46]
+        run: |
+          chmod +x test/scripts/smoke-test-audio-stream.sh
+          ./test/scripts/smoke-test-audio-stream.sh https://api-staging.hotung9108.me
+
+      - name: Setup Node for Selenium E2E [QA-36]
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Selenium Dependencies
+        working-directory: test/selenium
+        run: npm ci || npm install
+
+      - name: Run Staging Selenium Audio E2E [QA-36]
+        env:
+          SELENIUM_BASE_URL: https://staging.hotung9108.me
+          SELENIUM_HEADLESS: "true"
+          SELENIUM_ADMIN_EMAIL: ${{ secrets.SELENIUM_ADMIN_EMAIL }}
+          SELENIUM_ADMIN_PASSWORD: ${{ secrets.SELENIUM_ADMIN_PASSWORD }}
+          SELENIUM_TEACHER_EMAIL: ${{ secrets.SELENIUM_TEACHER_EMAIL }}
+          SELENIUM_TEACHER_PASSWORD: ${{ secrets.SELENIUM_TEACHER_PASSWORD }}
+          SELENIUM_STUDENT_EMAIL: ${{ secrets.SELENIUM_STUDENT_EMAIL }}
+          SELENIUM_STUDENT_PASSWORD: ${{ secrets.SELENIUM_STUDENT_PASSWORD }}
+        run: |
+          if [ -n "$SELENIUM_STUDENT_EMAIL" ] && [ -n "$SELENIUM_STUDENT_PASSWORD" ]; then
+            chmod +x test/scripts/run-selenium-audio-staging.sh
+            ./test/scripts/run-selenium-audio-staging.sh
+          else
+            echo "::notice::SELENIUM_STUDENT credentials secret not configured; skipping staging browser execution."
+          fi

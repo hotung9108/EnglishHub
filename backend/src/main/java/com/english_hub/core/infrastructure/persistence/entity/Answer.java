@@ -66,7 +66,7 @@ public class Answer {
 	@Column(name = "doc_storage_key", length = 255)
 	private String docStorageKey;
 
-	@Column(name = "doc_mime_type", length = 50)
+	@Column(name = "doc_mime_type", length = 255)
 	private String docMimeType;
 
 	@Column(name = "doc_file_size_bytes")
@@ -113,6 +113,12 @@ public class Answer {
 		return questionId == null && content.isTextual()
 				? content.textValue()
 				: JsonbValueCodec.serialize(content);
+	}
+
+	public void setExtractedTextContent(String extractedText) {
+		if (extractedText != null && !extractedText.isBlank()) {
+			this.content = JsonbValueCodec.text(extractedText);
+		}
 	}
 
 	/**

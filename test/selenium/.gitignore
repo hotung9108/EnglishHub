@@ -1,0 +1,12 @@
+node_modules/
+.env*
+!.env.example
+.cache/
+reports/
+cleanup_audit.log
+fixtures/staging.json
+fixtures/cleanup-state.json
+*.local.postman_environment.json
+# One-off local reading copy for a historical run; not part of the reusable suite.
+tools/build-admin-reviewed-report.mjs
+fixtures/qa30.json

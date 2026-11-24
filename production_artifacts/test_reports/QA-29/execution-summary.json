@@ -1,0 +1,450 @@
+{
+  "startedAt": "2026-10-15T14:39:05.249Z",
+  "finishedAt": "2026-10-15T14:56:57.444Z",
+  "status": "FAILED",
+  "baseUrl": "https://staging.hotung9108.me",
+  "browser": "chrome",
+  "counts": {
+    "PASSED": 41,
+    "FAILED": 7,
+    "BLOCKED": 3,
+    "ABORTED": 0
+  },
+  "sourceHashes": {
+    "src/config.js": "3d472a363a3ce3dc74ff472d30176ced183a2047d078814b76431afc698448e0",
+    "src/driver.js": "0be790c70c8e317dadfea18c49f723ed45b800f574055f9b5fae431e0af1b6d4",
+    "src/pages/BasePage.js": "d27cbed3091afa97db27a5df3ade4d344df0f70c483d8a1f1ba10a4857d3e7fd",
+    "src/pages/LoginPage.js": "46bb2ce72cd578082dd76df132e65c074bc7b723cb19101ae3d9b0e3fb68691e",
+    "src/pages/TeacherExtendedPage.js": "b69c5b0aaf274ddca11a2e887c745b61ac16761039c5fb2d550f1ce9e4527cb3",
+    "src/pages/TeacherPage.js": "92c35fd1058a8912e8490dc2e2fa14d84e336128bdfdb9635538db231707e1b3",
+    "src/report.js": "f8296efedc0bf99bc97efc9f8a84b82a8bc70528042f446fc63f2ea5f77a27c7",
+    "src/run-teacher.js": "dde83098e3a4bac35917977a633f651a555b6c496fba46a0b7103995c7f57b37",
+    "src/run.js": "d52cce372b753db9402739201a58f5908f5cc77ed75355e15774cdbb3f895399",
+    "src/teacher/cases.js": "87a8059d2deeab8d9d0feb7e5ae4e8d1ea8a4fcc55e6156505560b1ed2d02182",
+    "src/teacher/classification.js": "af9f2a8cd776cc4bc9a9af2154f36a5866efce487395d9e1d8a0941769009999",
+    "src/teacher/cleanup-fixtures.js": "99b30ed57ca3fbd0eeb0f52d7b027852b8103f6e5fdfeba76e2c7d6be65aca4a",
+    "src/teacher/cleanup.js": "09dc45929c6f01be4f80d29160c508f26e6ef7cf9247858cec4310f3f35120c7",
+    "src/teacher/config.js": "8ee160f0eb1289948a4d123f1fa76b87618abc0626c2a0d789b531785fca69d3",
+    "src/teacher/expanded-api.js": "696801957dd0d2fff1a0229dee3497682ccaa0a3d44acfe661414a01b7f188cc",
+    "src/teacher/expanded-cases.js": "1b894ec2cc8499562678cc74e03420c56fa7a715144fb5f1db85fc6c7bddb492",
+    "src/teacher/prepare-fixtures.js": "50968b684cf9c9656656574621186f9de409571cfd25b720e29baef18a82a0d0",
+    "src/teacher/report.js": "4965356723186b87d5b73b8d38afd81f04c3cee9343c4d55337e4a548bb3ca69",
+    "src/teacher/run-lock.js": "2b932f9d2237c41cbb103a8f18b4243ffbfeb03da27afca3a5945f225e8784d1"
+  },
+  "provenance": {
+    "run": "qa29-2026-10-15T14-39-05-249Z",
+    "sourceLayout": "Standalone QA-28/src before repository integration",
+    "originalSummarySha256": "2ad40480a6317c6934e90da219923b5f50a374b8855371e9d386e146c64c0168",
+    "note": "Historical execution; not a new staging run of the integrated source. Raw QA data and credentials omitted."
+  },
+  "cases": [
+    {
+      "id": "QA29-001",
+      "title": "Đăng nhập Giáo viên và xác nhận vai trò",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:39:58.099Z",
+      "finishedAt": "2026-10-15T14:40:00.959Z"
+    },
+    {
+      "id": "QA29-002",
+      "title": "Danh sách lớp: tìm kiếm đúng lớp và không có kết quả",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:00.969Z",
+      "finishedAt": "2026-10-15T14:40:07.891Z"
+    },
+    {
+      "id": "QA29-003",
+      "title": "Sổ điểm và báo cáo chi tiết học viên",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:07.899Z",
+      "finishedAt": "2026-10-15T14:40:18.554Z"
+    },
+    {
+      "id": "QA29-004",
+      "title": "Mở báo cáo phân tích bốn kỹ năng của lớp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:18.562Z",
+      "finishedAt": "2026-10-15T14:40:28.814Z"
+    },
+    {
+      "id": "QA29-005",
+      "title": "Tìm bài tập và mở chi tiết",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:28.825Z",
+      "finishedAt": "2026-10-15T14:40:42.021Z"
+    },
+    {
+      "id": "QA29-006",
+      "title": "Giao bài: từ chối tiêu đề trống",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:42.031Z",
+      "finishedAt": "2026-10-15T14:40:48.044Z"
+    },
+    {
+      "id": "QA29-007",
+      "title": "Giao bài Writing: lưu nháp và kiểm tra dữ liệu đã lưu",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:40:48.054Z",
+      "finishedAt": "2026-10-15T14:41:11.061Z"
+    },
+    {
+      "id": "QA29-008",
+      "title": "Giao bài Writing: xuất bản và kiểm tra dữ liệu đã lưu",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:41:11.072Z",
+      "finishedAt": "2026-10-15T14:41:35.179Z"
+    },
+    {
+      "id": "QA29-009",
+      "title": "Chấm bài: từ chối điểm ngoài thang",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:41:35.192Z",
+      "finishedAt": "2026-10-15T14:41:54.596Z"
+    },
+    {
+      "id": "QA29-010",
+      "title": "Lưu và trả điểm/nhận xét; mở lại kiểm tra",
+      "status": "FAILED",
+      "classification": "PRODUCT_CANDIDATE",
+      "startedAt": "2026-10-15T14:41:54.609Z",
+      "finishedAt": "2026-10-15T14:43:00.610Z"
+    },
+    {
+      "id": "QA29-011",
+      "title": "Giao bài Speaking và đọc lại nội dung/kỹ năng",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:43:00.626Z",
+      "finishedAt": "2026-10-15T14:43:27.178Z"
+    },
+    {
+      "id": "QA29-012",
+      "title": "Giao bài Reading và đọc lại nội dung/kỹ năng",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:43:27.194Z",
+      "finishedAt": "2026-10-15T14:44:06.239Z"
+    },
+    {
+      "id": "QA29-013",
+      "title": "Giao bài Listening và đọc lại nội dung/kỹ năng",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:44:06.256Z",
+      "finishedAt": "2026-10-15T14:44:37.851Z"
+    },
+    {
+      "id": "QA29-014",
+      "title": "Xem thử Writing, đóng và giữ nội dung editor",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:44:37.869Z",
+      "finishedAt": "2026-10-15T14:44:43.834Z"
+    },
+    {
+      "id": "QA29-015",
+      "title": "Xem thử Speaking, đóng và giữ nội dung editor",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:44:43.853Z",
+      "finishedAt": "2026-10-15T14:44:50.833Z"
+    },
+    {
+      "id": "QA29-016",
+      "title": "Xem thử Reading, đóng và giữ nội dung editor",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:44:50.851Z",
+      "finishedAt": "2026-10-15T14:44:56.803Z"
+    },
+    {
+      "id": "QA29-017",
+      "title": "Xem thử Listening, đóng và giữ nội dung editor",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:44:56.823Z",
+      "finishedAt": "2026-10-15T14:45:03.241Z"
+    },
+    {
+      "id": "QA29-018",
+      "title": "Sửa tiêu đề/nội dung Writing và xuất bản",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:45:03.261Z",
+      "finishedAt": "2026-10-15T14:45:42.812Z"
+    },
+    {
+      "id": "QA29-019",
+      "title": "Sửa hạn nộp và đối chiếu API",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:45:42.834Z",
+      "finishedAt": "2026-10-15T14:46:11.552Z"
+    },
+    {
+      "id": "QA29-020",
+      "title": "Không tạo bài khi hạn nộp trước thời gian mở",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:46:11.574Z",
+      "finishedAt": "2026-10-15T14:46:18.331Z"
+    },
+    {
+      "id": "QA29-021",
+      "title": "Đóng bài tập từ UI",
+      "status": "BLOCKED",
+      "classification": "BLOCKED",
+      "startedAt": "2026-10-15T14:46:18.354Z",
+      "finishedAt": "2026-10-15T14:46:36.332Z"
+    },
+    {
+      "id": "QA29-022",
+      "title": "Lọc danh sách bài theo kỹ năng Writing",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:46:36.355Z",
+      "finishedAt": "2026-10-15T14:46:50.750Z"
+    },
+    {
+      "id": "QA29-023",
+      "title": "Lọc roster đã nộp/chưa nộp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:46:50.776Z",
+      "finishedAt": "2026-10-15T14:47:10.378Z"
+    },
+    {
+      "id": "QA29-024",
+      "title": "Chấm điểm biên thấp 0 và đọc lại",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:47:10.405Z",
+      "finishedAt": "2026-10-15T14:47:52.048Z"
+    },
+    {
+      "id": "QA29-025",
+      "title": "Chấm điểm biên cao 10 và đọc lại",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:47:52.074Z",
+      "finishedAt": "2026-10-15T14:48:32.023Z"
+    },
+    {
+      "id": "QA29-026",
+      "title": "Từ chối điểm âm và giữ dữ liệu API",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:48:32.053Z",
+      "finishedAt": "2026-10-15T14:48:56.908Z"
+    },
+    {
+      "id": "QA29-027",
+      "title": "Từ chối điểm trống và giữ dữ liệu API",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:48:56.939Z",
+      "finishedAt": "2026-10-15T14:49:20.681Z"
+    },
+    {
+      "id": "QA29-028",
+      "title": "Sửa điểm đã chấm thành 4.5",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:49:20.708Z",
+      "finishedAt": "2026-10-15T14:50:01.839Z"
+    },
+    {
+      "id": "QA29-029",
+      "title": "Chấm bài Reading đã nộp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:50:01.869Z",
+      "finishedAt": "2026-10-15T14:50:42.738Z"
+    },
+    {
+      "id": "QA29-030",
+      "title": "Chấm bài Listening đã nộp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:50:42.771Z",
+      "finishedAt": "2026-10-15T14:51:22.067Z"
+    },
+    {
+      "id": "QA29-031",
+      "title": "Chấm bài Speaking có file WAV QA",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:51:22.104Z",
+      "finishedAt": "2026-10-15T14:52:03.312Z"
+    },
+    {
+      "id": "QA29-032",
+      "title": "Kích hoạt AI Writing và chờ gợi ý",
+      "status": "FAILED",
+      "classification": "API_ACCESS_REVIEW",
+      "startedAt": "2026-10-15T14:52:03.348Z",
+      "finishedAt": "2026-10-15T14:52:15.176Z"
+    },
+    {
+      "id": "QA29-033",
+      "title": "AI không hợp lệ cho Reading vẫn chấm thủ công được",
+      "status": "FAILED",
+      "classification": "API_ACCESS_REVIEW",
+      "startedAt": "2026-10-15T14:52:15.210Z",
+      "finishedAt": "2026-10-15T14:52:17.856Z"
+    },
+    {
+      "id": "QA29-034",
+      "title": "Đối chiếu sổ điểm bốn kỹ năng với API",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:52:17.897Z",
+      "finishedAt": "2026-10-15T14:52:35.342Z"
+    },
+    {
+      "id": "QA29-035",
+      "title": "Đối chiếu số học viên với API",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:52:35.365Z",
+      "finishedAt": "2026-10-15T14:52:47.147Z"
+    },
+    {
+      "id": "QA29-036",
+      "title": "Tìm học viên không tồn tại và khôi phục",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:52:47.171Z",
+      "finishedAt": "2026-10-15T14:52:59.176Z"
+    },
+    {
+      "id": "QA29-037",
+      "title": "Xuất báo cáo lớp thành file",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:52:59.201Z",
+      "finishedAt": "2026-10-15T14:53:10.927Z"
+    },
+    {
+      "id": "QA29-038",
+      "title": "Xuất danh sách bài nộp thành file",
+      "status": "FAILED",
+      "classification": "PRODUCT_CANDIDATE",
+      "startedAt": "2026-10-15T14:53:10.952Z",
+      "finishedAt": "2026-10-15T14:54:28.285Z"
+    },
+    {
+      "id": "QA29-039",
+      "title": "Teacher không phụ trách không đọc được lớp QA ngoài quyền",
+      "status": "FAILED",
+      "classification": "ENVIRONMENT_REVIEW",
+      "startedAt": "2026-10-15T14:54:28.309Z",
+      "finishedAt": "2026-10-15T14:55:02.938Z"
+    },
+    {
+      "id": "QA29-040",
+      "title": "Teacher không phụ trách không đọc được assignment QA ngoài quyền",
+      "status": "PASSED",
+      "classification": "ENVIRONMENT_REVIEW",
+      "startedAt": "2026-10-15T14:55:02.962Z",
+      "finishedAt": "2026-10-15T14:55:06.157Z"
+    },
+    {
+      "id": "QA29-041",
+      "title": "Hồ sơ đúng tài khoản QA và email chỉ đọc",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:55:06.183Z",
+      "finishedAt": "2026-10-15T14:55:09.932Z"
+    },
+    {
+      "id": "QA29-042",
+      "title": "Sửa số điện thoại hồ sơ, mở lại qua menu và khôi phục",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:55:09.960Z",
+      "finishedAt": "2026-10-15T14:55:14.788Z"
+    },
+    {
+      "id": "QA29-043",
+      "title": "Từ chối xác nhận mật khẩu không khớp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:55:14.814Z",
+      "finishedAt": "2026-10-15T14:55:17.620Z"
+    },
+    {
+      "id": "QA29-044",
+      "title": "Đổi mật khẩu tài khoản QA riêng và đăng nhập lại",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:55:17.649Z",
+      "finishedAt": "2026-10-15T14:55:22.479Z"
+    },
+    {
+      "id": "QA29-045",
+      "title": "Tùy chọn thông báo lưu qua reload",
+      "status": "BLOCKED",
+      "classification": "BLOCKED",
+      "startedAt": "2026-10-15T14:55:22.509Z",
+      "finishedAt": "2026-10-15T14:55:24.897Z"
+    },
+    {
+      "id": "QA29-046",
+      "title": "Tùy chọn giao diện lưu qua reload",
+      "status": "BLOCKED",
+      "classification": "BLOCKED",
+      "startedAt": "2026-10-15T14:55:24.929Z",
+      "finishedAt": "2026-10-15T14:55:27.269Z"
+    },
+    {
+      "id": "QA29-047",
+      "title": "Đăng xuất về login và xóa token frontend",
+      "status": "FAILED",
+      "classification": "PRODUCT_CANDIDATE",
+      "startedAt": "2026-10-15T14:55:27.298Z",
+      "finishedAt": "2026-10-15T14:55:59.749Z"
+    },
+    {
+      "id": "QA29-048",
+      "title": "Ngân hàng đề / modal giao nhanh",
+      "status": "FAILED",
+      "classification": "NEEDS_REVIEW",
+      "startedAt": "2026-10-15T14:55:59.777Z",
+      "finishedAt": "2026-10-15T14:56:33.556Z"
+    },
+    {
+      "id": "QA29-049",
+      "title": "Hủy tạo bài không sinh assignment",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:56:33.594Z",
+      "finishedAt": "2026-10-15T14:56:40.062Z"
+    },
+    {
+      "id": "QA29-050",
+      "title": "Mở lộ trình/buổi học của lớp",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:56:40.104Z",
+      "finishedAt": "2026-10-15T14:56:52.248Z"
+    },
+    {
+      "id": "QA29-051",
+      "title": "Sửa điện thoại ở Cài đặt, mở lại qua menu và khôi phục",
+      "status": "PASSED",
+      "classification": "ASSERTIONS_PASSED",
+      "startedAt": "2026-10-15T14:56:52.282Z",
+      "finishedAt": "2026-10-15T14:56:57.412Z"
+    }
+  ]
+}

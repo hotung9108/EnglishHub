@@ -40,6 +40,7 @@ services:
       STORAGE_S3_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_ACCESS_KEY:-}
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
+      STORAGE_MAX_SUBMISSION_FILE_SIZE_BYTES: ${STORAGE_MAX_SUBMISSION_FILE_SIZE_BYTES:-10485760}
       SERVER_PORT: ${SERVER_PORT:-8080}
       SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
       # ===== AI Service (FastAPI Microservice) - khớp với application.properties =====
@@ -47,11 +48,26 @@ services:
       # external "englishhub_shared" -> gọi qua http://ai-service:8001
       # Nếu AI service chạy ở máy khác: AI_SERVICE_BASE_URL=http://<host-ai>:8001
       AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
       AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
       AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-60}
       # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
       AI_SERVICE_MODEL: ${AI_SERVICE_MODEL:-}
       AI_SERVICE_PROVIDER: ${AI_SERVICE_PROVIDER:-}
+      # ===== Outbound Email (EmailJS REST) - khớp với application.properties =====
+      # Dùng để gửi OTP/mã đặt lại mật khẩu. Đặt EMAIL_ENABLED=false để tắt (API sẽ báo 500).
+      # LƯU Ý: bật "Allow non-browser applications" trong EmailJS Dashboard
+      #         (Account -> Security) để gọi được từ server.
+      # EMAILJS_PRIVATE_KEY là thông tin mật -> chỉ khai báo trong .env, KHÔNG commit.
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+      EMAILJS_BASE_URL: ${EMAILJS_BASE_URL:-https://api.emailjs.com}
+      EMAILJS_SERVICE_ID: ${EMAILJS_SERVICE_ID:-}
+      EMAILJS_PASSWORD_RESET_TEMPLATE_ID: ${EMAILJS_PASSWORD_RESET_TEMPLATE_ID:-}
+      EMAILJS_PUBLIC_KEY: ${EMAILJS_PUBLIC_KEY:-}
+      EMAILJS_PRIVATE_KEY: ${EMAILJS_PRIVATE_KEY:-}
+      EMAILJS_TIMEOUT_SECONDS: ${EMAILJS_TIMEOUT_SECONDS:-10}
+      # Link đặt lại mật khẩu nhúng trong email (trỏ tới trang /reset-password của frontend)
+      FRONTEND_RESET_PASSWORD_URL: ${FRONTEND_RESET_PASSWORD_URL:-https://hotung9108.me/reset-password}
       # OpenAPI servers (có thể override theo domain production thực tế)
       APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api.hotung9108.me}
       app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api.hotung9108.me}

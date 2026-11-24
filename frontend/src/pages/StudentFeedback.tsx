@@ -1,202 +1,395 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MessageSquare, Sparkles, UserCheck, Star,
-  ArrowRight, Search, CheckCircle2, AlertCircle,
-  Lightbulb, PenTool, Mic, BookOpen, Headphones
+  Sparkles, UserCheck, Star,
+  ArrowRight, Search, AlertCircle,
+  PenTool, Mic, BookOpen, Headphones,
+  RotateCcw, GraduationCap
 } from 'lucide-react';
+import { Button, EmptyState, Skeleton, Pagination, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { studentEvaluationService } from '../api/services/student-evaluation.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, hasAnyGradedModule } from '../api/services/submission.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
+import '../styles/student-ecosystem.css';
 
 interface FeedbackEntry {
   id: string;
-  assignmentId: string;
-  assignmentTitle: string;
+  type: 'evaluation' | 'submission';
+  targetTitle: string;
   className: string;
-  skill: 'writing' | 'speaking' | 'reading' | 'listening';
+  skill?: 'writing' | 'speaking' | 'reading' | 'listening';
   reviewerType: 'teacher' | 'ai';
   reviewerName: string;
   reviewerRole: string;
   date: string;
-  score: string;
+  score?: string;
   badgeType: string;
-  summaryComment: string;
-  keyStrengths: string[];
-  suggestedImprovement: string;
+  content: string;
+  actionUrl: string;
+  actionLabel: string;
 }
 
 export const StudentFeedback: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedbackList, setFeedbackList] = useState<FeedbackEntry[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'teacher' | 'ai'>('all');
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [feedbackList] = useState<FeedbackEntry[]>([
-    {
-      id: 'fb-1',
-      assignmentId: '2',
-      assignmentTitle: 'Speaking Part 2: Environmental Issues & Urban Pollution',
-      className: 'IELTS Speaking Master',
-      skill: 'speaking',
-      reviewerType: 'ai',
-      reviewerName: 'EnglishHub AI Fluency & Acoustic Engine v2.4',
-      reviewerRole: 'Automated Phoneme & Speech-to-Text Diagnostic',
-      date: '2026-03-19 14:20',
-      score: 'Band 7.0',
-      badgeType: 'Band 7.0',
-      summaryComment: 'Độ trôi chảy xuất sắc và ngữ điệu tự nhiên xuyên suốt bài nói Part 2. Tốc độ nói đạt chuẩn (138 từ/phút). Tuy nhiên có một số điểm ngập ngừng khi phát âm các từ đa âm tiết như "degradation" và "contaminants".',
-      keyStrengths: [
-        'Tốc độ nói ổn định và tự tin, không có khoảng ngắt chết (dead pauses)',
-        'Sử dụng khéo léo các từ nối phản biện: "Frankly speaking...", "To tackle this pressing issue..."'
-      ],
-      suggestedImprovement: 'Tập trung nối âm phụ âm cuối sang nguyên âm đầu (linking sounds) để giúp bài nói mượt mà hơn và đẩy điểm Fluency lên Band 7.5.'
-    },
-    {
-      id: 'fb-2',
-      assignmentId: '1',
-      assignmentTitle: 'Writing Task 2: Artificial Intelligence & Workforce Evolution',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'writing',
-      reviewerType: 'teacher',
-      reviewerName: 'Cô Trần Thị Mai Lan',
-      reviewerRole: 'Giảng viên Chuyên môn IELTS 8.5',
-      date: '2026-03-18 10:15',
-      score: 'Band 7.5',
-      badgeType: 'Band 7.5',
-      summaryComment: 'Bài viết có bố cục 4 đoạn chuẩn mực academic (Task Achievement rất tốt). Em đã đưa ra ví dụ minh họa thực tế thuyết phục về tự động hóa trong ngành sản xuất. Cần trau chuốt thêm các cặp liên từ phức tạp và tránh lặp từ vựng chủ đề.',
-      keyStrengths: [
-        'Cấu trúc đoạn thân bài mạch lạc với câu chủ đề rõ ràng (Cohesion tốt)',
-        'Vốn từ vựng chuyên ngành công nghệ phong phú: "technological disruption", "human ingenuity"'
-      ],
-      suggestedImprovement: 'Hạn chế lặp lại từ "technology" quá 4 lần trong bài; hãy linh hoạt thay thế bằng "digital transformation", "technological advances", "automation tools".'
-    },
-    {
-      id: 'fb-3',
-      assignmentId: '3',
-      assignmentTitle: 'Reading Mock Test 3: Academic Section 1 & 2',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'reading',
-      reviewerType: 'ai',
-      reviewerName: 'EnglishHub Auto-Evaluation Diagnostic',
-      reviewerRole: 'Automated Reading Key & Distractor Engine',
-      date: '2026-03-16 19:45',
-      score: '34 / 40 (Band 7.5)',
-      badgeType: 'Band 7.5',
-      summaryComment: 'Hoàn thành 34/40 câu đúng trong 48 phút. Em làm rất tốt dạng Matching Headings (100% đúng). Tuy nhiên gặp khó khăn ở dạng câu hỏi True/False/Not Given do bẫy thông tin suy diễn.',
-      keyStrengths: [
-        'Tốc độ đọc lướt (skimming) và quét thông tin (scanning) rất nhanh',
-        'Nắm bắt ý chính của đoạn văn chuẩn xác'
-      ],
-      suggestedImprovement: 'Đối với câu hỏi Not Given: nếu bài đọc không khẳng định trực tiếp hoặc không thể suy ra chắc chắn từ văn bản, tuyệt đối không được tự ý phán đoán theo logic thực tế bên ngoài.'
-    },
-    {
-      id: 'fb-4',
-      assignmentId: '4',
-      assignmentTitle: 'Listening Practice 4: Campus Facilities & Academic Life',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'listening',
-      reviewerType: 'teacher',
-      reviewerName: 'Thầy Hoàng Minh Đức',
-      reviewerRole: 'Giảng viên IELTS Listening & Pronunciation',
-      date: '2026-03-14 16:30',
-      score: '36 / 40 (Band 8.0)',
-      badgeType: 'Band 8.0',
-      summaryComment: 'Kết quả xuất sắc! Em bắt được các bẫy sửa đổi thông tin (self-correction trap) ở Section 3 rất nhanh nhạy. Chỉ mất điểm ở 2 câu điền từ do thiếu số nhiều đuôi "s".',
-      keyStrengths: [
-        'Khả năng nghe phân biệt âm tốt trong môi trường nhiều tạp âm',
-        'Phản xạ nhanh với các từ đồng nghĩa (synonyms) trong câu hỏi'
-      ],
-      suggestedImprovement: 'Dành 30 giây cuối mỗi Section để kiểm tra ngữ pháp câu điền từ (singular/plural noun và verb tense).'
-    }
-  ]);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  const handleActiveFilterChange = (filter: 'all' | 'teacher' | 'ai') => {
+    setActiveFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const handleSkillFilterChange = (skill: string) => {
+    setSkillFilter(skill);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFeedback = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 1. Fetch Teacher Evaluations, Submissions, Classes in parallel
+        const [evalsRes, submissionsRes, classesRes] = await Promise.allSettled([
+          user?.id ? studentEvaluationService.list(Number(user.id)) : Promise.reject('No user'),
+          submissionService.listSubmissions({ studentId: user?.id, limit: 50 }),
+          classService.list()
+        ]);
+
+        const evals: StudentEvaluationListItem[] = evalsRes.status === 'fulfilled'
+          ? (evalsRes.value?.data || (Array.isArray(evalsRes.value) ? evalsRes.value : []))
+          : [];
+        const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+          ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+          : [];
+        const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+          ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+          : [];
+
+        const classMap = new Map<number, string>();
+        classes.forEach(c => classMap.set(c.id, c.name));
+
+        // 2. Fetch assignments for each class and top graded submissions in parallel
+        const assignmentMap = new Map<string, AssignmentSummary>();
+        const assignmentClassMap = new Map<string, string>();
+
+        const gradedSubmissions = submissions
+          .filter(sub => hasAnyGradedModule(sub) || isSubmissionGraded(sub))
+          .sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime())
+          .slice(0, 15);
+
+        const [assignmentsResults, submissionDetails] = await Promise.all([
+          Promise.allSettled(
+            classes.map(async (c) => {
+              try {
+                const res = await assignmentService.listAssignments(c.id);
+                return { classId: c.id, className: c.name, assignments: res.data || [] };
+              } catch {
+                return { classId: c.id, className: c.name, assignments: [] };
+              }
+            })
+          ),
+          Promise.allSettled(
+            gradedSubmissions.map(sub => submissionService.getSubmission(sub.id))
+          )
+        ]);
+
+        assignmentsResults.forEach((item) => {
+          if (item.status === 'fulfilled') {
+            item.value.assignments.forEach(a => {
+              assignmentMap.set(String(a.id), a);
+              assignmentClassMap.set(String(a.id), item.value.className);
+            });
+          }
+        });
+
+        const dynamicList: FeedbackEntry[] = [];
+
+        // 3. Process Teacher Evaluations (StudentEvaluation schema: id, classId, teacherName, content, createdAt)
+        evals.forEach((ev) => {
+          const className = classMap.get(ev.classId) || (isVi ? `Lớp học #${ev.classId}` : `Class #${ev.classId}`);
+          const formattedDate = ev.createdAt
+            ? new Date(ev.createdAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : '';
+
+          dynamicList.push({
+            id: `eval-${ev.id}`,
+            type: 'evaluation',
+            targetTitle: isVi ? `Đánh giá rèn luyện học tập - ${className}` : `Academic & Progress Evaluation - ${className}`,
+            className,
+            reviewerType: 'teacher',
+            reviewerName: ev.teacherName || (isVi ? 'Giảng viên phụ trách lớp' : 'Course Instructor'),
+            reviewerRole: isVi ? 'Đánh giá định kỳ lớp học' : 'Class Evaluation',
+            date: formattedDate,
+            badgeType: isVi ? 'Nhận xét lớp học' : 'Class Review',
+            content: ev.content,
+            actionUrl: ev.classId ? `/student/classes/${ev.classId}` : '/student/classes',
+            actionLabel: isVi ? 'Xem thông tin lớp học' : 'View Class Details'
+          });
+        });
+
+        submissionDetails.forEach((res) => {
+          if (res.status !== 'fulfilled' || !res.value) return;
+          const subDetail = res.value;
+          const assignmentIdStr = String(subDetail.assignmentId);
+          const assignment = assignmentMap.get(assignmentIdStr);
+          const className = assignmentClassMap.get(assignmentIdStr) || (classes.length > 0 ? classes[0].name : (isVi ? 'Lớp học' : 'Class'));
+          const assignmentTitle = assignment?.title || (isVi ? `Bài tập #${assignmentIdStr}` : `Assignment #${assignmentIdStr}`);
+          const formattedDate = subDetail.submittedAt
+            ? new Date(subDetail.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : '';
+
+          subDetail.modules?.forEach((mod) => {
+            const grading = mod.grading;
+            if (!grading) return;
+
+            const rawSkill = mod.skill?.toLowerCase();
+            const skill: 'writing' | 'speaking' | 'reading' | 'listening' =
+              rawSkill === 'speaking' || rawSkill === 'reading' || rawSkill === 'listening' ? rawSkill : 'writing';
+
+            const scoreVal = grading.finalScore;
+            const maxVal = grading.maxScoreSnapshot;
+            const scoreStr = scoreVal !== null && scoreVal !== undefined
+              ? (maxVal ? `${scoreVal} / ${maxVal}` : `${scoreVal} / 10`)
+              : undefined;
+
+            // Real teacher feedback
+            if (grading.finalFeedback && grading.finalFeedback.trim()) {
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-teacher`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: 'teacher',
+                reviewerName: isVi ? 'Giáo viên chấm bài' : 'Instructor',
+                reviewerRole: isVi ? 'Nhận xét bài nộp' : 'Submission Feedback',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Nhận xét bài nộp' : 'Submission Review',
+                content: grading.finalFeedback.trim(),
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
+
+            // Real AI feedback
+            if (grading.aiFeedback && grading.aiFeedback.trim()) {
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-ai`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: 'ai',
+                reviewerName: 'EnglishHub AI Diagnostic Engine',
+                reviewerRole: isVi ? 'Đánh giá tự động AI' : 'AI Diagnostic',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Đánh giá AI' : 'AI Evaluation',
+                content: grading.aiFeedback.trim(),
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
+
+            // If neither feedback text is present, but module has score / completed status
+            if (!grading.finalFeedback?.trim() && !grading.aiFeedback?.trim() && scoreStr) {
+              const isAuto = grading.method === 'AUTO';
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-graded`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: isAuto ? 'ai' : 'teacher',
+                reviewerName: isAuto ? 'Hệ thống tự động' : (isVi ? 'Giáo viên phụ trách' : 'Instructor'),
+                reviewerRole: isVi ? 'Kết quả chấm điểm' : 'Grading Result',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Đã chấm điểm' : 'Graded',
+                content: isVi 
+                  ? 'Bài làm đã được chấm điểm hoàn tất. Bạn có thể mở bài nộp để xem chi tiết điểm số và đáp án.' 
+                  : 'Grading is complete for this submission. You can open the submission to review scores and answers.',
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
+          });
+        });
+
+        if (isMounted) {
+          setFeedbackList(dynamicList);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load feedback', err);
+        setError(isVi ? 'Không thể tải phản hồi từ máy chủ.' : 'Failed to load feedback.');
+        setFeedbackList([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchFeedback();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, isVi, reloadKey]);
 
   const teacherFeedbackCount = feedbackList.filter(f => f.reviewerType === 'teacher').length;
   const aiFeedbackCount = feedbackList.filter(f => f.reviewerType === 'ai').length;
 
-  const filtered = feedbackList.filter(item => {
-    if (activeFilter === 'teacher' && item.reviewerType !== 'teacher') return false;
-    if (activeFilter === 'ai' && item.reviewerType !== 'ai') return false;
-    if (skillFilter !== 'all' && item.skill !== skillFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        item.assignmentTitle.toLowerCase().includes(q) ||
-        item.reviewerName.toLowerCase().includes(q) ||
-        item.summaryComment.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return feedbackList.filter(item => {
+      if (activeFilter === 'teacher' && item.reviewerType !== 'teacher') return false;
+      if (activeFilter === 'ai' && item.reviewerType !== 'ai') return false;
+      if (skillFilter !== 'all' && item.skill !== skillFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          item.targetTitle.toLowerCase().includes(q) ||
+          item.reviewerName.toLowerCase().includes(q) ||
+          item.className.toLowerCase().includes(q) ||
+          item.content.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [feedbackList, activeFilter, skillFilter, searchQuery]);
 
-  const getSkillIcon = (skill: string) => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedFeedback = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
+
+  const getSkillIcon = (skill?: string) => {
     switch (skill) {
       case 'writing': return <PenTool size={14} />;
       case 'speaking': return <Mic size={14} />;
       case 'reading': return <BookOpen size={14} />;
-      default: return <Headphones size={14} />;
+      case 'listening': return <Headphones size={14} />;
+      default: return <GraduationCap size={14} />;
     }
   };
 
+  if (loading) {
+    return (
+      <div className="std-eco-container pt-6">
+        <Skeleton width="320px" height="36px" className="mb-6" />
+        <Skeleton height="48px" className="mb-6" />
+        <div className="grid gap-5">
+          {[1, 2].map(i => (
+            <Skeleton key={i} height="240px" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container p-24">
+    <div className="std-eco-container pt-6">
       {/* Header */}
-      <div className="mb-24">
-        <h1 className="flex items-center gap-12 m-0 text-on-surface font-bold mb-8" style={{ fontSize: '28px' }}>
-          <MessageSquare size={28} color="var(--primary)" />
-          {isVi ? 'Hòm Thư Nhận Xét & Phản Hồi Chữa Bài' : 'Feedback & Detailed Evaluation Inbox'}
-        </h1>
-        <p className="m-0 text-on-surface-variant" style={{ fontSize: '15px' }}>
-          {isVi
-            ? 'Tổng hợp lời nhận xét, ghi chú sửa lỗi từng câu từ Giảng viên chuyên môn và Trợ lý AI thông minh.'
-            : 'Review pedagogical feedback, rubric evaluation notes, and sentence-level corrections from instructors and AI.'}
-        </p>
+      <div className="std-eco-header">
+        <div>
+          <h1 className="std-eco-title">
+            {isVi ? 'Nhận xét & Phản hồi' : 'Feedback'}
+          </h1>
+        </div>
       </div>
 
+      {error && (
+        <div className="std-error-banner mb-6">
+          <div className="std-error-msg">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <Button variant="danger" size="sm" onClick={handleReload} icon={RotateCcw}>
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
+        </div>
+      )}
+
       {/* Filter and Search Bar */}
-      <div className="flex-between items-center bg-white p-12-18 rounded border mb-24">
-        <div className="flex items-center gap-8">
+      <div className="std-eco-filter-bar">
+        <div className="std-eco-pills">
           <button
             type="button"
-            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'all' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
-            onClick={() => setActiveFilter('all')}
-            style={{ fontSize: '13px', borderColor: activeFilter === 'all' ? 'transparent' : '#CBD5E1' }}
+            className={`std-eco-pill ${activeFilter === 'all' ? 'active' : ''}`}
+            onClick={() => handleActiveFilterChange('all')}
           >
             {isVi ? 'Tất cả phản hồi' : 'All Reviews'}
-            <span className={`flex-center rounded-full ${activeFilter === 'all' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{feedbackList.length}</span>
+            <span className="std-eco-pill-badge">{feedbackList.length}</span>
           </button>
 
           <button
             type="button"
-            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'teacher' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
-            onClick={() => setActiveFilter('teacher')}
-            style={{ fontSize: '13px', borderColor: activeFilter === 'teacher' ? 'transparent' : '#CBD5E1' }}
+            className={`std-eco-pill ${activeFilter === 'teacher' ? 'active' : ''}`}
+            onClick={() => handleActiveFilterChange('teacher')}
           >
             <UserCheck size={14} />
             {isVi ? 'Từ Giảng viên' : 'From Instructors'}
-            <span className={`flex-center rounded-full ${activeFilter === 'teacher' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{teacherFeedbackCount}</span>
+            <span className="std-eco-pill-badge">{teacherFeedbackCount}</span>
           </button>
 
           <button
             type="button"
-            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'ai' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
-            onClick={() => setActiveFilter('ai')}
-            style={{ fontSize: '13px', borderColor: activeFilter === 'ai' ? 'transparent' : '#CBD5E1' }}
+            className={`std-eco-pill ${activeFilter === 'ai' ? 'active' : ''}`}
+            onClick={() => handleActiveFilterChange('ai')}
           >
             <Sparkles size={14} />
             {isVi ? 'Từ Trợ lý AI' : 'From AI Diagnostic'}
-            <span className={`flex-center rounded-full ${activeFilter === 'ai' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{aiFeedbackCount}</span>
+            <span className="std-eco-pill-badge">{aiFeedbackCount}</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-10">
+        <div className="flex items-center gap-3">
           {/* Skill Filter Dropdown */}
           <select
             value={skillFilter}
-            onChange={(e) => setSkillFilter(e.target.value)}
-            className="p-8-16 border rounded bg-white text-on-surface outline-none"
-            style={{ fontSize: '13px' }}
+            onChange={(e) => handleSkillFilterChange(e.target.value)}
+            className="select-input"
           >
             <option value="all">{isVi ? 'Tất cả kỹ năng' : 'All Skills'}</option>
             <option value="writing">Writing</option>
@@ -206,28 +399,27 @@ export const StudentFeedback: React.FC = () => {
           </select>
 
           {/* Search box */}
-          <div className="flex items-center gap-8 bg-surface-container-low border rounded px-12 py-8" style={{ width: '240px' }}>
-            <Search size={15} className="text-on-surface-variant flex-shrink-0" />
+          <div className="std-eco-search-wrap">
+            <Search size={15} className="std-eco-search-icon" />
             <input
               type="text"
-              className="bg-transparent border-none outline-none w-full text-on-surface"
-              placeholder={isVi ? 'Tìm nhận xét, bài tập...' : 'Search feedback, teacher...'}
+              className="std-eco-search-input"
+              placeholder={isVi ? 'Tìm nhận xét, lớp, bài tập...' : 'Search feedback, teacher...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ fontSize: '13px' }}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
         </div>
       </div>
 
       {/* Feedback List */}
-      <div className="flex-col gap-20">
-        {filtered.map((item) => (
-          <div key={item.id} className="card bg-white p-24">
+      <div className="flex flex-col gap-5">
+        {paginatedFeedback.map((item) => (
+          <div key={item.id} className="feedback-card">
             {/* Header */}
-            <div className="flex-between items-start mb-20">
-              <div className="flex items-center gap-16">
-                <div className={`flex-center rounded-full text-white ${item.reviewerType === 'teacher' ? 'bg-primary' : 'bg-secondary'}`} style={{ width: 44, height: 44 }}>
+            <div className="feedback-header">
+              <div className="flex items-center gap-4">
+                <div className={`feedback-reviewer-avatar ${item.reviewerType}`}>
                   {item.reviewerType === 'teacher' ? (
                     <UserCheck size={22} />
                   ) : (
@@ -236,122 +428,108 @@ export const StudentFeedback: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-8 flex-wrap mb-4">
-                    <span className="font-bold text-on-surface" style={{ fontSize: '15px' }}>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-bold text-slate-900 text-sm">
                       {item.reviewerName}
                     </span>
                     <span
-                      className="font-bold rounded"
-                      style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        backgroundColor: item.reviewerType === 'teacher' ? '#eff6ff' : '#f0fdf4',
-                        color: item.reviewerType === 'teacher' ? '#2563eb' : '#16a34a',
-                        border: `1px solid ${item.reviewerType === 'teacher' ? '#bfdbfe' : '#bbf7d0'}`
-                      }}
+                      className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+                        item.reviewerType === 'teacher' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}
                     >
                       {item.reviewerRole}
                     </span>
                   </div>
 
-                  <div className="text-on-surface-variant" style={{ fontSize: '12.5px' }}>
-                    {item.className} • <span>{item.date}</span>
+                  <div className="text-xs text-slate-500">
+                    {item.className} {item.date ? `• ${item.date}` : ''}
                   </div>
                 </div>
               </div>
 
               {/* Band Score & Skill Tag */}
-              <div className="flex items-center gap-12">
-                <span className="flex items-center gap-6 font-semibold text-uppercase rounded text-on-surface bg-surface-container-low" style={{ fontSize: '11px', padding: '4px 10px' }}>
-                  {getSkillIcon(item.skill)}
-                  {item.skill}
-                </span>
+              <div className="flex items-center gap-3">
+                {item.skill && (
+                  <span className={`std-skill-tag ${item.skill}`}>
+                    {getSkillIcon(item.skill)}
+                    {item.skill.charAt(0).toUpperCase() + item.skill.slice(1)}
+                  </span>
+                )}
 
-                <span
-                  className="flex items-center gap-6 font-bold rounded-full"
-                  style={{
-                    padding: '6px 14px',
-                    fontSize: '13px',
-                    backgroundColor: '#ecfdf5',
-                    color: '#059669',
-                    border: '1px solid #a7f3d0'
-                  }}
-                >
-                  <Star size={13} fill="#059669" />
-                  {item.score}
-                </span>
+                {item.score && (
+                  <span className="grade-score-pill high">
+                    <Star size={13} fill="var(--eh-success, #155d47)" />
+                    {item.score}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Assignment Title */}
-            <div className="mb-20">
-              <span className="font-semibold text-uppercase text-on-surface-variant tracking-wide" style={{ fontSize: '12px' }}>
-                {isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:'}
+            {/* Target Title */}
+            <div className="mb-2">
+              <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">
+                {item.type === 'submission' 
+                  ? (isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:') 
+                  : (isVi ? 'Đánh giá học tập lớp:' : 'Class Evaluation:')}
               </span>
-              <h3 className="font-bold text-primary m-0 mt-4 leading-snug" style={{ fontSize: '15.5px' }}>
-                {item.assignmentTitle}
+              <h3 className="text-base font-bold text-primary m-0 mt-1">
+                {item.targetTitle}
               </h3>
             </div>
 
             {/* Quote Box: General Evaluation */}
-            <div className="rounded-lg p-20 mb-20 bg-primary-fixed border" style={{ borderColor: 'var(--primary-fixed-dim)' }}>
-              <div className="font-bold text-uppercase text-primary tracking-wide mb-8" style={{ fontSize: '12px' }}>
-                {isVi ? 'Đánh giá tổng quan' : 'General Assessment'}
+            <div className="feedback-quote-box">
+              <div className="text-xs font-bold uppercase text-primary tracking-wider mb-2">
+                {item.reviewerType === 'ai'
+                  ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
+                  : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
               </div>
-              <div className="leading-relaxed text-on-surface" style={{ fontSize: '14px' }}>{item.summaryComment}</div>
-            </div>
-
-            {/* Key Strengths & Suggested Improvements */}
-            <div className="grid gap-16 mb-20" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-              {/* Strengths */}
-              <div className="rounded-lg p-20 border bg-white" style={{ borderColor: '#BBF7D0' }}>
-                <div className="flex items-center gap-8 font-bold mb-12" style={{ fontSize: '13px', color: '#166534' }}>
-                  <CheckCircle2 size={16} />
-                  <span>{isVi ? 'Điểm mạnh nổi bật' : 'Key Strengths'}</span>
-                </div>
-                <ul className="m-0 pl-16 leading-relaxed" style={{ fontSize: '13px', color: '#14532d' }}>
-                  {item.keyStrengths.map((str, idx) => (
-                    <li key={idx} className="mb-4">{str}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Weakness / Advice */}
-              <div className="rounded-lg p-20 border bg-white" style={{ borderColor: '#FDE68A' }}>
-                <div className="flex items-center gap-8 font-bold mb-12" style={{ fontSize: '13px', color: '#92400e' }}>
-                  <Lightbulb size={16} />
-                  <span>{isVi ? 'Gợi ý cần khắc phục' : 'Targeted Improvement'}</span>
-                </div>
-                <div className="leading-relaxed" style={{ fontSize: '13px', color: '#78350f' }}>
-                  {item.suggestedImprovement}
-                </div>
+              <div className="text-slate-700 leading-relaxed text-sm">
+                <MarkdownView content={item.content} />
               </div>
             </div>
 
             {/* Action Footer */}
-            <div className="flex justify-end pt-16 border-t">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate(`/student/assignments/${item.assignmentId}/result`)}
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <Button
+                variant="primary"
+                onClick={() => navigate(item.actionUrl)}
+                icon={ArrowRight}
+                iconPosition="right"
               >
-                <span>{isVi ? 'Xem bài làm & Lời giải chi tiết' : 'Review Full Submission & Corrections'}</span>
-                <ArrowRight size={14} />
-              </button>
+                {item.actionLabel}
+              </Button>
             </div>
           </div>
         ))}
 
         {filtered.length === 0 && (
-          <div className="card text-center py-48">
-            <AlertCircle size={36} className="mx-auto mb-16 text-on-surface-variant opacity-50" />
-            <h4 className="m-0 font-bold mb-8 text-on-surface" style={{ fontSize: '15px' }}>
-              {isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
-            </h4>
-            <p className="m-0 text-on-surface-variant" style={{ fontSize: '13px' }}>
-              {isVi ? 'Hãy thử đổi từ khóa tìm kiếm hoặc bỏ bớt bộ lọc.' : 'Try adjusting your search query or active filters.'}
-            </p>
-          </div>
+          <EmptyState
+            icon={AlertCircle}
+            title={isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
+            description={isVi ? 'Hiện chưa có nhận xét nào hoặc hãy thử đổi từ khóa tìm kiếm.' : 'No feedback entries available or try adjusting your search.'}
+          />
+        )}
+
+        {/* Pagination */}
+        {filtered.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20]}
+            itemLabel={isVi ? 'nhận xét' : 'feedback'}
+            isVi={isVi}
+            variant="standalone"
+          />
         )}
       </div>
     </div>
@@ -359,3 +537,4 @@ export const StudentFeedback: React.FC = () => {
 };
 
 export default StudentFeedback;
+

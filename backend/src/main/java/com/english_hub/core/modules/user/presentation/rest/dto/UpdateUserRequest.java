@@ -15,5 +15,17 @@ public record UpdateUserRequest(
 		@Nullable
 		LocalDate dateOfBirth,
 		@Nullable
-		String parentPhone) {
+		String parentPhone,
+		@Nullable
+		String role) {
+
+	public UpdateUserRequest(
+			String fullName,
+			String phone,
+			String specialization,
+			String studentCode,
+			LocalDate dateOfBirth,
+			String parentPhone) {
+		this(fullName, phone, specialization, studentCode, dateOfBirth, parentPhone, null);
+	}
 }

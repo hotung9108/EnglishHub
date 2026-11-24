@@ -7,4 +7,7 @@ import java.util.Optional;
 public interface AssignmentWindowRepository {
 
 	Optional<AssignmentWindow> findWindowById(Long assignmentId);
+
+	/** Locks the assignment until the transaction creating the attempt completes. */
+	Optional<AssignmentWindow> findWindowByIdForUpdate(Long assignmentId);
 }

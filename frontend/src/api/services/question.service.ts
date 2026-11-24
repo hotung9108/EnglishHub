@@ -1,0 +1,270 @@
+import { httpClient } from '../core/client';
+import type { MessageResponse } from '../interfaces/api-response.interface';
+import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
+
+export type QuestionType = 'MULTIPLE_CHOICE' | 'SHORT_ANSWER';
+
+export interface MultipleChoiceOptionDto {
+  id: number;
+  content: string;
+  isCorrect: boolean;
+}
+
+export interface MultipleChoiceCorrectAnswerDto {
+  options: MultipleChoiceOptionDto[];
+}
+
+export interface ShortAnswerCorrectAnswerDto {
+  correctAnswer: string;
+}
+
+export interface QuestionOptionResponse {
+  id: number;
+  content: string;
+}
+
+export interface QuestionResponse {
+  id: number;
+  content: string;
+  questionType: QuestionType;
+  score: number;
+  orderIndex: number;
+  options?: QuestionOptionResponse[];
+  correctAnswer?: Record<string, unknown> | null;
+}
+
+export interface QuestionListResponse {
+  questions: QuestionResponse[];
+  data?: QuestionResponse[];
+}
+
+export interface CreateQuestionPayload {
+  content: string;
+  questionType: QuestionType;
+  correctAnswer: Record<string, unknown>;
+  score: number;
+  orderIndex: number;
+}
+
+export interface UpdateQuestionPayload {
+  content?: string;
+  correctAnswer?: Record<string, unknown>;
+  score?: number;
+  orderIndex?: number;
+}
+
+export interface CreatedQuestionResponse extends MessageResponse {
+  id: number;
+}
+
+/**
+ * Helper to build a valid MULTIPLE_CHOICE payload according to backend validation rules:
+ * - At least 2 options with positive id (1..N), non-blank content, isCorrect boolean.
+ * - Exactly one option has isCorrect: true.
+ * - Score defaults to 1, orderIndex > 0.
+ */
+export function buildMcqPayload(params: {
+  content: string;
+  options?: string[];
+  correctOptionIndexOrText?: number | string;
+  score?: number;
+  orderIndex: number;
+}): CreateQuestionPayload {
+  const rawContent = (params.content || '').trim();
+  const content = rawContent || `Câu hỏi ${params.orderIndex}`;
+  const rawOptions = (params.options || []).map((o) => (o || '').trim());
+
+  // Determine dynamic options (minimum 2 options)
+  const optionCount = Math.max(rawOptions.length, 2);
+  const fixedOptions: string[] = [];
+  for (let i = 0; i < optionCount; i++) {
+    const val = rawOptions[i];
+    const letter = String.fromCharCode(65 + i);
+    fixedOptions.push(val && val.length > 0 ? val : `Lựa chọn ${letter}`);
+  }
+
+  // Determine correct option index (0..fixedOptions.length - 1)
+  let correctIdx = 0;
+  const target = params.correctOptionIndexOrText;
+
+  if (typeof target === 'number' && target >= 0 && target < fixedOptions.length) {
+    correctIdx = target;
+  } else if (typeof target === 'string') {
+    const trimmedTarget = target.trim();
+    // Check if matching option text exactly
+    const foundByText = fixedOptions.findIndex((opt) => opt.toLowerCase() === trimmedTarget.toLowerCase());
+    if (foundByText !== -1) {
+      correctIdx = foundByText;
+    } else {
+      // Check if target is a letter ('A', 'B', 'C', ...) or 1-based number string
+      const upperTarget = trimmedTarget.toUpperCase();
+      if (upperTarget.length === 1 && upperTarget >= 'A' && upperTarget <= 'Z') {
+        const letterIdx = upperTarget.charCodeAt(0) - 65;
+        if (letterIdx >= 0 && letterIdx < fixedOptions.length) {
+          correctIdx = letterIdx;
+        }
+      } else {
+        const numIdx = parseInt(trimmedTarget, 10);
+        if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= fixedOptions.length) {
+          correctIdx = numIdx - 1;
+        }
+      }
+    }
+  }
+
+  const optionDtos: MultipleChoiceOptionDto[] = fixedOptions.map((optContent, idx) => ({
+    id: idx + 1,
+    content: optContent,
+    isCorrect: idx === correctIdx,
+  }));
+
+  const validScore = params.score && params.score > 0 ? Number(params.score) : 1;
+  const validOrder = params.orderIndex > 0 ? params.orderIndex : 1;
+
+  return {
+    content,
+    questionType: 'MULTIPLE_CHOICE',
+    score: validScore,
+    orderIndex: validOrder,
+    correctAnswer: {
+      options: optionDtos,
+    },
+  };
+}
+
+/**
+ * Helper to build a valid SHORT_ANSWER payload according to backend validation rules:
+ * - correctAnswer contains a non-blank string.
+ * - Score defaults to 1, orderIndex > 0.
+ */
+export function buildShortAnswerPayload(params: {
+  content: string;
+  answerText: string;
+  score?: number;
+  orderIndex: number;
+}): CreateQuestionPayload {
+  const rawContent = (params.content || '').trim();
+  const content = rawContent || `Câu hỏi ${params.orderIndex}`;
+  const rawAnswer = (params.answerText || '').trim();
+  const answer = rawAnswer || 'N/A';
+
+  const validScore = params.score && params.score > 0 ? Number(params.score) : 1;
+  const validOrder = params.orderIndex > 0 ? params.orderIndex : 1;
+
+  return {
+    content,
+    questionType: 'SHORT_ANSWER',
+    score: validScore,
+    orderIndex: validOrder,
+    correctAnswer: {
+      correctAnswer: answer,
+    },
+  };
+}
+
+/**
+ * Extract multiple choice options safely from a QuestionResponse's correctAnswer map.
+ */
+export function extractMcqOptions(
+  correctAnswer?: Record<string, unknown> | null,
+  fallbackOptions?: unknown[]
+): {
+  options: string[];
+  correctOptionContent: string;
+  correctOptionIndex: number;
+} {
+  const defaultResult = {
+    options: ['Option A', 'Option B'],
+    correctOptionContent: 'Option A',
+    correctOptionIndex: 0,
+  };
+
+  const rawList = (correctAnswer && typeof correctAnswer === 'object' && (correctAnswer.options || (correctAnswer as Record<string, unknown>).options)) || fallbackOptions;
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return defaultResult;
+  }
+
+  const options: string[] = [];
+  let correctOptionContent = '';
+  let correctOptionIndex = 0;
+
+  for (let i = 0; i < rawList.length; i++) {
+    const item = rawList[i] as Record<string, unknown>;
+    const text = String(item.content || item.text || `Option ${String.fromCharCode(65 + i)}`);
+    options.push(text);
+    const isCorrect = item.isCorrect === true || item.is_correct === true;
+    if (isCorrect) {
+      correctOptionContent = text;
+      correctOptionIndex = i;
+    }
+  }
+
+  if (!correctOptionContent && options.length > 0) {
+    correctOptionContent = options[0];
+    correctOptionIndex = 0;
+  }
+
+  return {
+    options,
+    correctOptionContent,
+    correctOptionIndex,
+  };
+}
+
+/**
+ * Extract short answer string safely from a QuestionResponse's correctAnswer map.
+ */
+export function extractShortAnswerText(correctAnswer?: Record<string, unknown> | null): string {
+  if (!correctAnswer || typeof correctAnswer !== 'object') {
+    return '';
+  }
+  const answer =
+    correctAnswer.correctAnswer ||
+    correctAnswer.correct_answer ||
+    correctAnswer.text ||
+    '';
+  return String(answer).trim();
+}
+
+export class QuestionService {
+  private readonly http: IHttpClient;
+
+  constructor(http: IHttpClient = httpClient) {
+    this.http = http;
+  }
+
+  async listQuestions(moduleId: number, options?: ApiRequestOptions): Promise<QuestionListResponse> {
+    const res = await this.http.get<QuestionListResponse>(`/modules/${moduleId}/questions`, options);
+    const items = res.questions || res.data || (Array.isArray(res) ? (res as QuestionResponse[]) : []);
+    return {
+      data: items,
+      questions: items,
+    };
+  }
+
+  getQuestion(questionId: number, options?: ApiRequestOptions): Promise<QuestionResponse> {
+    return this.http.get<QuestionResponse>(`/questions/${questionId}`, options);
+  }
+
+  createQuestion(
+    moduleId: number,
+    payload: CreateQuestionPayload,
+    options?: ApiRequestOptions
+  ): Promise<CreatedQuestionResponse> {
+    return this.http.post<CreatedQuestionResponse>(`/modules/${moduleId}/questions`, payload, options);
+  }
+
+  updateQuestion(
+    questionId: number,
+    payload: UpdateQuestionPayload,
+    options?: ApiRequestOptions
+  ): Promise<MessageResponse> {
+    return this.http.put<MessageResponse>(`/questions/${questionId}`, payload, options);
+  }
+
+  deleteQuestion(questionId: number, options?: ApiRequestOptions): Promise<MessageResponse> {
+    return this.http.delete<MessageResponse>(`/questions/${questionId}`, options);
+  }
+}
+
+export const questionService = new QuestionService();

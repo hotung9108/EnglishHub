@@ -1,3 +1,5 @@
 #!/bin/sh
 export TEST_ENV=dev
-node selenium/suites/dev/run-dev.js
+export SELENIUM_BASE_URL=http://localhost:5173
+cd "$(dirname "$0")/../selenium" || exit 1
+npm test

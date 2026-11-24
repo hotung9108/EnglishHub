@@ -1,0 +1,51 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #2C3E50
+skinparam ActivityBackgroundColor #F8F9FA
+skinparam ActivityDiamondBorderColor #2C3E50
+skinparam ActivityDiamondBackgroundColor #EBF5FB
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam SwimlaneBorderColor #7F8C8D
+skinparam SwimlaneTitleFontSize 13
+skinparam SwimlaneTitleFontStyle bold
+skinparam SwimlaneTitleBackgroundColor #EAEDED
+skinparam roundCorner 14
+skinparam dpi 250
+skinparam shadowing false
+
+|Học viên|
+start
+:Chọn bài tập kỹ năng Viết trong danh sách;
+:Đọc đề bài, quy định số từ và thời lượng làm bài;
+
+|Hệ thống|
+:Khởi tạo giao diện làm bài và bộ đếm thời gian;
+
+|Học viên|
+if (Hình thức làm bài?) then (Soạn thảo trực tiếp)
+  :Nhập nội dung bài viết vào trình soạn thảo (Text Editor);
+  |Hệ thống|
+  :Đếm số từ (word count) theo thời gian thực;
+else (Đính kèm tệp)
+  |Học viên|
+  :Chọn tệp tài liệu bài viết (.docx / .pdf);
+  |Hệ thống|
+  :Kiểm tra định dạng và dung lượng tệp (<10MB);
+  :Cấp Presigned PUT URL MinIO S3;
+  :Tải tệp trực tiếp lên MinIO S3;
+  :Ghi nhận doc_storage_key của tệp đính kèm;
+endif
+
+|Học viên|
+:Rà soát toàn bộ bài viết trước khi nộp;
+:Nhấn nút "Lưu câu trả lời";
+
+|Hệ thống|
+:Lưu bài gõ (content) hoặc tệp S3 (doc_storage_key)\nvào answers (gắn với submission_modules tương ứng);
+:Cập nhật trạng thái câu trả lời đã lưu;
+
+|Học viên|
+stop
+@enduml

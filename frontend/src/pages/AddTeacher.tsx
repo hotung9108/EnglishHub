@@ -1,27 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, ArrowRight, Check, Award
+  ArrowLeft, ArrowRight, Check, Award, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { validateFullName } from '../utils/nameValidation';
+import { userService } from '../api/services/user.service';
+import { classService } from '../api/services/class.service';
+import { parseApiError } from '../api';
+import type { ClassSummary } from '../api/services/class.service';
 
 export const AddTeacher: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
-    name: 'Cô Hoàng Thu Thảo',
-    code: 'GV-092',
-    email: 'thao.ht@center.edu.vn',
-    phone: '0977 123 456',
-    certs: 'IELTS 8.5 • TESOL Certified',
-    experience: '5 năm kinh nghiệm luyện thi IELTS Academic',
-    assignedClass: 'ENG-IELTS-6.5A'
+    name: '',
+    code: '',
+    email: '',
+    phone: '',
+    password: '',
+    certs: '',
+    experience: '',
+    assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState<'invalid' | 'duplicate' | null>(null);
+  const emailInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchClasses = async () => {
+      try {
+        const res = await classService.list({ page: 1, limit: 50 });
+        if (isMounted) {
+          setClasses(res.data);
+        }
+      } catch {
+        // fail gracefully
+      }
+    };
+    fetchClasses();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const steps = [
     { num: 1 as const, title: isVi ? 'Thông tin cá nhân' : 'Personal Info' },
@@ -29,7 +60,7 @@ export const AddTeacher: React.FC = () => {
     { num: 3 as const, title: isVi ? 'Phân công lớp & Lưu' : 'Class Assignment' },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -38,59 +69,117 @@ export const AddTeacher: React.FC = () => {
       return;
     }
     setNameError('');
-    alert(isVi ? `Đã thêm hồ sơ giảng viên ${valResult.normalized} (${formData.code}) thành công!` : `Teacher profile created for ${valResult.normalized}!`);
-    navigate('/admin/teachers');
+
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+
+      await userService.createUser({
+        role: 'TEACHER',
+        fullName: valResult.normalized,
+        email: formData.email.trim(),
+        password: formData.password || 'Teacher123!',
+        specialization: formData.certs || undefined
+      });
+
+      toast.success(isVi ? 'Thêm giảng viên thành công!' : 'Teacher created successfully!');
+      navigate('/admin/teachers');
+    } catch (err: unknown) {
+      if (parseApiError(err).statusCode === 409) {
+        setEmailError('duplicate');
+        setCurrentStep(1);
+      } else {
+        const msg = err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.';
+        setSubmitError(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name.trim()) return 'GV';
+    return name.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
   };
 
   return (
-    <div className="adm-container" style={{ maxWidth: '1100px' }}>
+    <div className="adm-container adm-container-narrow">
       {/* Header */}
       <div className="adm-header">
         <div className="adm-title-group">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="adm-header-nav-group">
             <button 
-              className="btn btn-secondary"
+              className="btn btn-secondary adm-btn-back"
               onClick={() => navigate('/admin/teachers')}
-              style={{ padding: '6px 10px' }}
             >
               <ArrowLeft size={16} />
             </button>
             <h1 className="adm-title">{t('addTeacher.title')}</h1>
           </div>
-          <p className="adm-subtitle">
-            {isVi ? 'Khởi tạo hồ sơ giảng viên mới với định danh và phân công lớp học.' : 'Onboard new faculty member with qualifications and class assignment.'}
-          </p>
         </div>
       </div>
 
-      {/* Stepper */}
-      <div className="adm-stepper">
-        {steps.map(s => (
-          <div 
-            key={s.num}
-            className={`adm-step-item ${currentStep === s.num ? 'active' : currentStep > s.num ? 'completed' : ''}`}
-            onClick={() => s.num < currentStep && setCurrentStep(s.num)}
-          >
-            <div className="adm-step-circle">
-              {currentStep > s.num ? <Check size={16} /> : s.num}
-            </div>
-            <span className="adm-step-text">{s.title}</span>
-          </div>
-        ))}
+      {submitError && (
+        <div className="adm-alert-banner">
+          <AlertCircle size={18} />
+          <span>{submitError}</span>
+        </div>
+      )}
+
+      {/* Stepper with Circles & Connecting Lines */}
+      <div className="adm-stepper-card">
+        <div className="adm-stepper-progress">
+          {steps.map((s, idx) => {
+            const isCompleted = currentStep > s.num;
+            const isActive = currentStep === s.num;
+            const isClickable = s.num < currentStep;
+
+            return (
+              <React.Fragment key={s.num}>
+                <div 
+                  className={`adm-progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                  onClick={() => isClickable && setCurrentStep(s.num)}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isClickable) {
+                      setCurrentStep(s.num);
+                    }
+                  }}
+                >
+                  <div className="adm-progress-circle">
+                    {isCompleted ? <Check size={18} strokeWidth={2.5} /> : s.num}
+                  </div>
+                  <div className="adm-progress-label">
+                    <span className="adm-progress-sub">{isVi ? `Bước ${s.num}` : `Step ${s.num}`}</span>
+                    <span className="adm-progress-title">{s.title}</span>
+                  </div>
+                </div>
+
+                {idx < steps.length - 1 && (
+                  <div className={`adm-progress-connector ${currentStep > s.num ? 'completed' : ''}`}>
+                    <div className="adm-progress-connector-line" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       {/* 2-Column Form & Preview */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '28px', alignItems: 'flex-start' }}>
-        <div className="card" style={{ padding: '28px' }}>
+      <div className="adm-multistep-layout">
+        <div className="card adm-multistep-form-card">
           <form onSubmit={handleSubmit}>
             {/* Step 1: Personal Info */}
             {currentStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Họ và tên giảng viên' : 'Full Name'} *</label>
                   <input 
                     type="text"
-                    className="input"
+                    className={`input ${nameError ? 'adm-input-error' : ''}`}
+                    placeholder="Nguyễn Văn A..."
                     value={formData.name}
                     onChange={(e) => {
                       setFormData({ ...formData, name: e.target.value });
@@ -104,15 +193,14 @@ export const AddTeacher: React.FC = () => {
                         setNameError('');
                       }
                     }}
-                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
                   {nameError ? (
-                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="adm-form-field-error">
                       {nameError}
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="adm-form-field-hint">
                       {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
                     </span>
                   )}
@@ -120,13 +208,13 @@ export const AddTeacher: React.FC = () => {
 
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mã định danh (GV Code)' : 'Faculty Code'} *</label>
+                    <label className="adm-form-label">{isVi ? 'Mã định danh (GV Code)' : 'Faculty Code'}</label>
                     <input 
                       type="text"
                       className="input font-mono"
+                      placeholder={isVi ? 'Tự sinh hoặc nhập' : 'Auto-assigned'}
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      required
                     />
                   </div>
 
@@ -135,6 +223,7 @@ export const AddTeacher: React.FC = () => {
                     <input 
                       type="text"
                       className="input"
+                      placeholder="0912-345-678"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
@@ -142,31 +231,54 @@ export const AddTeacher: React.FC = () => {
                 </div>
 
                 <div className="adm-form-group">
-                  <label className="adm-form-label">Email *</label>
+                  <label className="adm-form-label" htmlFor="teacher-email">Email *</label>
                   <input 
+                    ref={emailInput}
+                    id="teacher-email"
                     type="email"
-                    className="input"
+                    className={emailError ? 'input adm-input-error' : 'input'}
+                    placeholder="teacher@center.edu.vn"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setEmailError(null);
+                    }}
+                    aria-invalid={Boolean(emailError)}
+                    aria-describedby={emailError ? 'teacher-email-error' : undefined}
                     required
+                  />
+                  {emailError && (
+                    <span id="teacher-email-error" className="adm-form-field-error" role="alert">
+                      {t(emailError === 'duplicate' ? 'addTeacher.emailDuplicate' : 'emailValidation.invalid')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Mật khẩu khởi tạo' : 'Password'}</label>
+                  <input 
+                    type="password"
+                    className="input"
+                    placeholder={isVi ? 'Mặc định: Teacher123!' : 'Default: Teacher123!'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+                <div className="adm-form-actions-end">
                   <button 
                     type="button" 
-                    className="btn btn-primary"
+                    className="btn btn-primary adm-btn-with-icon"
+                    disabled={!formData.name.trim() || !formData.email.trim()}
                     onClick={() => {
                       const res = validateFullName(formData.name, isVi);
-                      if (!res.isValid) {
-                        setNameError(res.errorMessage || '');
-                        return;
-                      }
-                      setNameError('');
+                      const invalidEmail = emailInput.current?.validity.typeMismatch;
+                      if (invalidEmail) setEmailError('invalid');
+                      setNameError(res.errorMessage || '');
+                      if (!res.isValid || invalidEmail) return;
                       setFormData(prev => ({ ...prev, name: res.normalized }));
                       setCurrentStep(2);
                     }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addTeacher.btnNextStep3')}</span>
                     <ArrowRight size={16} />
@@ -177,15 +289,15 @@ export const AddTeacher: React.FC = () => {
 
             {/* Step 2: Qualifications */}
             {currentStep === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Chứng chỉ sư phạm & Điểm thi' : 'Certificates & Test Scores'} *</label>
+                  <label className="adm-form-label">{isVi ? 'Chứng chỉ sư phạm & Chuyên môn' : 'Certificates & Specialization'}</label>
                   <input 
                     type="text"
                     className="input"
+                    placeholder={isVi ? 'Ví dụ: TESOL Certified • 4 Kỹ năng Tiếng Anh' : 'e.g. TESOL Certified • 4 English Skills'}
                     value={formData.certs}
                     onChange={(e) => setFormData({ ...formData, certs: e.target.value })}
-                    required
                   />
                 </div>
 
@@ -194,12 +306,13 @@ export const AddTeacher: React.FC = () => {
                   <textarea 
                     className="input"
                     rows={3}
+                    placeholder={isVi ? 'Kinh nghiệm luyện thi, trung tâm trước đây...' : 'Teaching background and notes...'}
                     value={formData.experience}
                     onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
                   />
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                <div className="adm-form-actions-between">
                   <button 
                     type="button" 
                     className="btn btn-secondary"
@@ -209,9 +322,8 @@ export const AddTeacher: React.FC = () => {
                   </button>
                   <button 
                     type="button" 
-                    className="btn btn-primary"
+                    className="btn btn-primary adm-btn-with-icon"
                     onClick={() => setCurrentStep(3)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addTeacher.btnNextStep4')}</span>
                     <ArrowRight size={16} />
@@ -222,35 +334,45 @@ export const AddTeacher: React.FC = () => {
 
             {/* Step 3: Assignment & Finish */}
             {currentStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Phân công lớp phụ trách ban đầu' : 'Initial Class Assignment'}</label>
-                  <select 
-                    className="input"
-                    value={formData.assignedClass}
-                    onChange={(e) => setFormData({ ...formData, assignedClass: e.target.value })}
-                  >
-                    <option value="ENG-IELTS-6.5A">ENG-IELTS-6.5A (IELTS Intensive 6.5 - 7.5)</option>
-                    <option value="ENG-TOEIC-750">ENG-TOEIC-750 (Luyện thi TOEIC 750+)</option>
-                    <option value="ENG-GRAM-PREP">ENG-GRAM-PREP (Pre-IELTS Grammar)</option>
-                  </select>
+                  {classes.length === 0 ? (
+                    <div className="adm-form-meta-note">
+                      {isVi ? 'Chưa có lớp học nào trên hệ thống.' : 'No classes available.'}
+                    </div>
+                  ) : (
+                    <select 
+                      className="input"
+                      value={formData.assignedClassId}
+                      onChange={(e) => setFormData({ ...formData, assignedClassId: e.target.value })}
+                    >
+                      <option value="">{isVi ? '-- Chưa phân công lớp --' : '-- No class assigned --'}</option>
+                      {classes.map(c => (
+                        <option key={c.id} value={c.id}>
+                          ENG-{c.id}: {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                <div className="adm-form-actions-between">
                   <button 
                     type="button" 
                     className="btn btn-secondary"
                     onClick={() => setCurrentStep(2)}
+                    disabled={submitting}
                   >
                     {isVi ? 'Quay lại' : 'Back'}
                   </button>
                   <button 
                     type="submit" 
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    className="btn btn-primary adm-btn-with-icon"
+                    disabled={submitting || !formData.name.trim() || !formData.email.trim()}
                   >
-                    <Check size={16} />
-                    <span>{isVi ? 'Tạo hồ sơ giáo viên' : 'Complete Registration'}</span>
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                    <span>{isVi ? 'Thêm giáo viên' : 'Complete Registration'}</span>
                   </button>
                 </div>
               </div>
@@ -260,30 +382,35 @@ export const AddTeacher: React.FC = () => {
 
         {/* Live Preview Card */}
         <div>
-          <div style={{ fontSize: '12.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--on-surface-variant)', marginBottom: '8px' }}>
-            {isVi ? 'XEM TRƯỚC HỒ SƠ GIẢNG VIÊN' : 'FACULTY PROFILE PREVIEW'}
+          <div className="adm-preview-label">
+            {isVi ? 'XEM TRƯỚC GIẢNG VIÊN' : 'FACULTY PREVIEW'}
           </div>
 
-          <div className="card" style={{ padding: '24px', border: '2px solid var(--primary-fixed-dim, #bfdbfe)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-              <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#2563eb' }}>
-                {formData.name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase()}
+          <div className="card adm-preview-card">
+            <div className="adm-preview-header">
+              <div className="adm-avatar adm-preview-avatar adm-preview-avatar-teacher">
+                {getInitials(formData.name)}
               </div>
               <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 2px 0' }}>{formData.name}</h3>
-                <span className="font-mono text-primary font-semibold" style={{ fontSize: '12.5px' }}>{formData.code}</span>
+                <h3 className="adm-preview-name">
+                  {formData.name || (isVi ? 'Họ và tên giảng viên' : 'Teacher Full Name')}
+                </h3>
+                <span className="font-mono text-primary font-semibold adm-preview-code">
+                  {formData.code || 'GV-NEW'}
+                </span>
               </div>
             </div>
 
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: 'var(--radius-full)', background: 'var(--surface-container-high)', fontSize: '12px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '16px' }}>
-              <Award size={14} color="var(--primary)" />
-              <span>{formData.certs}</span>
-            </div>
+            {formData.certs && (
+              <div className="adm-preview-badge">
+                <Award size={14} color="var(--primary)" />
+                <span>{formData.certs}</span>
+              </div>
+            )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-              <div><strong>Email:</strong> {formData.email}</div>
-              <div><strong>SĐT:</strong> {formData.phone}</div>
-              <div><strong>Lớp phụ trách:</strong> <span className="font-mono text-primary">{formData.assignedClass}</span></div>
+            <div className="adm-preview-details">
+              <div><strong>Email:</strong> {formData.email || '—'}</div>
+              <div><strong>{isVi ? 'SĐT' : 'Phone'}:</strong> {formData.phone || '—'}</div>
             </div>
           </div>
         </div>

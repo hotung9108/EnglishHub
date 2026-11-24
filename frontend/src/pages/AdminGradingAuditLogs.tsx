@@ -1,222 +1,260 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   History, Search, Download, 
-  CheckCircle2, Clock, X, 
-  PenTool, Mic, RotateCcw, 
-  Award
+  X, 
+  Loader2, AlertCircle,
+  RotateCcw, CheckCircle2, FileText,
+  Award, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-
-interface GradingHistoryItem {
-  id: string;
-  gradingId: number;
-  gradedBy: {
-    name: string;
-    code: string;
-  };
-  student: {
-    name: string;
-    code: string;
-  };
-  assignment: {
-    code: string;
-    title: string;
-    className: string;
-    skill: 'writing' | 'speaking';
-    submittedAt: string;
-  };
-  score: number;
-  gradedAt: string;
-  status: 'completed' | 'verified';
-  teacherFeedback: string;
-  submissionExcerpt: string;
-}
+import { useToast } from '../components/common/ToastContext';
+import { gradingService } from '../api/services/grading.service';
+import { gradingChangeLogService } from '../api/services/grading-change-log.service';
+import type { 
+  GradingSummaryResponse, 
+  GradingStatus, 
+  GradingDetailResponse 
+} from '../api/services/grading.service';
+import type { GradingChangeLog } from '../api/services/grading-change-log.service';
+import { Pagination } from '../components/common';
 
 export const AdminGradingAuditLogs: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success, warning } = useToast();
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gradings, setGradings] = useState<GradingSummaryResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTeacher, setFilterTeacher] = useState('all');
-  const [filterSkill, setFilterSkill] = useState<'all' | 'writing' | 'speaking'>('all');
-  const [filterType, setFilterType] = useState<'all' | 'writing' | 'speaking' | 'high'>('all');
-  const [selectedItem, setSelectedItem] = useState<GradingHistoryItem | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | GradingStatus>('ALL');
+  const [scoreFilter, setScoreFilter] = useState<'ALL' | 'SCORED' | 'UNSCORED'>('ALL');
 
-  const gradingHistory: GradingHistoryItem[] = [
-    {
-      id: 'GR-8812',
-      gradingId: 8812,
-      gradedBy: {
-        name: 'Cô Trần Thị Mai Lan',
-        code: 'GV-088'
-      },
-      student: {
-        name: 'Alice Johnson',
-        code: 'HV-8801'
-      },
-      assignment: {
-        code: 'HW-01',
-        title: 'Writing Task 2: Artificial Intelligence & Workforce Evolution',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-20 20:15:00'
-      },
-      score: 7.0,
-      gradedAt: '2026-03-21 14:32:10',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Học sinh có ý tưởng phát triển bài viết rất tốt, lập luận chặt chẽ và sử dụng chính xác 4 cấu trúc câu phức hợp (Inversion & Cleft sentences). Bài làm hoàn thành xuất sắc yêu cầu đề bài.' 
-        : 'Student demonstrated solid paragraph coherence, accurate complex syntax (inversion and cleft sentences), and comprehensive task achievement.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "In contemporary society, the rapid emergence of generative artificial intelligence has catalyzed a profound paradigm shift across global employment sectors..."'
-        : 'Essay excerpt: "In contemporary society, the rapid emergence of generative artificial intelligence has catalyzed a profound paradigm shift across global employment sectors..."'
-    },
-    {
-      id: 'GR-8815',
-      gradingId: 8815,
-      gradedBy: {
-        name: 'Cô Trần Thị Mai Lan',
-        code: 'GV-088'
-      },
-      student: {
-        name: 'David Pham',
-        code: 'HV-8802'
-      },
-      assignment: {
-        code: 'HW-02',
-        title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'speaking',
-        submittedAt: '2026-03-20 10:30:12'
-      },
-      score: 5.5,
-      gradedAt: '2026-03-20 18:05:44',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Phần mở đầu trôi chảy nhưng đoạn sau học viên phụ thuộc vào kịch bản đọc sẵn, làm giảm độ tự nhiên trong giao tiếp tự phát (Spontaneous Speech). Cần luyện phản xạ nói trực tiếp không nhìn tài liệu.' 
-        : 'Opening was fluent but subsequent delivery relied heavily on scripted reading, decreasing spontaneous speaking naturalness.',
-      submissionExcerpt: isVi
-        ? 'Bản ghi âm 2 phút 15 giây: Học viên trình bày về giải pháp xử lý rác thải đô thị và giao thông công cộng, ngữ điệu còn đều đều.'
-        : 'Audio recording 2m 15s: Student discussed urban waste management and public transit; intonation remained slightly monotonic.'
-    },
-    {
-      id: 'GR-8819',
-      gradingId: 8819,
-      gradedBy: {
-        name: 'Thầy Nguyễn Văn Nam',
-        code: 'GV-042'
-      },
-      student: {
-        name: 'Nguyễn Minh Huy',
-        code: 'HV-8809'
-      },
-      assignment: {
-        code: 'HW-05',
-        title: 'Writing Task 1: Comparative Bar Chart on Carbon Emissions',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-18 22:45:00'
-      },
-      score: 7.0,
-      gradedAt: '2026-03-19 11:20:15',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Bố cục tổng quan (Overview) xuất sắc, chỉ ra được xu hướng chủ đạo của biểu đồ carbon. Các đoạn thân bài phân chia logic, lựa chọn số liệu nổi bật tốt.' 
-        : 'Outstanding overview paragraph identifying key macro-trends. Logical grouping of data categories with precise comparative vocabulary.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "The provided bar chart delineates a comparative analysis of annual carbon footprint metrics across five primary industrialized territories over a 20-year timeframe..."'
-        : 'Essay excerpt: "The provided bar chart delineates a comparative analysis of annual carbon footprint metrics across five primary industrialized territories over a 20-year timeframe..."'
-    },
-    {
-      id: 'GR-8824',
-      gradingId: 8824,
-      gradedBy: {
-        name: 'Thầy David Miller',
-        code: 'GV-019'
-      },
-      student: {
-        name: 'Lê Bảo Trâm',
-        code: 'HV-8803'
-      },
-      assignment: {
-        code: 'HW-02',
-        title: 'Speaking Part 2: Urban Environment & Green Living',
-        className: 'ENG-TOEIC-750',
-        skill: 'speaking',
-        submittedAt: '2026-03-17 15:20:00'
-      },
-      score: 7.5,
-      gradedAt: '2026-03-18 09:45:00',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Phát âm chuẩn xác, trọng âm từ và ngữ điệu tự nhiên. Vốn từ vựng chuyên đề môi trường rất đa dạng và sử dụng thành thạo.' 
-        : 'Excellent phonetic stress accuracy and natural cadence. Rich environmental lexicon deployed effortlessly throughout the response.',
-      submissionExcerpt: isVi
-        ? 'Bản ghi âm 2 phút 40 giây: Học viên trả lời lưu loát về lối sống xanh, giải pháp năng lượng tái tạo trong các tòa nhà thông minh.'
-        : 'Audio recording 2m 40s: Fluent elaboration on green lifestyles and sustainable architecture solutions.'
-    },
-    {
-      id: 'GR-8830',
-      gradingId: 8830,
-      gradedBy: {
-        name: 'Thầy David Miller',
-        code: 'GV-019'
-      },
-      student: {
-        name: 'Alice Johnson',
-        code: 'HV-8801'
-      },
-      assignment: {
-        code: 'HW-03',
-        title: 'Writing Task 2: Remote Work & Corporate Culture Integration',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-15 19:40:00'
-      },
-      score: 8.0,
-      gradedAt: '2026-03-16 16:10:20',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Bài viết mẫu mực ở band 8.0. Luận điểm sắc sảo, cấu trúc ngữ pháp phong phú và phong cách viết học thuật tự nhiên.' 
-        : 'Exemplary Band 8.0 performance. Sophisticated arguments, diverse syntactic variety, and natural academic register.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "While proponents argue that telecommuting bolsters operational efficiency and work-life balance, detractors highlight potential risks to corporate cultural cohesion..."'
-        : 'Essay excerpt: "While proponents argue that telecommuting bolsters operational efficiency and work-life balance, detractors highlight potential risks to corporate cultural cohesion..."'
-    }
-  ];
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const filteredHistory = gradingHistory.filter(item => {
-    if (filterTeacher !== 'all' && item.gradedBy.code !== filterTeacher) return false;
-    if (filterSkill !== 'all' && item.assignment.skill !== filterSkill) return false;
-    if (filterType === 'writing' && item.assignment.skill !== 'writing') return false;
-    if (filterType === 'speaking' && item.assignment.skill !== 'speaking') return false;
-    if (filterType === 'high' && item.score < 7.0) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        item.gradedBy.name.toLowerCase().includes(q) ||
-        item.student.name.toLowerCase().includes(q) ||
-        item.assignment.title.toLowerCase().includes(q) ||
-        item.assignment.code.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  const countWriting = gradingHistory.filter(i => i.assignment.skill === 'writing').length;
-  const countSpeaking = gradingHistory.filter(i => i.assignment.skill === 'speaking').length;
-  const countHigh = gradingHistory.filter(i => i.score >= 7.0).length;
-
-  const handleExportCsv = () => {
-    alert(isVi ? 'Đang trích xuất danh sách bài đã chấm ra tập tin CSV...' : 'Exporting graded assignments list to CSV...');
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
   };
 
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setFilterTeacher('all');
-    setFilterSkill('all');
-    setFilterType('all');
+  const handleStatusFilterChange = (status: 'ALL' | 'COMPLETED' | 'AI_GRADED' | 'PENDING' | 'FAILED') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleScoreFilterChange = (score: 'ALL' | 'SCORED' | 'UNSCORED') => {
+    setScoreFilter(score);
+    setCurrentPage(1);
+  };
+
+  // Drawer / Inspection
+  const [selectedGradingId, setSelectedGradingId] = useState<number | null>(null);
+  const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
+  const [changeLogs, setChangeLogs] = useState<GradingChangeLog[]>([]);
+  const [loadingDrawer, setLoadingDrawer] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadGradings = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const params = {
+          page: 1,
+          limit: 100,
+        };
+
+        const res = await gradingService.listGradings(params);
+        if (isMounted) {
+          setGradings(res.data || []);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải nhật ký chấm điểm.' : 'Failed to load grading audit records.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadGradings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey, isVi]);
+
+  // Open inspection drawer
+  const handleOpenDetail = async (gradingId: number) => {
+    setSelectedGradingId(gradingId);
+    setGradingDetail(null);
+    setChangeLogs([]);
+    setDrawerError(null);
+    setLoadingDrawer(true);
+
+    try {
+      const [detailRes, logsRes] = await Promise.allSettled([
+        gradingService.getById(gradingId),
+        gradingChangeLogService.getChangeLogs(gradingId)
+      ]);
+
+      if (detailRes.status === 'fulfilled') {
+        setGradingDetail(detailRes.value);
+      } else {
+        throw detailRes.reason;
+      }
+
+      if (logsRes.status === 'fulfilled') {
+        setChangeLogs(logsRes.value.data || []);
+      }
+    } catch (err: unknown) {
+      setDrawerError(err instanceof Error ? err.message : isVi ? 'Không thể tải chi tiết bài chấm và lịch sử sửa điểm.' : 'Failed to load grading details and change logs.');
+    } finally {
+      setLoadingDrawer(false);
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    setSelectedGradingId(null);
+    setGradingDetail(null);
+    setChangeLogs([]);
+  };
+
+  const countCompleted = useMemo(() => gradings.filter(i => i.status === 'COMPLETED').length, [gradings]);
+  const countAiGraded = useMemo(() => gradings.filter(i => i.status === 'AI_GRADED').length, [gradings]);
+  const countPending = useMemo(() => gradings.filter(i => i.status === 'PENDING').length, [gradings]);
+  const countFailed = useMemo(() => gradings.filter(i => i.status === 'FAILED').length, [gradings]);
+  const selectedSummary = useMemo(() => gradings.find(i => i.id === selectedGradingId), [gradings, selectedGradingId]);
+
+  const filteredGradings = useMemo(() => {
+    return gradings.filter(item => {
+      // 1. Status segment filter
+      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
+        return false;
+      }
+
+      // 2. Score filter
+      if (scoreFilter === 'SCORED' && (item.finalScore === null || item.finalScore === undefined)) {
+        return false;
+      }
+      if (scoreFilter === 'UNSCORED' && item.finalScore !== null && item.finalScore !== undefined) {
+        return false;
+      }
+
+      // 3. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const code = `gr-${item.id}`.toLowerCase();
+        const idStr = String(item.id);
+        const rawStatus = item.status.toLowerCase();
+        const scoreStr = item.finalScore !== null && item.finalScore !== undefined ? String(item.finalScore) : '';
+
+        const matchesAssignment = item.assignmentTitle?.toLowerCase().includes(q) ?? false;
+        const matchesTeacher = item.teacherName?.toLowerCase().includes(q) ?? false;
+        const matchesStudent = item.studentName?.toLowerCase().includes(q) ?? false;
+        const matchesClass = item.className?.toLowerCase().includes(q) ?? false;
+
+        // Friendly keyword matching for status
+        let statusMatches = rawStatus.includes(q);
+        if (item.status === 'COMPLETED' && (q.includes('hoàn tất') || q.includes('hoàn thành') || q.includes('xong') || q.includes('complete'))) {
+          statusMatches = true;
+        } else if (item.status === 'AI_GRADED' && (q.includes('ai') || q.includes('máy chấm') || q.includes('tự động'))) {
+          statusMatches = true;
+        } else if (item.status === 'PENDING' && (q.includes('chờ') || q.includes('duyệt') || q.includes('pend'))) {
+          statusMatches = true;
+        } else if (item.status === 'FAILED' && (q.includes('thất bại') || q.includes('lỗi') || q.includes('fail'))) {
+          statusMatches = true;
+        }
+
+        // Score keyword matching
+        let scoreMatches = scoreStr.includes(q);
+        if ((item.finalScore === null || item.finalScore === undefined) && (q.includes('chưa') || q.includes('unscored') || q.includes('null'))) {
+          scoreMatches = true;
+        }
+
+        return (
+          code.includes(q) ||
+          idStr === q ||
+          matchesAssignment ||
+          matchesTeacher ||
+          matchesStudent ||
+          matchesClass ||
+          statusMatches ||
+          scoreMatches
+        );
+      }
+
+      return true;
+    });
+  }, [gradings, statusFilter, scoreFilter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredGradings.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedGradings = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredGradings.slice(start, start + pageSize);
+  }, [filteredGradings, safeCurrentPage, pageSize]);
+
+  const handleExportCsv = () => {
+    if (filteredGradings.length === 0) {
+      warning(isVi ? 'Không có dữ liệu kiểm toán để xuất tập tin.' : 'No audit records to export.');
+      return;
+    }
+
+    const headers = ['ID', 'Grading Code', 'Assignment', 'Class', 'Teacher', 'Student', 'Status', 'Final Score', 'Graded At'];
+    const rows = filteredGradings.map((item) => [
+      item.id,
+      `GR-${item.id}`,
+      item.assignmentTitle || 'N/A',
+      item.className || 'N/A',
+      item.teacherName || 'N/A',
+      item.studentName || 'N/A',
+      item.status,
+      item.finalScore !== null && item.finalScore !== undefined ? item.finalScore : 'N/A',
+      item.gradedAt || 'N/A',
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `grading-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    success(
+      isVi
+        ? `Đã trích xuất thành công ${filteredGradings.length} bản ghi ra tệp CSV.`
+        : `Successfully exported ${filteredGradings.length} records to CSV.`
+    );
+  };
+
+  const formatStatusBadge = (status: GradingStatus) => {
+    switch (status) {
+      case 'COMPLETED':
+        return <span className="badge badge-active">{isVi ? 'Đã hoàn thành' : 'Completed'}</span>;
+      case 'AI_GRADED':
+        return <span className="badge badge-secondary">{isVi ? 'AI Đã Chấm' : 'AI Graded'}</span>;
+      case 'PENDING':
+        return <span className="badge badge-onleave">{isVi ? 'Đang chờ duyệt' : 'Pending'}</span>;
+      case 'FAILED':
+        return <span className="badge badge-blocked">{isVi ? 'Thất bại' : 'Failed'}</span>;
+      default:
+        return <span className="badge">{status}</span>;
+    }
   };
 
   return (
@@ -225,17 +263,8 @@ export const AdminGradingAuditLogs: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <div className="adm-gh-header-icon">
-              <History size={24} />
-            </div>
             <span>{t('auditLogs.title')}</span>
-            <span className="adm-gh-count-badge">
-              {filteredHistory.length} {isVi ? 'bài đã chấm' : 'graded submissions'}
-            </span>
           </h1>
-          <p className="adm-subtitle">
-            {t('auditLogs.subtitle')}
-          </p>
         </div>
 
         <div className="adm-gh-header-actions">
@@ -250,250 +279,199 @@ export const AdminGradingAuditLogs: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Bento Grid: Graded Assignments Overview */}
-      <div className="adm-kpi-grid">
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'TỔNG SỐ BÀI ĐÃ CHẤM' : 'TOTAL GRADED ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-blue">
-              <CheckCircle2 size={20} />
-            </div>
+      {error && (
+        <div className="adm-alert-error justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} />
+            <span>{error}</span>
           </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value">148</span>
-            <span className="adm-kpi-delta pos">+18.5%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Đã hoàn tất chấm điểm trên hệ thống' : 'Completed grading evaluations'}
-            </span>
-          </div>
+          <button 
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setRefreshKey(prev => prev + 1)}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </button>
         </div>
-
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'BÀI TỰ LUẬN (WRITING)' : 'WRITING ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-emerald">
-              <PenTool size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value adm-gh-kpi-value-emerald">86</span>
-            <span className="adm-kpi-delta pos">58.1%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Bài viết Task 1 & Task 2 đã chấm' : 'Essay submissions verified'}
-            </span>
-          </div>
-        </div>
-
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'BÀI NÓI (SPEAKING)' : 'SPEAKING ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-violet">
-              <Mic size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value adm-gh-kpi-value-violet">62</span>
-            <span className="adm-kpi-delta neutral">41.9%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Ghi âm Speaking Part 2 & Part 3' : 'Audio responses evaluated'}
-            </span>
-          </div>
-        </div>
-
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'ĐIỂM TRUNG BÌNH TOÀN TRƯỜNG' : 'COHORT AVERAGE SCORE'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-blue">
-              <Award size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value">6.8</span>
-            <span className="adm-kpi-delta pos">
-              {isVi ? '91.2% Đạt' : '91.2% Pass'}
-            </span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Tỷ lệ đạt chuẩn đầu ra đề ra' : 'Target attainment standard'}
-            </span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Filter and Search Bar */}
-      <div className="adm-filter-bar">
-        <div className="adm-gh-filter-controls">
-          <div className="adm-gh-search-container">
-            <Search size={16} className="adm-gh-search-icon" />
-            <input 
-              type="text" 
-              className="adm-gh-search-input" 
-              placeholder={t('auditLogs.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <select 
-            className="adm-gh-select" 
-            value={filterTeacher}
-            onChange={(e) => setFilterTeacher(e.target.value)}
+      <div className="adm-filter-bar mb-6">
+        {/* Status Segment Filter Pills */}
+        <div className="adm-pills">
+          <button
+            type="button"
+            className={`adm-pill ${statusFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => handleStatusFilterChange('ALL')}
           >
-            <option value="all">{t('auditLogs.filterAllTeachers')}</option>
-            <option value="GV-088">Cô Trần Thị Mai Lan (GV-088)</option>
-            <option value="GV-042">Thầy Nguyễn Văn Nam (GV-042)</option>
-            <option value="GV-019">Thầy David Miller (GV-019)</option>
-          </select>
-
-          <select 
-            className="adm-gh-select" 
-            value={filterSkill}
-            onChange={(e) => setFilterSkill(e.target.value as 'all' | 'writing' | 'speaking')}
+            <span>{isVi ? 'Tất cả bài chấm' : 'All Gradings'}</span>
+            <span className="adm-pill-badge">{gradings.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`adm-pill ${statusFilter === 'COMPLETED' ? 'active' : ''}`}
+            onClick={() => handleStatusFilterChange('COMPLETED')}
           >
-            <option value="all">{t('auditLogs.filterAllSkills')}</option>
-            <option value="writing">{t('auditLogs.filterSkillWriting')}</option>
-            <option value="speaking">{t('auditLogs.filterSkillSpeaking')}</option>
-          </select>
+            <span>{isVi ? 'Đã hoàn tất' : 'Completed'}</span>
+            <span className="adm-pill-badge">{countCompleted}</span>
+          </button>
+          <button
+            type="button"
+            className={`adm-pill ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
+            onClick={() => handleStatusFilterChange('AI_GRADED')}
+          >
+            <span>{isVi ? 'AI Đã chấm' : 'AI Graded'}</span>
+            <span className="adm-pill-badge">{countAiGraded}</span>
+          </button>
+          <button
+            type="button"
+            className={`adm-pill ${statusFilter === 'PENDING' ? 'active' : ''}`}
+            onClick={() => handleStatusFilterChange('PENDING')}
+          >
+            <span>{isVi ? 'Chờ duyệt' : 'Pending'}</span>
+            <span className="adm-pill-badge">{countPending}</span>
+          </button>
+          {countFailed > 0 && (
+            <button
+              type="button"
+              className={`adm-pill ${statusFilter === 'FAILED' ? 'active' : ''}`}
+              onClick={() => handleStatusFilterChange('FAILED')}
+            >
+              <span>{isVi ? 'Thất bại' : 'Failed'}</span>
+              <span className="adm-pill-badge">{countFailed}</span>
+            </button>
+          )}
         </div>
 
-        <div className="adm-gh-pills">
-          <button
-            type="button"
-            className={`adm-gh-pill ${filterType === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterType('all')}
-          >
-            <span>{isVi ? 'Tất cả bài chấm' : 'All Graded'}</span>
-            <span className="adm-gh-pill-count">{gradingHistory.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`adm-gh-pill ${filterType === 'writing' ? 'active' : ''}`}
-            onClick={() => setFilterType('writing')}
-          >
-            <span>{isVi ? 'Bài Viết (Writing)' : 'Writing'}</span>
-            <span className="adm-gh-pill-count">{countWriting}</span>
-          </button>
-          <button
-            type="button"
-            className={`adm-gh-pill ${filterType === 'speaking' ? 'active' : ''}`}
-            onClick={() => setFilterType('speaking')}
-          >
-            <span>{isVi ? 'Bài Nói (Speaking)' : 'Speaking'}</span>
-            <span className="adm-gh-pill-count">{countSpeaking}</span>
-          </button>
-          <button
-            type="button"
-            className={`adm-gh-pill ${filterType === 'high' ? 'active' : ''}`}
-            onClick={() => setFilterType('high')}
-          >
-            <span>{isVi ? 'Điểm cao (≥ 7.0)' : 'High Score (≥ 7.0)'}</span>
-            <span className="adm-gh-pill-count">{countHigh}</span>
-          </button>
+        {/* Filter Controls: Score dropdown & Search */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className={`adm-gh-select-wrap ${scoreFilter !== 'ALL' ? 'has-value' : ''}`}>
+            <Award size={15} className="adm-gh-select-icon" />
+            <select
+              className={`adm-gh-select ${scoreFilter !== 'ALL' ? 'has-value' : ''}`}
+              value={scoreFilter}
+              onChange={(e) => handleScoreFilterChange(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
+              aria-label={isVi ? 'Lọc theo mức điểm' : 'Filter by score'}
+            >
+              <option value="ALL">{isVi ? 'Tất cả mức điểm' : 'All Scores'}</option>
+              <option value="SCORED">{isVi ? 'Đã có điểm chốt' : 'Has Final Score'}</option>
+              <option value="UNSCORED">{isVi ? 'Chưa có điểm chốt' : 'No Final Score'}</option>
+            </select>
+            <ChevronDown size={14} className="adm-gh-select-arrow" />
+          </div>
+
+          {/* Search Input */}
+          <div className="adm-search-wrap">
+            <Search size={16} className="adm-search-icon" />
+            <input 
+              type="text" 
+              className="adm-search-input"
+              placeholder={isVi ? 'Tìm mã GR-..., bài tập, giáo viên, học sinh...' : 'Search GR-... ID, assignment, teacher, student...'}
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+            {searchQuery && (
+              <button 
+                type="button"
+                className="adm-search-clear-btn"
+                onClick={() => setSearchQuery('')}
+                title={isVi ? 'Xóa tìm kiếm' : 'Clear search'}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Modern Rounded Table Card */}
-      <div className="adm-gh-table-card">
-        <div className="adm-gh-table-header">
-          <div className="adm-gh-table-title-group">
-            <h3 className="adm-gh-table-title">
-              {isVi ? 'Danh Sách Bài Đã Chấm Điểm' : 'Graded Assignments Registry'}
-            </h3>
-            <p className="adm-gh-table-subtitle">
-              {isVi 
-                ? `Hiển thị ${filteredHistory.length} bài tập đã chấm phù hợp với tiêu chí lọc (Click vào hàng để xem chi tiết bài chấm)` 
-                : `Showing ${filteredHistory.length} evaluated submissions (Click row to inspect grading details)`}
-            </p>
+      {/* Main Table Card */}
+      <div className="adm-table-card">
+        {loading ? (
+          <div className="adm-loading-state">
+            <Loader2 size={32} className="animate-spin adm-loading-state-icon" />
+            <div>{isVi ? 'Đang tải danh sách hồ sơ chấm điểm từ máy chủ...' : 'Loading grading records from server...'}</div>
           </div>
-        </div>
-
-        {filteredHistory.length === 0 ? (
-          <div className="adm-gh-empty">
-            <div className="adm-gh-empty-icon">
-              <RotateCcw size={24} />
-            </div>
-            <div className="adm-gh-empty-title">
-              {isVi ? 'Không tìm thấy bài chấm nào' : 'No grading records found'}
-            </div>
-            <div className="adm-gh-empty-desc">
-              {isVi 
-                ? 'Không có dữ liệu phù hợp với từ khóa hoặc bộ lọc đã chọn. Vui lòng thử lại.' 
-                : 'No results match your search or filter criteria. Try resetting filters.'}
-            </div>
-            <button 
-              type="button" 
-              className="adm-gh-empty-btn"
-              onClick={handleResetFilters}
-            >
-              {isVi ? 'Xóa bộ lọc' : 'Reset filters'}
-            </button>
+        ) : filteredGradings.length === 0 ? (
+          <div className="adm-empty-state-card">
+            <History size={40} className="adm-empty-state-icon" />
+            <h3 className="adm-empty-state-title">
+              {isVi ? 'Không tìm thấy hồ sơ chấm điểm nào' : 'No grading records found'}
+            </h3>
+            <p className="adm-empty-state-desc">
+              {searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL'
+                ? (isVi ? 'Không tìm thấy kết quả phù hợp với bộ lọc hiện tại.' : 'No entries match your current search criteria or filters.')
+                : (isVi ? 'Nhật ký sẽ hiển thị khi học sinh nộp bài và bài làm được xử lý chấm.' : 'Entries will appear here as submissions are processed.')}
+            </p>
+            {(searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL') && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm mt-4 inline-flex items-center gap-1.5"
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                  setScoreFilter('ALL');
+                }}
+              >
+                <RotateCcw size={14} />
+                <span>{isVi ? 'Đặt lại bộ lọc' : 'Reset Filters'}</span>
+              </button>
+            )}
           </div>
         ) : (
-          <div className="adm-gh-table-overflow">
+          <div className="overflow-x-auto">
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>{t('auditLogs.colTime')}</th>
-                  <th>{t('auditLogs.colTeacher')}</th>
-                  <th>{t('auditLogs.colStudent')}</th>
-                  <th>{t('auditLogs.colAssignment')}</th>
-                  <th>{t('auditLogs.colScore')}</th>
-                  <th>{t('auditLogs.colStatus')}</th>
+                  <th>{isVi ? 'MÃ CHẤM' : 'GRADING ID'}</th>
+                  <th>{isVi ? 'BÀI TẬP & LỚP HỌC' : 'ASSIGNMENT & CLASS'}</th>
+                  <th>{isVi ? 'GIÁO VIÊN' : 'INSTRUCTOR'}</th>
+                  <th>{isVi ? 'HỌC VIÊN' : 'STUDENT'}</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th>{isVi ? 'ĐIỂM CHỐT' : 'FINAL SCORE'}</th>
+                  <th className="text-right">{isVi ? 'NHẬT KÝ SỬA ĐIỂM' : 'AUDIT ACTION'}</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredHistory.map((item) => (
+                {paginatedGradings.map((item) => (
                   <tr 
-                    key={item.id} 
-                    className="adm-table-row-clickable"
-                    onClick={() => setSelectedItem(item)}
+                    key={item.id}
+                    onClick={() => handleOpenDetail(item.id)}
+                    className="cursor-pointer"
                   >
+                    <td className="font-mono font-semibold text-primary">GR-{item.id}</td>
                     <td>
-                      <div className="adm-gh-time-cell">
-                        <Clock size={13} />
-                        <span>{item.gradedAt}</span>
+                      <div className="font-medium text-on-surface line-clamp-1" title={item.assignmentTitle}>
+                        {item.assignmentTitle || <span className="text-on-surface-variant italic">{isVi ? 'Chưa xác định' : 'Unknown'}</span>}
                       </div>
-                    </td>
-                    <td>
-                      <div className="adm-gh-user-info">
-                        <div className="adm-gh-user-name">{item.gradedBy.name}</div>
-                        <div className="adm-gh-user-code">{item.gradedBy.code}</div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="adm-gh-student-name">{item.student.name}</div>
-                      <div className="adm-gh-student-code">{item.student.code}</div>
-                    </td>
-                    <td>
-                      <div className="adm-gh-assignment-wrap">
-                        <div className="adm-gh-assignment-title" title={item.assignment.title}>
-                          {item.assignment.title}
+                      {item.className && (
+                        <div className="text-xs text-on-surface-variant font-mono mt-0.5">
+                          {item.className}
                         </div>
-                        <div className="adm-gh-assignment-meta">
-                          <span className="adm-gh-class-chip">{item.assignment.className}</span>
-                          <span className={`adm-gh-skill-chip ${item.assignment.skill === 'writing' ? 'adm-gh-skill-chip-writing' : 'adm-gh-skill-chip-speaking'}`}>
-                            {item.assignment.skill === 'writing' ? <PenTool size={10} /> : <Mic size={10} />}
-                            {item.assignment.skill}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </td>
+                    <td className="text-sm">
+                      {item.teacherName || <span className="text-on-surface-variant italic">-</span>}
+                    </td>
+                    <td className="text-sm">
+                      {item.studentName || <span className="text-on-surface-variant italic">-</span>}
+                    </td>
+                    <td>{formatStatusBadge(item.status)}</td>
                     <td>
-                      <span className="adm-gh-score-text">
-                        {item.score.toFixed(1)}
+                      <span className={`font-bold font-mono text-[15px] ${item.finalScore !== null ? 'text-primary' : 'text-on-surface-variant'}`}>
+                        {item.finalScore !== null ? item.finalScore : (isVi ? 'Chưa có điểm' : 'Unscored')}
                       </span>
                     </td>
-                    <td>
-                      <span className="adm-gh-status-text">
-                        {isVi ? 'Đã chấm điểm' : 'Graded'}
-                      </span>
+                    <td className="text-right">
+                      <button 
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDetail(item.id);
+                        }}
+                      >
+                        {isVi ? 'Xem lịch sử sửa điểm' : 'Audit Logs'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -502,116 +480,185 @@ export const AdminGradingAuditLogs: React.FC = () => {
           </div>
         )}
 
-        <div className="adm-gh-table-footer">
-          <span>
-            {isVi 
-              ? `Hiển thị ${filteredHistory.length} trên tổng số ${gradingHistory.length} bài chấm` 
-              : `Showing ${filteredHistory.length} of ${gradingHistory.length} recorded submissions`}
-          </span>
-          <span className="adm-gh-count-badge">grading_records v2</span>
-        </div>
+        {/* Pagination */}
+        {!loading && filteredGradings.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredGradings.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+            itemLabel={isVi ? 'lượt chấm' : 'audit logs'}
+            isVi={isVi}
+            variant="table"
+          />
+        )}
       </div>
 
-      {/* Slide-over Inspection Drawer (Chi tiết bài chấm điểm) */}
-      {selectedItem && (
-        <div className="adm-drawer-backdrop" onClick={() => setSelectedItem(null)}>
-          <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
+      {/* Drawer: Detailed Inspection and Change Logs */}
+      {selectedGradingId !== null && (
+        <div className="adm-drawer-backdrop" onClick={handleCloseDrawer}>
+          <div className="adm-drawer adm-drawer-wide" onClick={(e) => e.stopPropagation()}>
             <div className="adm-drawer-header">
-              <div className="adm-gh-assignment-meta">
-                <span className="adm-gh-count-badge">{selectedItem.id}</span>
+              <div>
                 <h2 className="adm-drawer-title">
-                  {isVi ? 'Chi Tiết Bài Chấm Điểm' : 'Graded Assignment Details'}
+                  {isVi ? `Chi Tiết Kiểm Toán & Lịch Sử Sửa Điểm: GR-${selectedGradingId}` : `Grading Audit & Change Logs: GR-${selectedGradingId}`}
                 </h2>
+                <div className="text-xs text-on-surface-variant mt-0.5">
+                  Hồ sơ chấm điểm #GR-{selectedGradingId}
+                </div>
               </div>
               <button 
-                type="button" 
-                className="adm-gh-drawer-close"
-                onClick={() => setSelectedItem(null)}
+                type="button"
+                onClick={handleCloseDrawer}
+                className="adm-btn-ghost p-1 text-on-surface-variant"
+                aria-label={isVi ? 'Đóng' : 'Close'}
               >
-                <X size={16} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="adm-drawer-body">
-              {/* Graded Score Highlight Card */}
-              <div className="adm-gh-drawer-grade-card">
-                <div>
-                  <div className="adm-gh-drawer-score-label">
-                    {isVi ? 'ĐIỂM SỐ ĐẠT ĐƯỢC' : 'FINAL EVALUATION SCORE'}
-                  </div>
-                  <div className="adm-gh-drawer-grade-val">
-                    {selectedItem.score.toFixed(1)}
-                  </div>
+            <div className="adm-drawer-body flex flex-col gap-5">
+              {loadingDrawer ? (
+                <div className="adm-loading-state">
+                  <Loader2 size={32} className="animate-spin adm-loading-state-icon" />
+                  <div>{isVi ? 'Đang truy xuất thông tin chấm và nhật ký chỉnh sửa...' : 'Fetching grading context and change history...'}</div>
                 </div>
-              </div>
+              ) : drawerError ? (
+                <div className="adm-alert-error">
+                  {drawerError}
+                </div>
+              ) : gradingDetail ? (
+                <>
+                  {/* Context Card: Assignment, Class, Teacher, Student */}
+                  {(selectedSummary?.assignmentTitle || selectedSummary?.teacherName || selectedSummary?.studentName) && (
+                    <div className="card p-4 bg-surface-container-low border border-outline-variant/40 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Bài tập' : 'Assignment'}</div>
+                        <div className="font-semibold text-sm text-on-surface mt-0.5">{selectedSummary.assignmentTitle || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Lớp học' : 'Class'}</div>
+                        <div className="font-semibold text-sm text-on-surface mt-0.5">{selectedSummary.className || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</div>
+                        <div className="font-medium text-on-surface mt-0.5">{selectedSummary.teacherName || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Học viên làm bài' : 'Student'}</div>
+                        <div className="font-medium text-on-surface mt-0.5">{selectedSummary.studentName || '-'}</div>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Execution Details Grid */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Thông Tin Thực Hiện' : 'Grading Information'}
-                </div>
-                <div className="adm-gh-drawer-meta-grid">
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Giáo viên chấm' : 'Graded By'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.gradedBy.name}</span>
-                    <span className="adm-gh-user-code">{selectedItem.gradedBy.code}</span>
+                  {/* Status & Scores Strip */}
+                  <div className="adm-drawer-metrics-grid">
+                    <div className="adm-drawer-metric-item">
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Trạng thái' : 'Status'}</div>
+                      <div className="mt-1">{formatStatusBadge(gradingDetail.status)}</div>
+                    </div>
+                    <div className="adm-drawer-metric-item">
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Phương thức' : 'Method'}</div>
+                      <div className="font-semibold text-sm mt-1">{gradingDetail.method}</div>
+                    </div>
+                    <div className="adm-drawer-metric-item">
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Điểm chốt hiện tại' : 'Final Score'}</div>
+                      <div className="adm-drawer-metric-val font-mono text-primary">
+                        {gradingDetail.finalScore !== null ? gradingDetail.finalScore : '-'}
+                      </div>
+                    </div>
                   </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Học viên nộp bài' : 'Student'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.student.name}</span>
-                    <span className="adm-gh-student-code">{selectedItem.student.code}</span>
-                  </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Bài tập & Lớp' : 'Assignment & Class'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.assignment.code}</span>
-                    <span className="adm-gh-user-code">{selectedItem.assignment.className}</span>
-                  </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Thời gian hoàn tất chấm' : 'Graded Timestamp'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.gradedAt}</span>
-                    <span className="adm-gh-user-code">{isVi ? `Nộp: ${selectedItem.assignment.submittedAt}` : `Submitted: ${selectedItem.assignment.submittedAt}`}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Teacher Feedback / Comments (Lời phê của giáo viên) */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Lời Phê & Nhận Xét Của Giáo Viên' : 'Teacher Comments & Feedback'}
-                </div>
-                <div className="adm-gh-drawer-feedback-box">
-                  {selectedItem.teacherFeedback}
-                </div>
-              </div>
+                  {/* Feedback Notes */}
+                  {gradingDetail.finalFeedback && (
+                    <div className="card adm-drawer-feedback-card">
+                      <div className="text-[13px] font-bold mb-1.5 flex items-center gap-1.5">
+                        <FileText size={15} className="text-primary" />
+                        <span>{isVi ? 'Lời phê chính thức' : 'Official Instructor Feedback'}</span>
+                      </div>
+                      <div className="text-[13.5px] leading-relaxed text-on-surface">
+                        {gradingDetail.finalFeedback}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Student Submission Content Excerpt (Nội dung bài làm của học sinh) */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Nội Dung Bài Nộp Của Học Viên' : 'Student Submission Excerpt'}
-                </div>
-                <div className="adm-gh-drawer-submission-preview">
-                  {selectedItem.submissionExcerpt}
-                </div>
-              </div>
+                  {gradingDetail.aiFeedback && (
+                    <div className="card adm-ai-feedback-card">
+                      <div className="adm-ai-feedback-title">
+                        {isVi ? 'Nhận xét từ AI Engine' : 'AI Engine Feedback'}
+                      </div>
+                      <div className="text-[13px] leading-relaxed">
+                        {gradingDetail.aiFeedback}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* REAL CHANGE LOGS SECTION */}
+                  <div>
+                    <h3 className="text-[15px] font-bold mb-2.5">
+                      <span>{isVi ? 'Nhật Ký Các Lần Sửa Điểm (Change Logs Audit)' : 'Grading Adjustment History'}</span>
+                    </h3>
+
+                    {changeLogs.length === 0 ? (
+                      <div className="p-6 text-center bg-surface-container-low rounded-lg text-on-surface-variant">
+                        <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-600 opacity-80" />
+                        <div className="font-semibold text-sm">
+                          {isVi ? 'Chưa có lượt sửa điểm nào' : 'No grade changes recorded'}
+                        </div>
+                        <p className="mt-1 mb-0 text-[12.5px]">
+                          {isVi 
+                            ? 'Điểm số của bài làm này vẫn giữ nguyên vẹn từ lần chấm đầu tiên.' 
+                            : 'The score for this submission remains unchanged from the initial evaluation.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="adm-audit-table-wrap">
+                        <table className="adm-table m-0">
+                          <thead>
+                            <tr>
+                              <th>{isVi ? 'NGƯỜI ĐIỀU CHỈNH' : 'CHANGED BY'}</th>
+                              <th>{isVi ? 'ĐIỂM CŨ' : 'OLD'}</th>
+                              <th>{isVi ? 'ĐIỂM MỚI' : 'NEW'}</th>
+                              <th>{isVi ? 'LÝ DO / GHI CHÚ' : 'REASON / NOTE'}</th>
+                              <th>{isVi ? 'THỜI GIAN' : 'TIMESTAMP'}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {changeLogs.map((log, idx) => (
+                              <tr key={idx}>
+                                <td className="font-medium">{log.changedBy}</td>
+                                <td className="font-mono text-on-surface-variant">{log.oldScore ?? '-'}</td>
+                                <td className="font-mono font-bold text-primary">{log.newScore ?? '-'}</td>
+                                <td className="max-w-[200px] text-[13px]">
+                                  {log.note || <span className="text-on-surface-variant italic">{isVi ? 'Không có ghi chú' : 'No note provided'}</span>}
+                                </td>
+                                <td className="font-mono text-on-surface-variant text-xs">
+                                  {log.changedAt}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
             </div>
 
-            <div className="adm-gh-drawer-footer">
+            <div className="adm-drawer-footer">
               <button 
                 type="button" 
-                className="adm-gh-btn-secondary"
-                onClick={() => setSelectedItem(null)}
+                className="btn btn-secondary"
+                onClick={handleCloseDrawer}
               >
                 {isVi ? 'Đóng' : 'Close'}
-              </button>
-              <button 
-                type="button" 
-                className="adm-gh-btn-primary"
-                onClick={() => {
-                  alert(isVi ? `Đang mở toàn bộ bài làm và chi tiết bài thi ${selectedItem.id}...` : `Opening full submission record ${selectedItem.id}...`);
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>{isVi ? 'Xem toàn bộ bài làm' : 'View Full Submission'}</span>
               </button>
             </div>
           </div>

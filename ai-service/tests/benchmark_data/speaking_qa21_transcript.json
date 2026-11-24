@@ -1,0 +1,21 @@
+{
+  "submissionModuleId": 14,
+  "words": [
+    { "word": "I", "start": 0.0, "end": 0.25, "confidence": 0.98 },
+    { "word": "would", "start": 0.25, "end": 0.45, "confidence": 0.97 },
+    { "word": "like", "start": 0.45, "end": 0.70, "confidence": 0.99 },
+    { "word": "to", "start": 0.70, "end": 0.85, "confidence": 0.96 },
+    { "word": "talk", "start": 0.85, "end": 1.15, "confidence": 0.98 },
+    { "word": "about", "start": 1.15, "end": 1.45, "confidence": 0.95 },
+    { "word": "a", "start": 1.45, "end": 1.55, "confidence": 0.94 },
+    { "word": "book", "start": 1.55, "end": 1.95, "confidence": 0.99 },
+    { "word": "I", "start": 2.50, "end": 2.70, "confidence": 0.98 },
+    { "word": "read", "start": 2.70, "end": 3.00, "confidence": 0.97 },
+    { "word": "recently", "start": 3.00, "end": 3.60, "confidence": 0.96 }
+  ],
+  "expectedMetrics": {
+    "minWordsPerMinute": 90.0,
+    "maxWordsPerMinute": 170.0,
+    "pauseCount": 1
+  }
+}

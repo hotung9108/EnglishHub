@@ -29,6 +29,7 @@ public class StudentEvaluationService {
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String STUDENT_NOT_FOUND_MESSAGE = "Không tìm thấy học viên.";
 	private static final String STUDENT_OR_CLASS_NOT_FOUND_MESSAGE = "Không tìm thấy học viên hoặc lớp học.";
+	private static final String CLASS_NOT_FOUND_MESSAGE = "Không tìm thấy lớp học.";
 	private static final String EVALUATION_NOT_FOUND_MESSAGE = "Không tìm thấy đánh giá.";
 	private static final String STUDENT_NOT_IN_CLASS_MESSAGE = "Học viên không thuộc lớp học này.";
 	private static final String EMPTY_CONTENT_MESSAGE = "Nội dung đánh giá không được để trống.";
@@ -60,6 +61,13 @@ public class StudentEvaluationService {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		validatePage(studentId, classId, page, limit);
+		Long teacherId = null;
+		if (caller.role() == UserRole.TEACHER) {
+			teacherId = caller.id();
+			if (classId != null) {
+				requireClassOwnedBy(classId, caller);
+			}
+		}
 		if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
 			throw ApiException.badRequest(INVALID_DATE_RANGE_MESSAGE);
 		}
@@ -74,7 +82,10 @@ public class StudentEvaluationService {
 				? null
 				: toDate.plusDays(1).atStartOfDay(STUDENT_EVALUATION_ZONE).toInstant();
 		StudentEvaluationPage result = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId, classId, createdAtFromInclusive, createdAtToExclusive), page, limit);
+				new StudentEvaluationFilter(
+						studentId, classId, teacherId, createdAtFromInclusive, createdAtToExclusive),
+				page,
+				limit);
 		return new StudentEvaluationPage(
 				result.getContent().stream().map(this::addTeacherName).toList(),
 				page,
@@ -121,6 +132,9 @@ public class StudentEvaluationService {
 		if (caller.role() == UserRole.STUDENT && !Objects.equals(caller.id(), evaluation.studentId())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
+		if (caller.role() == UserRole.TEACHER) {
+			requireClassOwnedBy(evaluation.classId(), caller);
+		}
 		return evaluation;
 	}
 
@@ -131,7 +145,7 @@ public class StudentEvaluationService {
 			throw ApiException.badRequest(EMPTY_CONTENT_MESSAGE);
 		}
 		StudentEvaluation current = requireEvaluation(evaluationId);
-		requireAuthor(current, teacher);
+		requireClassOwnedBy(current.classId(), teacher);
 		studentEvaluationRepository.save(current.withContent(command.content()));
 	}
 
@@ -139,7 +153,7 @@ public class StudentEvaluationService {
 	public void delete(long evaluationId) {
 		User teacher = requireTeacher();
 		StudentEvaluation evaluation = requireEvaluation(evaluationId);
-		requireAuthor(evaluation, teacher);
+		requireClassOwnedBy(evaluation.classId(), teacher);
 		studentEvaluationRepository.deleteById(evaluation.id());
 	}
 
@@ -152,7 +166,9 @@ public class StudentEvaluationService {
 
 	private User requireReader() {
 		User caller = currentUserProvider.requireActiveUser();
-		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.STUDENT) {
+		if (caller.role() != UserRole.ADMIN
+				&& caller.role() != UserRole.TEACHER
+				&& caller.role() != UserRole.STUDENT) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		return caller;
@@ -166,8 +182,10 @@ public class StudentEvaluationService {
 		return caller;
 	}
 
-	private void requireAuthor(StudentEvaluation evaluation, User teacher) {
-		if (!Objects.equals(evaluation.teacherId(), teacher.id())) {
+	private void requireClassOwnedBy(long classId, User teacher) {
+		EnglishClass englishClass = classRepository.findById(classId)
+				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		if (!Objects.equals(englishClass.getTeacherId(), teacher.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 	}

@@ -5,6 +5,9 @@ import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.grading.application.dto.GradingChangeLogItem;
+import com.english_hub.core.modules.grading.application.dto.GradingListPage;
+import com.english_hub.core.modules.grading.application.dto.GradingMetadata;
+import com.english_hub.core.modules.grading.application.dto.GradingSummaryItem;
 import com.english_hub.core.modules.grading.domain.model.AnnotationSource;
 import com.english_hub.core.modules.grading.domain.model.AnswerAnnotation;
 import com.english_hub.core.modules.grading.domain.model.Grading;
@@ -14,6 +17,7 @@ import com.english_hub.core.modules.grading.domain.model.GradingFilter;
 import com.english_hub.core.modules.grading.domain.model.GradingPage;
 import com.english_hub.core.modules.grading.domain.model.GradingStatus;
 import com.english_hub.core.modules.grading.domain.model.ReviewStatus;
+import com.english_hub.core.modules.grading.application.port.AiAnalysisInFlightRegistry;
 import com.english_hub.core.modules.grading.domain.repository.AnswerAnnotationRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingChangeLogRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingContextRepository;
@@ -37,6 +41,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.PessimisticLockingFailureException;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -56,6 +65,8 @@ public class GradingService {
 			"Vị trí kết thúc phải lớn hơn hoặc bằng vị trí bắt đầu.";
 	private static final String INVALID_ANNOTATION_REVIEW_MESSAGE = "Không thể duyệt chú thích này.";
 	private static final String INVALID_AI_ANALYSIS_MESSAGE = "Không thể phân tích AI cho module này.";
+	private static final String AI_ANALYSIS_LOCK_TIMEOUT_MESSAGE =
+			"Không thể khóa bản chấm để cập nhật. Vui lòng thử lại.";
 
 	private final GradingRepository gradingRepository;
 	private final AnswerAnnotationRepository answerAnnotationRepository;
@@ -65,6 +76,8 @@ public class GradingService {
 	private final CurrentUserProvider currentUserProvider;
 	private final UserRepository userRepository;
 	private final GradingAiAnalysisService gradingAiAnalysisService;
+	private final GradingAiResultPersistenceService gradingAiResultPersistenceService;
+	private final AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry;
 	private final SpringDataAnswerRepository answerRepository;
 
 	@Autowired
@@ -77,6 +90,8 @@ public class GradingService {
 			CurrentUserProvider currentUserProvider,
 			UserRepository userRepository,
 			GradingAiAnalysisService gradingAiAnalysisService,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry,
 			@Autowired(required = false) SpringDataAnswerRepository answerRepository) {
 		this.gradingRepository = gradingRepository;
 		this.answerAnnotationRepository = answerAnnotationRepository;
@@ -86,6 +101,8 @@ public class GradingService {
 		this.currentUserProvider = currentUserProvider;
 		this.userRepository = userRepository;
 		this.gradingAiAnalysisService = gradingAiAnalysisService;
+		this.gradingAiResultPersistenceService = gradingAiResultPersistenceService;
+		this.aiAnalysisInFlightRegistry = aiAnalysisInFlightRegistry;
 		this.answerRepository = answerRepository;
 	}
 
@@ -97,7 +114,9 @@ public class GradingService {
 			ClassRepository classRepository,
 			CurrentUserProvider currentUserProvider,
 			UserRepository userRepository,
-			GradingAiAnalysisService gradingAiAnalysisService) {
+			GradingAiAnalysisService gradingAiAnalysisService,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry) {
 		this(
 				gradingRepository,
 				answerAnnotationRepository,
@@ -107,6 +126,8 @@ public class GradingService {
 				currentUserProvider,
 				userRepository,
 				gradingAiAnalysisService,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
 				null);
 	}
 
@@ -158,7 +179,10 @@ public class GradingService {
 				try {
 					parsedNode = OBJECT_MAPPER.readTree(grading.aiTranscript().toString());
 				} catch (Exception e) {
-					LOGGER.warn("Failed to parse aiTranscript JSON for grading {}: {}", grading.id(), e.getMessage());
+					LOGGER.warn(
+							"Failed to parse AI transcript JSON for grading {}: {}",
+							grading.id(),
+							e.getClass().getSimpleName());
 				}
 			}
 
@@ -206,8 +230,6 @@ public class GradingService {
 			} catch (Exception ignored) {
 				suggestedScore = BigDecimal.valueOf(criteriaScoresNode.get("overallScore").asDouble());
 			}
-		} else if (grading.status() == GradingStatus.AI_GRADED || grading.status() == GradingStatus.COMPLETED) {
-			suggestedScore = grading.finalScore();
 		}
 
 		return new AiGradingSuggestionResponse(
@@ -230,36 +252,51 @@ public class GradingService {
 		);
 	}
 
+	@Transactional
 	public void requestAiAnalysis(long submissionModuleId) {
 		User teacher = requireTeacher();
 		GradingContext context = requireSubmissionModuleContext(submissionModuleId);
 		requireTeacherOwnsContext(context, teacher);
-		Grading grading = gradingRepository.findBySubmissionModuleId(submissionModuleId)
-				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+		Grading grading = requireGradingForUpdate(submissionModuleId);
 		if (!context.submitted()
 				|| (context.moduleSkill() != ModuleSkill.WRITING && context.moduleSkill() != ModuleSkill.SPEAKING)
 				|| (grading.status() != GradingStatus.PENDING && grading.status() != GradingStatus.FAILED)) {
 			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
 		}
-		if (grading.status() == GradingStatus.FAILED) {
-			gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
+		if (!aiAnalysisInFlightRegistry.tryClaim(submissionModuleId)) {
+			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
 		}
-		gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
+		try {
+			registerAiWorkerAfterCommit(submissionModuleId);
+			if (grading.status() == GradingStatus.FAILED) {
+				gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
+			}
+		} catch (RuntimeException exception) {
+			aiAnalysisInFlightRegistry.release(submissionModuleId);
+			throw exception;
+		}
 	}
 
 	@Transactional
 	public void updateFinalGrade(long gradingId, BigDecimal finalScore, String finalFeedback, String note) {
 		User teacher = requireTeacher();
-		Grading current = requireGrading(gradingId);
 		GradingContext context = requireGradingContext(gradingId);
 		requireTeacherOwnsContext(context, teacher);
-		if (!isValidScore(finalScore, current.maxScoreSnapshot())) {
+		Grading current = requireGradingForUpdate(context.submissionModuleId());
+		if (!Objects.equals(current.id(), gradingId)) {
+			throw ApiException.notFound(GRADING_NOT_FOUND_MESSAGE);
+		}
+		BigDecimal effectiveMaxScore = current.maxScoreSnapshot() != null
+				? current.maxScoreSnapshot()
+				: context.moduleMaxScore();
+		if (!isValidScore(finalScore, effectiveMaxScore)) {
 			throw ApiException.badRequest(INVALID_SCORE_MESSAGE);
 		}
 
 		OffsetDateTime changedAt = OffsetDateTime.now(ZoneOffset.UTC);
 		boolean scoreChanged = !sameScore(current.finalScore(), finalScore);
-		Grading updated = current.withTeacherGrade(finalScore, finalFeedback, teacher.id(), changedAt);
+		Grading updated = current.withTeacherGrade(
+				finalScore, finalFeedback, teacher.id(), changedAt, effectiveMaxScore);
 		gradingRepository.saveTeacherGrade(updated);
 		if (scoreChanged) {
 			gradingChangeLogRepository.save(new GradingChangeLog(
@@ -273,15 +310,52 @@ public class GradingService {
 		}
 	}
 
+	private void registerAiWorkerAfterCommit(long submissionModuleId) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			throw new IllegalStateException("AI analysis requests require an active transaction synchronization.");
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				try {
+					gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
+				} catch (RuntimeException exception) {
+					aiAnalysisInFlightRegistry.release(submissionModuleId);
+					LOGGER.warn(
+							"AI analysis worker could not be scheduled for submission module {}: {}",
+							submissionModuleId,
+							exception.getClass().getSimpleName());
+					try {
+						gradingAiResultPersistenceService.markFailedIfStillPending(submissionModuleId);
+					} catch (RuntimeException failure) {
+						LOGGER.error(
+								"Could not mark rejected AI analysis as failed for submission module {}: {}",
+								submissionModuleId,
+								failure.getClass().getSimpleName());
+					}
+				}
+			}
+
+			@Override
+			public void afterCompletion(int status) {
+				if (status != STATUS_COMMITTED) {
+					aiAnalysisInFlightRegistry.release(submissionModuleId);
+				}
+			}
+		});
+	}
+
 	public Grading getById(long gradingId) {
 		User caller = currentUserProvider.requireActiveUser();
 		Grading grading = requireGrading(gradingId);
-		GradingContext context = requireGradingContext(gradingId);
-		requireSubmissionReadAccess(context, caller);
+		if (caller.role() != UserRole.ADMIN) {
+			GradingContext context = requireGradingContext(gradingId);
+			requireSubmissionReadAccess(context, caller);
+		}
 		return grading;
 	}
 
-	public GradingPage listGradings(Long classId, Long studentId, String statusValue, int page, int limit) {
+	public GradingListPage listGradings(Long classId, Long studentId, String statusValue, int page, int limit) {
 		User caller = currentUserProvider.requireActiveUser();
 		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.ADMIN) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
@@ -292,14 +366,46 @@ public class GradingService {
 		}
 		GradingStatus status = parseStatus(statusValue);
 		Long teacherId = caller.role() == UserRole.TEACHER ? caller.id() : null;
-		return gradingRepository.findPage(new GradingFilter(classId, studentId, status, teacherId), page, limit);
+		GradingPage gradingPage = gradingRepository.findPage(new GradingFilter(classId, studentId, status, teacherId), page, limit);
+
+		List<Long> submissionModuleIds = gradingPage.getContent().stream()
+				.map(Grading::submissionModuleId)
+				.filter(Objects::nonNull)
+				.toList();
+
+		java.util.Map<Long, GradingMetadata> metadataMap =
+				gradingContextRepository.findMetadataBySubmissionModuleIds(submissionModuleIds);
+
+		List<GradingSummaryItem> items = gradingPage.getContent().stream()
+				.map(grading -> {
+					GradingMetadata meta = metadataMap != null ? metadataMap.get(grading.submissionModuleId()) : null;
+					return new GradingSummaryItem(
+							grading,
+							meta != null ? meta.assignmentId() : null,
+							meta != null ? meta.assignmentTitle() : null,
+							meta != null ? meta.classId() : null,
+							meta != null ? meta.className() : null,
+							meta != null ? meta.teacherId() : null,
+							meta != null ? meta.teacherName() : null,
+							meta != null ? meta.studentId() : null,
+							meta != null ? meta.studentName() : null);
+				})
+				.toList();
+
+		return new GradingListPage(items, gradingPage.getPage(), gradingPage.getSize(), gradingPage.getTotalElements());
 	}
 
 	public List<AnswerAnnotation> listAnnotations(long answerId) {
 		User caller = currentUserProvider.requireActiveUser();
 		GradingContext context = requireAnswerContext(answerId);
 		requireSubmissionReadAccess(context, caller);
-		return answerAnnotationRepository.findByAnswerId(answerId);
+		List<AnswerAnnotation> annotations = answerAnnotationRepository.findByAnswerId(answerId);
+		if (caller.role() == UserRole.STUDENT) {
+			return annotations.stream()
+					.filter(annotation -> annotation.reviewStatus() == ReviewStatus.ACCEPTED)
+					.toList();
+		}
+		return annotations;
 	}
 
 	@Transactional
@@ -361,8 +467,8 @@ public class GradingService {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		requireGrading(gradingId);
-		GradingContext context = requireGradingContext(gradingId);
 		if (caller.role() == UserRole.TEACHER) {
+			GradingContext context = requireGradingContext(gradingId);
 			requireTeacherOwnsContext(context, caller);
 		}
 		return gradingChangeLogRepository.findByGradingIdNewestFirst(gradingId).stream()
@@ -400,6 +506,9 @@ public class GradingService {
 	}
 
 	private void requireSubmissionReadAccess(GradingContext context, User caller) {
+		if (caller.role() == UserRole.ADMIN) {
+			return;
+		}
 		if (caller.role() == UserRole.TEACHER) {
 			requireTeacherOwnsContext(context, caller);
 			return;
@@ -430,6 +539,15 @@ public class GradingService {
 				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
 	}
 
+	private Grading requireGradingForUpdate(long submissionModuleId) {
+		try {
+			return gradingRepository.findBySubmissionModuleIdForUpdate(submissionModuleId)
+					.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException | LockTimeoutException | PessimisticLockException exception) {
+			throw ApiException.badRequest(AI_ANALYSIS_LOCK_TIMEOUT_MESSAGE);
+		}
+	}
+
 	private AnswerAnnotation requireAnnotation(long annotationId) {
 		return answerAnnotationRepository.findById(annotationId)
 				.orElseThrow(() -> ApiException.notFound(ANNOTATION_NOT_FOUND_MESSAGE));
@@ -438,6 +556,7 @@ public class GradingService {
 	private boolean isValidScore(BigDecimal score, BigDecimal maxScore) {
 		return score != null
 				&& maxScore != null
+				&& maxScore.compareTo(BigDecimal.ZERO) > 0
 				&& score.compareTo(BigDecimal.ZERO) >= 0
 				&& score.compareTo(maxScore) <= 0;
 	}

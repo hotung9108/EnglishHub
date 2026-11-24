@@ -322,6 +322,15 @@ class GradingPersistenceIntegrationTest {
 				null, null, null, null, null, null, null, null, null)).getId();
 	}
 
+	@Test
+	void findMetadataBySubmissionModuleIdsResolvesAssignmentAndTeacher() {
+		var metadataMap = gradingContextRepository.findMetadataBySubmissionModuleIds(List.of(pendingSubmissionModuleId));
+		assertThat(metadataMap).containsKey(pendingSubmissionModuleId);
+		var meta = metadataMap.get(pendingSubmissionModuleId);
+		assertThat(meta.assignmentTitle()).isNotNull();
+		assertThat(meta.className()).isNotNull();
+	}
+
 	private long createGrading(long submissionModuleId, GradingMethod method, GradingStatus status) {
 		return gradingJpaRepository.save(new Grading(
 				submissionModuleId,

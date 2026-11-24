@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.infrastructure.persistence.entity.Answer;
 import com.english_hub.core.infrastructure.persistence.entity.Assignment;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus;
@@ -29,6 +30,7 @@ import com.english_hub.core.infrastructure.persistence.entity.ClassStatus;
 import com.english_hub.core.infrastructure.persistence.entity.EnglishClass;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleTaskType;
+import com.english_hub.core.infrastructure.persistence.entity.UploadStatus;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository;
 import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRepository;
@@ -58,6 +60,9 @@ import jakarta.persistence.EntityManager;
 @SpringBootTest
 @Transactional
 class SubmissionPersistenceIntegrationTest {
+
+	private static final String DOCX_MIME_TYPE =
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 	@Container
 	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -124,6 +129,55 @@ class SubmissionPersistenceIntegrationTest {
 	}
 
 	@Test
+	void persistsDocxMimeTypeWithoutTruncation() {
+		Seed seed = seedBase();
+		Submission submission = submissionRepository.create(seed.assignmentId(), seed.studentId(), 1);
+		SubmissionModule submissionModule = submissionModuleRepository
+				.bulkCreate(submission.getId(), List.of(seed.module2Id())).getFirst();
+		String storageKey = "submissions/" + submission.getId()
+				+ "/module-" + submissionModule.getId() + "/essay.docx";
+		assertThat(DOCX_MIME_TYPE).hasSize(71);
+
+		Answer answer = new Answer(
+				submissionModule.getId(), null, null,
+				null, null, null, null, null,
+				storageKey, DOCX_MIME_TYPE, null, UploadStatus.READY);
+		entityManager.persist(answer);
+		entityManager.flush();
+		Long answerId = answer.getId();
+		entityManager.clear();
+
+		Answer loaded = entityManager.find(Answer.class, answerId);
+		assertThat(loaded).isNotNull();
+		assertThat(loaded.getDocMimeType()).isEqualTo(DOCX_MIME_TYPE);
+		assertThat(loaded.getDocStorageKey()).isEqualTo(storageKey);
+		assertThat(loaded.getDocUploadStatus()).isEqualTo(UploadStatus.READY);
+	}
+
+	@Test
+	void persistsDocMimeTypeAtMaximumLength() {
+		Seed seed = seedBase();
+		Submission submission = submissionRepository.create(seed.assignmentId(), seed.studentId(), 1);
+		SubmissionModule submissionModule = submissionModuleRepository
+				.bulkCreate(submission.getId(), List.of(seed.module2Id())).getFirst();
+		String mimeType = "x".repeat(127) + "/" + "x".repeat(127);
+		assertThat(mimeType).hasSize(255);
+
+		Answer answer = new Answer(
+				submissionModule.getId(), null, null,
+				null, null, null, null, null,
+				null, mimeType, null, UploadStatus.READY);
+		entityManager.persist(answer);
+		entityManager.flush();
+		Long answerId = answer.getId();
+		entityManager.clear();
+
+		Answer loaded = entityManager.find(Answer.class, answerId);
+		assertThat(loaded).isNotNull();
+		assertThat(loaded.getDocMimeType()).isEqualTo(mimeType);
+	}
+
+	@Test
 	void duplicateAttemptViolatesUniqueConstraint() {
 		Seed seed = seedBase();
 
@@ -152,39 +206,109 @@ class SubmissionPersistenceIntegrationTest {
 		entityManager.clear();
 
 		SubmissionPage all = submissionRepository.findPage(
-				new SubmissionFilter(null, null, null), new SubmissionPageRequest(1, 2));
+				new SubmissionFilter(null, null, null, null), new SubmissionPageRequest(1, 2));
 		assertThat(all.submissions()).hasSize(2);
 		assertThat(all.total()).isEqualTo(4);
 		assertThat(all.getTotalPages()).isEqualTo(2);
 
 		SubmissionPage secondPage = submissionRepository.findPage(
-				new SubmissionFilter(null, null, null), new SubmissionPageRequest(2, 2));
+				new SubmissionFilter(null, null, null, null), new SubmissionPageRequest(2, 2));
 		assertThat(secondPage.submissions()).hasSize(2);
 
 		SubmissionPage byAssignment = submissionRepository.findPage(
-				new SubmissionFilter(assignmentA, null, null), new SubmissionPageRequest(1, 20));
+				new SubmissionFilter(null, assignmentA, null, null), new SubmissionPageRequest(1, 20));
 		assertThat(byAssignment.submissions()).hasSize(3);
 		assertThat(byAssignment.submissions()).extracting(Submission::getAssignmentId)
 				.containsOnly(assignmentA);
 
 		SubmissionPage byStudent = submissionRepository.findPage(
-				new SubmissionFilter(null, seed.studentId(), null), new SubmissionPageRequest(1, 20));
+				new SubmissionFilter(null, null, seed.studentId(), null), new SubmissionPageRequest(1, 20));
 		assertThat(byStudent.submissions()).hasSize(3);
 		assertThat(byStudent.submissions()).extracting(Submission::getStudentId)
 				.containsOnly(seed.studentId());
 
 		SubmissionPage byStatus = submissionRepository.findPage(
-				new SubmissionFilter(null, null, SubmissionStatus.SUBMITTED), new SubmissionPageRequest(1, 20));
+				new SubmissionFilter(null, null, null, SubmissionStatus.SUBMITTED), new SubmissionPageRequest(1, 20));
 		assertThat(byStatus.submissions()).hasSize(1);
 		assertThat(byStatus.submissions()).extracting(Submission::getId).containsExactly(a1s1);
 
 		SubmissionPage combined = submissionRepository.findPage(
-				new SubmissionFilter(assignmentA, seed.studentId(), null), new SubmissionPageRequest(1, 20));
+				new SubmissionFilter(null, assignmentA, seed.studentId(), null), new SubmissionPageRequest(1, 20));
 		assertThat(combined.submissions()).hasSize(2);
 
 		entityManager.flush();
 		entityManager.clear();
 		assertThat(submissionRepository.findById(a2s1)).isPresent();
+	}
+
+	@Test
+	void classFilterExcludesDeletedIncludesDraftAndPreservesIntersectionAndTotal() {
+		Seed seed = seedBase();
+		Assignment original = assignmentRepository.findById(seed.assignmentId()).orElseThrow();
+		Long classId = original.getClassId();
+		EnglishClass ownClass = englishClassRepository.findById(classId).orElseThrow();
+		Long otherClassId = englishClassRepository.save(new EnglishClass(
+				"Other Persistence Class", "Intermediate", "Other class",
+				LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), ClassStatus.ACTIVE,
+				ownClass.getTeacherId())).getId();
+		Long draftId = assignmentRepository.save(new Assignment(classId, "Draft", "Test",
+				original.getOpenAt(), original.getCloseAt(), 3, false, AssignmentStatus.DRAFT)).getId();
+		Long deletedId = assignmentRepository.save(new Assignment(classId, "Deleted", "Test",
+				original.getOpenAt(), original.getCloseAt(), 3, true, AssignmentStatus.PUBLISHED)).getId();
+		Long foreignId = assignmentRepository.save(new Assignment(otherClassId, "Foreign", "Test",
+				original.getOpenAt(), original.getCloseAt(), 3, false, AssignmentStatus.PUBLISHED)).getId();
+		for (Long assignmentId : List.of(seed.assignmentId(), seed.secondAssignmentId(), draftId, deletedId, foreignId)) {
+			submissionRepository.create(assignmentId, seed.studentId(), 1);
+		}
+		entityManager.flush();
+		entityManager.clear();
+
+		SubmissionPage first = submissionRepository.findPage(
+				new SubmissionFilter(classId, null, null, null), new SubmissionPageRequest(1, 2));
+		SubmissionPage second = submissionRepository.findPage(
+				new SubmissionFilter(classId, null, null, null), new SubmissionPageRequest(2, 2));
+		assertThat(first.total()).isEqualTo(3);
+		assertThat(second.total()).isEqualTo(3);
+		assertThat(first.submissions()).extracting(Submission::getAssignmentId)
+				.containsExactly(draftId, seed.secondAssignmentId());
+		assertThat(second.submissions()).extracting(Submission::getAssignmentId)
+				.containsExactly(seed.assignmentId());
+
+		SubmissionPage intersection = submissionRepository.findPage(
+				new SubmissionFilter(classId, draftId, seed.studentId(), SubmissionStatus.IN_PROGRESS),
+				new SubmissionPageRequest(1, 20));
+		assertThat(intersection.total()).isEqualTo(1);
+		assertThat(intersection.submissions()).extracting(Submission::getAssignmentId).containsExactly(draftId);
+		for (Long excludedId : List.of(deletedId, foreignId)) {
+			SubmissionPage empty = submissionRepository.findPage(
+					new SubmissionFilter(classId, excludedId, null, null), new SubmissionPageRequest(1, 20));
+			assertThat(empty.total()).isZero();
+			assertThat(empty.submissions()).isEmpty();
+		}
+		SubmissionPage missingClass = submissionRepository.findPage(
+				new SubmissionFilter(Long.MAX_VALUE, null, null, null), new SubmissionPageRequest(1, 20));
+		assertThat(missingClass.total()).isZero();
+		assertThat(missingClass.submissions()).isEmpty();
+		SubmissionPage legacy = submissionRepository.findPage(
+				new SubmissionFilter(null, deletedId, null, null), new SubmissionPageRequest(1, 20));
+		assertThat(legacy.total()).isEqualTo(1);
+	}
+
+	@Test
+	void batchModuleQueryOrdersWithinEachAssignment() {
+		Seed seed = seedBase();
+		Long otherModuleId = assignmentModuleRepository.save(new AssignmentModule(
+				seed.secondAssignmentId(), ModuleSkill.READING, ModuleTaskType.QUIZ, 1,
+				"Other module", BigDecimal.TEN, null, null, null, null, null)).getId();
+		entityManager.flush();
+		entityManager.clear();
+
+		List<AssignmentModule> modules = assignmentModuleRepository
+				.findByAssignmentIdInOrderByAssignmentIdAscOrderIndexAsc(
+						List.of(seed.secondAssignmentId(), seed.assignmentId()));
+
+		assertThat(modules).extracting(AssignmentModule::getId)
+				.containsExactly(seed.module1Id(), seed.module2Id(), otherModuleId);
 	}
 
 	@Test
@@ -229,8 +353,8 @@ class SubmissionPersistenceIntegrationTest {
 				submissionModuleRepository.bulkCreate(submissionId, List.of(seed.module1Id(), seed.module2Id()));
 
 		List<GradingDraft> drafts = List.of(
-				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO),
-				new GradingDraft(modules.get(1).getId(), GradingMethod.TEACHER_MANUAL));
+				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO, BigDecimal.TEN, "Rubric prompt A"),
+				new GradingDraft(modules.get(1).getId(), GradingMethod.TEACHER_MANUAL, BigDecimal.TEN));
 
 		List<Grading> gradings = gradingRepository.bulkCreate(drafts);
 
@@ -246,6 +370,11 @@ class SubmissionPersistenceIntegrationTest {
 		Grading first = gradingRepository.findBySubmissionModuleId(modules.get(0).getId()).get(0);
 		assertThat(first.getMethod()).isEqualTo(GradingMethod.AUTO);
 		assertThat(first.getStatus()).isEqualTo(GradingStatus.PENDING);
+		assertThat(first.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
+		assertThat(first.getAiInstructionSnapshot()).isEqualTo("Rubric prompt A");
+		Grading second = gradingRepository.findBySubmissionModuleId(modules.get(1).getId()).get(0);
+		assertThat(second.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
+		assertThat(second.getAiInstructionSnapshot()).isNull();
 	}
 
 	@Test
@@ -255,7 +384,7 @@ class SubmissionPersistenceIntegrationTest {
 		List<SubmissionModule> modules =
 				submissionModuleRepository.bulkCreate(submissionId, List.of(seed.module1Id(), seed.module2Id()));
 		List<GradingDraft> drafts = modules.stream()
-				.map(m -> new GradingDraft(m.getId(), GradingMethod.AUTO))
+				.map(m -> new GradingDraft(m.getId(), GradingMethod.AUTO, BigDecimal.TEN))
 				.toList();
 		gradingRepository.bulkCreate(drafts);
 

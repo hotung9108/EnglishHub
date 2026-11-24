@@ -1,578 +1,610 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Phone, Mail, 
-  Calendar, Award, BookOpen, ShieldCheck, 
+  User, Mail, 
+  Award, ShieldCheck, 
   CheckCircle2, FileText,
-  KeyRound, RefreshCw, PenTool,
-  Headphones, Mic
+  KeyRound, ArrowLeft, Loader2, UserX, Pencil,
+  Copy, Check, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-
-interface EnrolledClass {
-  id: string;
-  code: string;
-  name: string;
-  teacher: string;
-  schedule: string;
-  status: 'active' | 'completed';
-  attendanceRate: number;
-  avgScore: number;
-}
-
-interface StudentSubmission {
-  id: string;
-  title: string;
-  skill: 'writing' | 'speaking' | 'reading' | 'listening';
-  className: string;
-  submittedAt: string;
-  attempt: number;
-  aiScore: number;
-  finalScore: number;
-  teacherReviewed: boolean;
-  status: 'graded' | 'pending';
-}
-
-interface StudentEvaluation {
-  id: string;
-  teacherName: string;
-  date: string;
-  type: string;
-  content: string;
-  recommendation: string;
-}
+import { useStudentDetails } from '../hooks/useStudentDetails';
+import { AdminUserProfileDrawer } from '../components/admin/AdminUserProfileDrawer';
+import { Button, EmptyState, ConfirmModal, useToast } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const parsedId = id && /^\d+$/.test(id) ? Number(id) : 0;
+  const studentId = Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : 0;
+  return <StudentDetailsPage key={studentId} studentId={studentId} />;
+};
+
+function StudentDetailsPage({ studentId }: { studentId: number }) {
+  const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'scores' | 'evaluations' | 'security'>('overview');
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'evaluations' | 'security'>('overview');
+  const [showConfirmResetModal, setShowConfirmResetModal] = useState(false);
+  const [resetResultPassword, setResetResultPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [hasSavedProfile, setHasSavedProfile] = useState(false);
+  const toast = useToast();
 
-  // Mock student data mapped with student_profiles & users schema
-  const student = {
-    id: id || 'HV-8801',
-    name: id === 'HV-8802' ? 'David Pham' : id === 'HV-8803' ? 'Lê Bảo Trâm' : 'Alice Johnson',
-    code: id || 'HV-8801',
-    email: id === 'HV-8802' ? 'david.p@student.edu.vn' : id === 'HV-8803' ? 'tram.lb@student.edu.vn' : 'alice.j@student.edu.vn',
-    phone: '0912 345 678',
-    parentPhone: '0988 776 655',
-    dateOfBirth: '2005-08-14',
-    entryBand: '5.5 IELTS',
-    targetBand: '7.0 IELTS',
-    joinedDate: '2025-11-10',
-    totalSubmissions: 14,
-    overallAvg: 6.8,
-    status: 'active'
-  };
+  const {
+    studentUser,
+    progressData,
+    evaluations,
+    isLoading,
+    isError,
+    errorMessage,
+    isTogglingStatus,
+    isResettingPassword,
+    toggleSuspend,
+    resetPassword,
+    refetch,
+  } = useStudentDetails({
+    studentId,
+    isVi,
+  });
 
-  const enrolledClasses: EnrolledClass[] = [
-    {
-      id: 'cls-1',
-      code: 'ENG-IELTS-6.5A',
-      name: 'IELTS Intensive Band 6.5 - 7.5',
-      teacher: 'Cô Trần Thị Mai Lan',
-      schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
-      status: 'active',
-      attendanceRate: 96,
-      avgScore: 7.0
-    },
-    {
-      id: 'cls-2',
-      code: 'ENG-GRAM-PREP',
-      name: 'Pre-IELTS Grammar & Academic Collocations',
-      teacher: 'Thầy Nguyễn Văn Nam',
-      schedule: 'T3 - T5 (19:30 - 21:00)',
-      status: 'completed',
-      attendanceRate: 100,
-      avgScore: 8.2
-    }
-  ];
-
-  const submissions: StudentSubmission[] = [
-    {
-      id: 'sub-1',
-      title: 'Writing Task 2: Artificial Intelligence & Future Workforce',
-      skill: 'writing',
-      className: 'ENG-IELTS-6.5A',
-      submittedAt: '2026-03-20 21:15',
-      attempt: 1,
-      aiScore: 6.5,
-      finalScore: 7.0,
-      teacherReviewed: true,
-      status: 'graded'
-    },
-    {
-      id: 'sub-2',
-      title: 'Speaking Part 2: Environmental Pollution in Megacities',
-      skill: 'speaking',
-      className: 'ENG-IELTS-6.5A',
-      submittedAt: '2026-03-18 20:45',
-      attempt: 2,
-      aiScore: 6.5,
-      finalScore: 6.5,
-      teacherReviewed: true,
-      status: 'graded'
-    },
-    {
-      id: 'sub-3',
-      title: 'Reading Mock Test Passage 1-3 (Cambridge 19)',
-      skill: 'reading',
-      className: 'ENG-IELTS-6.5A',
-      submittedAt: '2026-03-14 16:30',
-      attempt: 1,
-      aiScore: 7.5,
-      finalScore: 7.5,
-      teacherReviewed: false,
-      status: 'graded'
-    },
-    {
-      id: 'sub-4',
-      title: 'Listening Section 3 & 4 (Campus Discussions)',
-      skill: 'listening',
-      className: 'ENG-IELTS-6.5A',
-      submittedAt: '2026-03-10 19:00',
-      attempt: 1,
-      aiScore: 7.0,
-      finalScore: 7.0,
-      teacherReviewed: false,
-      status: 'graded'
-    }
-  ];
-
-  const evaluations: StudentEvaluation[] = [
-    {
-      id: 'eval-1',
-      teacherName: 'Cô Trần Thị Mai Lan',
-      date: '2026-03-15',
-      type: isVi ? 'Đánh giá giữa kỳ' : 'Midterm Review',
-      content: isVi 
-        ? 'Học viên có tư duy lập luận logic ở bài Writing Task 2. Cần cải thiện thêm sự tự nhiên trong phát âm (intonation) và phản xạ ở Speaking Part 3.'
-        : 'Student shows strong logical cohesion in Writing Task 2. Needs more practice with intonation and spontaneous fluency in Speaking Part 3.',
-      recommendation: isVi ? 'Đề xuất tăng cường 2 bài luyện phát âm AI mỗi tuần.' : 'Recommended 2 additional AI pronunciation sessions weekly.'
-    },
-    {
-      id: 'eval-2',
-      teacherName: 'Thầy Nguyễn Văn Nam',
-      date: '2026-01-20',
-      type: isVi ? 'Tổng kết môn Pre-IELTS' : 'Pre-IELTS Course Completion',
-      content: isVi 
-        ? 'Nắm vững 12 cấu trúc ngữ pháp phức hợp, bài làm viết lại câu đạt độ chính xác cao 92%.'
-        : 'Mastered 12 advanced sentence transformation structures, rewrite tasks scored 92% precision.',
-      recommendation: isVi ? 'Đủ điều kiện chuyển tiếp thẳng lên lớp IELTS 6.5+.' : 'Eligible for direct enrollment into IELTS 6.5+ band.'
-    }
-  ];
-
-  const getSkillIcon = (skill: string) => {
-    switch (skill) {
-      case 'writing': return <PenTool size={16} color="#2563eb" />;
-      case 'speaking': return <Mic size={16} color="#d97706" />;
-      case 'reading': return <BookOpen size={16} color="#059669" />;
-      default: return <Headphones size={16} color="#7c3aed" />;
+  const handleToggleSuspend = async () => {
+    const success = await toggleSuspend();
+    if (success) {
+      toast.success(
+        isActive
+          ? (isVi ? 'Đã tạm khóa tài khoản học viên.' : 'Student account suspended.')
+          : (isVi ? 'Đã kích hoạt lại tài khoản học viên.' : 'Student account reactivated.')
+      );
+    } else {
+      toast.error(isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword.trim()) return;
-    setPasswordSuccess(true);
-    setTimeout(() => {
-      setShowPasswordModal(false);
-      setPasswordSuccess(false);
-      setNewPassword('');
-    }, 1500);
+  const handleProfileSaved = () => {
+    setHasSavedProfile(true);
+    void refetch();
   };
+
+  const handleConfirmResetPassword = async () => {
+    setShowConfirmResetModal(false);
+    const newPass = await resetPassword();
+    if (newPass) {
+      setResetResultPassword(newPass);
+      toast.success(isVi ? 'Đặt lại mật khẩu thành công!' : 'Password reset successfully!');
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetResultPassword) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(resetResultPassword);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = resetResultPassword;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
+
+  const studentName = studentUser?.fullName ?? '';
+  const studentCode = studentUser ? `HV-${String(studentUser.id).padStart(4, '0')}` : '';
+  const studentInitials = studentName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
+  const studentEmail = studentUser?.email || '—';
+  const errorTitle = hasSavedProfile
+    ? (isVi ? 'Đã lưu, chưa tải lại được hồ sơ' : 'Saved, but the profile could not be reloaded')
+    : (isVi ? 'Hồ sơ học viên không khả dụng' : 'Student profile unavailable');
+  const isActive = studentUser?.status === 'ACTIVE';
+  const isLocked = studentUser?.status === 'LOCKED';
+  const canChangeStatus = isActive || isLocked;
+  const statusClass = isActive ? 'badge-active' : isLocked ? 'badge-blocked' : 'badge-neutral';
+  const statusBadge = (
+    <span className={`badge ${statusClass}`}>
+      {isActive && (isVi ? 'Hoạt động' : 'Active')}
+      {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+      {!canChangeStatus && (
+        <>
+          <span aria-hidden="true">—</span>
+          <span className="sr-only">{isVi ? 'Chưa xác định' : 'Unknown'}</span>
+        </>
+      )}
+    </span>
+  );
+  const completedTimelineCount = progressData?.scoreTimeline?.length ?? 0;
+  const avgSkillScore = progressData?.skillAverages?.length
+    ? Math.round(progressData.skillAverages.reduce((acc, s) => acc + s.averageScorePercent, 0) / progressData.skillAverages.length)
+    : 0;
 
   return (
     <div className="adm-container">
-      {/* Hero Profile Bento Banner */}
-      <div className="card" style={{ padding: '24px', marginBottom: '24px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-          <div style={{
-            width: '84px',
-            height: '84px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--primary)',
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '32px',
-            fontWeight: 700,
-            boxShadow: 'var(--shadow-md)'
-          }}>
-            {student.name.split(' ').map(n => n[0]).slice(-2).join('')}
-          </div>
-
-          <div style={{ flex: 1, minWidth: '240px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: '6px' }}>
-              {student.name}
-            </h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--on-surface-variant)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Mail size={15} /> {student.email}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Phone size={15} /> {student.phone}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <User size={15} /> {t('studentDetails.parentPhone')}<strong>{student.parentPhone}</strong>
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Calendar size={15} /> {t('studentDetails.dob')}<strong>{student.dateOfBirth}</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Target Progress Pill */}
-          <div style={{
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-lg, 12px)',
-            background: 'var(--surface-container-high)',
-            border: '1px solid var(--outline-variant)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            minWidth: '220px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-              <span className="text-on-surface-variant">{t('studentDetails.entryBand')}: <strong>{student.entryBand}</strong></span>
-              <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{student.targetBand}</span>
-            </div>
-            <div style={{ height: '8px', borderRadius: '4px', backgroundColor: 'var(--surface-container-highest)', overflow: 'hidden' }}>
-              <div style={{ width: '75%', height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--secondary))' }}></div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-              <span>{isVi ? 'ĐTB hiện tại: ' : 'Current Avg: '}<strong>{student.overallAvg}</strong></span>
-              <span>{student.totalSubmissions} {isVi ? 'bài đã nộp' : 'submissions'}</span>
-            </div>
-          </div>
-        </div>
+      <div style={{ marginBottom: '16px' }}>
+        <Button 
+          variant="secondary"
+          size="sm"
+          icon={<ArrowLeft size={16} />}
+          onClick={() => navigate('/admin/students')}
+        >
+          {isVi ? 'Quay lại danh sách' : 'Back to Students'}
+        </Button>
       </div>
 
-      {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--outline-variant)', marginBottom: '24px', overflowX: 'auto' }}>
-        {(
-          [
-            { key: 'overview', label: t('studentDetails.infoTitle'), icon: User },
-            { key: 'classes', label: t('studentDetails.tabClasses'), icon: BookOpen },
-            { key: 'scores', label: t('studentDetails.tabScores'), icon: Award },
-            { key: 'evaluations', label: t('studentDetails.tabEvaluations'), icon: FileText },
-            { key: 'security', label: t('studentDetails.tabSecurity'), icon: ShieldCheck },
-          ] as const
-        ).map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+
+
+      {isError && !studentUser && !isLoading && (
+        <div role="alert">
+          <EmptyState
+            icon={<UserX size={48} />}
+            title={errorTitle}
+            description={errorMessage ?? undefined}
+            action={studentId !== 0 && (
+              <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+                {isVi ? 'Thử lại' : 'Retry'}
+              </Button>
+            )}
+          />
+        </div>
+      )}
+
+      {isLoading ? (
+        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <div>{isVi ? 'Đang tải thông tin học viên...' : 'Loading student details...'}</div>
+        </div>
+      ) : studentUser ? (
+        <>
+          {/* Hero Profile Bento Banner */}
+          <div className="card" style={{ padding: '24px', marginBottom: '24px', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+              <div 
+                className="adm-avatar"
+                style={{
+                  width: '84px',
+                  height: '84px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--eh-primary)',
+                  color: 'var(--eh-on-primary, #ffffff)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  boxShadow: 'var(--shadow-card)'
+                }}
+              >
+                {studentInitials}
+              </div>
+
+              <div style={{ flex: 1, minWidth: '240px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--eh-text-primary)', margin: 0 }}>
+                    {studentName}
+                  </h2>
+                  <span className="badge badge-primary font-mono">{studentCode}</span>
+                  {statusBadge}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Pencil size={14} />}
+                    disabled={showStatusConfirmModal || showConfirmResetModal || Boolean(resetResultPassword)}
+                    onClick={() => setIsProfileDrawerOpen(true)}
+                  >
+                    {isVi ? 'Sửa' : 'Edit'}
+                  </Button>
+                  {canChangeStatus && (
+                    <button
+                      type="button"
+                      disabled={isTogglingStatus || isProfileDrawerOpen}
+                      className={`btn ${isLocked ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      onClick={() => setShowStatusConfirmModal(true)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--eh-text-secondary)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <Mail size={15} /> {studentEmail}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Summary */}
+              {progressData && (
+                <div style={{
+                  padding: '16px 20px',
+                  borderRadius: 'var(--radius-lg, 12px)',
+                  background: 'var(--eh-surface-dim)',
+                  border: '1px solid var(--eh-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  minWidth: '220px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Bài đã hoàn thành:' : 'Completed Tests:'}</span>
+                    <span style={{ color: 'var(--eh-primary)', fontWeight: 700 }}>
+                      {completedTimelineCount} {isVi ? 'bài' : 'items'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--eh-text-secondary)' }}>
+                    <span>{isVi ? 'Điểm TB: ' : 'Avg Score: '}<strong>{avgSkillScore}%</strong></span>
+                    <span>{progressData.skillAverages?.length ?? 0} {isVi ? 'kỹ năng' : 'skills'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--eh-border)', marginBottom: '24px', overflowX: 'auto' }}>
+            {(
+              [
+                { key: 'overview', label: t('studentDetails.infoTitle'), icon: User },
+                { key: 'progress', label: isVi ? 'Tiến độ học tập' : 'Progress & Scores', icon: Award },
+                { key: 'evaluations', label: t('studentDetails.tabEvaluations'), icon: FileText, count: evaluations.length },
+                { key: 'security', label: t('studentDetails.tabSecurity'), icon: ShieldCheck },
+              ] as const
+            ).map((tab) => {
+              const Icon = tab.icon;
+              const isTabActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 18px',
+                    border: 'none',
+                    background: 'none',
+                    fontSize: '14px',
+                    fontWeight: isTabActive ? 600 : 500,
+                    color: isTabActive ? 'var(--eh-primary)' : 'var(--eh-text-secondary)',
+                    borderBottom: isTabActive ? '3px solid var(--eh-primary)' : '3px solid transparent',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Icon size={17} />
+                  <span>{tab.label}</span>
+                  {'count' in tab && tab.count !== undefined && <span className="adm-pill-badge">{tab.count}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab 1: Overview */}
+          {activeTab === 'overview' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+              <div className="card">
+                <h3 className="headline-md" style={{ marginBottom: '16px' }}>
+                  {isVi ? 'Hồ Sơ CSDL (Student Profile)' : 'Database Student Profile'}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--eh-border)' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
+                    <span className="font-semibold">{studentCode}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--eh-border)' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>Email</span>
+                    <span className="font-semibold">{studentEmail}</span>
+                  </div>
+                  <dl className="adm-form-grid m-0">
+                    <div>
+                      <dt className="text-muted">{isVi ? 'Số điện thoại' : 'Phone'}</dt>
+                      <dd className="m-0 font-semibold">{studentUser.phone || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">{isVi ? 'Ngày sinh' : 'Date of birth'}</dt>
+                      <dd className="m-0 font-semibold">{studentUser.dateOfBirth || '—'}</dd>
+                    </div>
+                  </dl>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
+                    {statusBadge}
+                  </div>
+                </div>
+              </div>
+
+              {progressData && progressData.skillAverages && progressData.skillAverages.length > 0 && (
+                <div className="card">
+                  <h3 className="headline-md" style={{ marginBottom: '16px' }}>
+                    {isVi ? 'Thống Kê Điểm Số 4 Kỹ Năng' : 'Skill Performance'}
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '14px' }}>
+                    {progressData.skillAverages.map(sk => (
+                      <div key={sk.skill} style={{ padding: '14px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--eh-surface-dim)', border: '1px solid var(--eh-border)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--eh-text-secondary)' }}>{sk.skill}</div>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--eh-primary)', marginTop: '4px' }}>
+                          {sk.averageScorePercent}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2: Progress & Scores */}
+          {activeTab === 'progress' && (
+            <div className="card card-flush">
+              <div className="card-section-header">
+                <h3 className="headline-md card-section-header-title">{isVi ? 'Dòng Thời Gian Điểm Số Bài Tập' : 'Score Timeline'}</h3>
+              </div>
+              {!progressData || !progressData.scoreTimeline || progressData.scoreTimeline.length === 0 ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
+                  <Award size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                  <div style={{ fontSize: '15px', fontWeight: 600 }}>
+                    {isVi ? 'Chưa có kết quả bài nộp nào cho học viên này' : 'No submission timeline available'}
+                  </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
+                  </div>
+                </div>
+              ) : (
+                <div className="data-table-wrapper">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>{isVi ? 'MÃ BÀI' : 'ID'}</th>
+                        <th>{isVi ? 'TIÊU ĐỀ BÀI TẬP' : 'ASSIGNMENT'}</th>
+                        <th>{isVi ? 'NGÀY NỘP' : 'SUBMITTED AT'}</th>
+                        <th>{isVi ? 'ĐIỂM ĐẠT' : 'SCORE'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {progressData.scoreTimeline.map((item) => (
+                        <tr key={item.assignmentId}>
+                          <td className="font-mono font-semibold text-primary">#{item.assignmentId}</td>
+                          <td className="font-medium">{item.title}</td>
+                          <td className="font-mono text-muted">{item.submittedAt}</td>
+                          <td className="font-bold text-primary">{item.scorePercent}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 3: Evaluations */}
+          {activeTab === 'evaluations' && (
+            <div>
+              {evaluations.length === 0 ? (
+                <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
+                  <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                  <div style={{ fontSize: '15px', fontWeight: 600 }}>
+                    {isVi ? 'Chưa có nhận xét hoặc đánh giá học tập nào' : 'No evaluations recorded'}
+                  </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {evaluations.map((ev) => (
+                    <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--eh-primary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ fontSize: '15px' }}>{ev.teacherName || (isVi ? 'Giảng viên phụ trách' : 'Instructor')}</strong>
+                          <span className="badge" style={{ backgroundColor: 'var(--eh-surface-dim)', fontSize: '12px' }}>#{ev.id}</span>
+                        </div>
+                        <span className="label-md text-muted">{ev.createdAt || '—'}</span>
+                      </div>
+                      <p className="body-md" style={{ color: 'var(--eh-text-primary)', marginBottom: '8px', lineHeight: 1.6 }}>
+                        "{ev.content}"
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 4: Security */}
+          {activeTab === 'security' && (
+            <div className="card" style={{ maxWidth: '640px' }}>
+              <h3 className="headline-md" style={{ marginBottom: '16px' }}>
+                {t('studentDetails.tabSecurity')}
+              </h3>
+              <p className="body-md text-muted" style={{ marginBottom: '20px' }}>
+                {isVi 
+                  ? 'Quản trị viên có toàn quyền cấp lại mật khẩu mới hoặc khóa phiên đăng nhập đối với tài khoản học viên này.' 
+                  : 'Administrators have full privilege to force-reset credentials or revoke active tokens for this student.'}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <Button 
+                  variant="primary"
+                  icon={<KeyRound size={16} />}
+                  onClick={() => setShowConfirmResetModal(true)}
+                  disabled={isResettingPassword}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                >
+                  {isResettingPassword ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{isVi ? 'Đang xử lý...' : 'Resetting...'}</span>
+                    </>
+                  ) : (
+                    t('studentDetails.btnResetPassword')
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm Reset Password Modal */}
+          {showConfirmResetModal && (
+            <ConfirmModal
+              isOpen={showConfirmResetModal}
+              title={isVi ? 'Xác nhận đặt lại mật khẩu' : 'Confirm Password Reset'}
+              message={
+                isVi
+                  ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho học viên "${studentName}" (${studentCode})? Một mật khẩu ngẫu nhiên mới sẽ được hệ thống tạo tự động và hiển thị để bạn sao chép gửi cho học viên.`
+                  : `Are you sure you want to reset password for "${studentName}" (${studentCode})? A new random password will be generated and displayed for you to copy and send to the student.`
+              }
+              confirmText={isVi ? 'Xác nhận đặt lại' : 'Reset Password'}
+              cancelText={isVi ? 'Hủy' : 'Cancel'}
+              variant="primary"
+              onConfirm={handleConfirmResetPassword}
+              onCancel={() => setShowConfirmResetModal(false)}
+            />
+          )}
+
+          {/* Modal hiển thị mật khẩu ngẫu nhiên tạm thời vừa sinh ra */}
+          {resetResultPassword && (
+            <div
               style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '12px 18px',
-                border: 'none',
-                background: 'none',
-                fontSize: '14px',
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? 'var(--primary)' : 'var(--on-surface-variant)',
-                borderBottom: isActive ? '3px solid var(--primary)' : '3px solid transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
+                justifyContent: 'center',
+                zIndex: 1000,
+                padding: '16px',
               }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="student-reset-password-success-title"
             >
-              <Icon size={17} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab 1: Overview */}
-      {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-          <div className="card">
-            <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <User size={18} color="var(--primary)" />
-              {isVi ? 'Hồ Sơ CSDL (Student Profile)' : 'Database Student Profile'}
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                <span className="text-on-surface-variant">{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
-                <span className="font-semibold">{student.code}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                <span className="text-on-surface-variant">{t('studentDetails.dob')}</span>
-                <span className="font-semibold">{student.dateOfBirth}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                <span className="text-on-surface-variant">{t('studentDetails.parentPhone')}</span>
-                <span className="font-semibold">{student.parentPhone}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                <span className="text-on-surface-variant">{isVi ? 'Ngày nhập học' : 'Enrollment Date'}</span>
-                <span className="font-semibold">{student.joinedDate}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span className="text-on-surface-variant">{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
-                <span className="badge badge-active">{isVi ? 'Bình thường' : 'Good Standing'}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Award size={18} color="var(--secondary)" />
-              {isVi ? 'Thống Kê Điểm Số 4 Kỹ Năng' : '4-Skill Performance Summary'}
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: 600 }}>Writing Band</div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#1d4ed8' }}>7.0</div>
-                <div style={{ fontSize: '11px', color: '#3b82f6' }}>+0.5 so với đầu vào</div>
-              </div>
-              <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: '#fffbeb', border: '1px solid #fde68a' }}>
-                <div style={{ fontSize: '12px', color: '#92400e', fontWeight: 600 }}>Speaking Band</div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#b45309' }}>6.5</div>
-                <div style={{ fontSize: '11px', color: '#d97706' }}>Cần cải thiện intonation</div>
-              </div>
-              <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>Reading Band</div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#15803d' }}>7.5</div>
-                <div style={{ fontSize: '11px', color: '#22c55e' }}>Đạt target 7.5</div>
-              </div>
-              <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: '#faf5ff', border: '1px solid #e9d5ff' }}>
-                <div style={{ fontSize: '12px', color: '#6b21a8', fontWeight: 600 }}>Listening Band</div>
-                <div style={{ fontSize: '24px', fontWeight: 700, color: '#7e22ce' }}>7.0</div>
-                <div style={{ fontSize: '11px', color: '#a855f7' }}>Ổn định Section 1-3</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 2: Enrolled Classes */}
-      {activeTab === 'classes' && (
-        <div className="card card-flush">
-          <div className="card-section-header">
-            <h3 className="headline-md card-section-header-title">{t('studentDetails.tabClasses')}</h3>
-          </div>
-          <div className="data-table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                  <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                  <th>{isVi ? 'GIÁO VIÊN' : 'TEACHER'}</th>
-                  <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
-                  <th>{isVi ? 'CHUYÊN CẦN' : 'ATTENDANCE'}</th>
-                  <th>{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
-                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enrolledClasses.map((cls) => (
-                  <tr key={cls.id}>
-                    <td className="font-semibold text-primary">{cls.code}</td>
-                    <td className="font-medium">{cls.name}</td>
-                    <td>{cls.teacher}</td>
-                    <td className="text-on-surface-variant">{cls.schedule}</td>
-                    <td>
-                      <span className="badge badge-active">{cls.attendanceRate}%</span>
-                    </td>
-                    <td className="font-semibold">{cls.avgScore}</td>
-                    <td>
-                      <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                        {cls.status === 'active' ? (isVi ? 'Đang học' : 'Active') : (isVi ? 'Đã hoàn thành' : 'Completed')}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Scores & Submissions */}
-      {activeTab === 'scores' && (
-        <div className="card card-flush">
-          <div className="card-section-header flex-between">
-            <h3 className="headline-md card-section-header-title">{t('studentDetails.tabScores')}</h3>
-            <span className="label-md text-on-surface-variant">
-              {isVi ? 'Hiển thị dữ liệu thực tế từ bảng submissions & gradings' : 'Showing data from submissions & gradings tables'}
-            </span>
-          </div>
-          <div className="data-table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{isVi ? 'KỸ NĂNG' : 'SKILL'}</th>
-                  <th>{isVi ? 'BÀI TẬP' : 'ASSIGNMENT'}</th>
-                  <th>{isVi ? 'LẦN NỘP' : 'ATTEMPT'}</th>
-                  <th>{isVi ? 'THỜI GIAN NỘP' : 'SUBMITTED AT'}</th>
-                  <th>{isVi ? 'ĐIỂM AI' : 'AI SCORE'}</th>
-                  <th>{isVi ? 'ĐIỂM CHỐT' : 'FINAL SCORE'}</th>
-                  <th>{isVi ? 'GV DUYỆT' : 'TEACHER REVIEW'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.map((sub) => (
-                  <tr key={sub.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {getSkillIcon(sub.skill)}
-                        <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{sub.skill}</span>
-                      </div>
-                    </td>
-                    <td className="font-medium">{sub.title}</td>
-                    <td>
-                      <span className="badge" style={{ backgroundColor: 'var(--surface-container-highest)', color: 'var(--on-surface)' }}>
-                        #{sub.attempt}
-                      </span>
-                    </td>
-                    <td className="text-on-surface-variant">{sub.submittedAt}</td>
-                    <td className="font-semibold text-secondary">{sub.aiScore}</td>
-                    <td className="font-bold text-primary">{sub.finalScore}</td>
-                    <td>
-                      {sub.teacherReviewed ? (
-                        <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <CheckCircle2 size={12} /> {isVi ? 'Đã duyệt' : 'Reviewed'}
-                        </span>
-                      ) : (
-                        <span className="badge badge-warning">
-                          {isVi ? 'Chưa can thiệp' : 'Auto AI'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Evaluations */}
-      {activeTab === 'evaluations' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {evaluations.map((ev) => (
-            <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <strong style={{ fontSize: '15px' }}>{ev.teacherName}</strong>
-                  <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', fontSize: '12px' }}>{ev.type}</span>
-                </div>
-                <span className="label-md text-on-surface-variant">{ev.date}</span>
-              </div>
-              <p className="body-md" style={{ color: 'var(--on-surface)', marginBottom: '8px', lineHeight: 1.6 }}>
-                "{ev.content}"
-              </p>
-              <div style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm, 6px)', background: 'var(--surface-container-low)', fontSize: '13px', color: 'var(--primary)' }}>
-                <strong>{isVi ? 'Khuyến nghị: ' : 'Recommendation: '}</strong>{ev.recommendation}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tab 5: Security */}
-      {activeTab === 'security' && (
-        <div className="card" style={{ maxWidth: '640px' }}>
-          <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={18} color="var(--primary)" />
-            {t('studentDetails.tabSecurity')}
-          </h3>
-          <p className="body-md text-on-surface-variant" style={{ marginBottom: '20px' }}>
-            {isVi 
-              ? 'Quản trị viên có toàn quyền cấp lại mật khẩu mới hoặc khóa phiên đăng nhập đối với tài khoản học viên này.' 
-              : 'Administrators have full privilege to force-reset credentials or revoke active tokens for this student.'}
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowPasswordModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-            >
-              <KeyRound size={16} />
-              <span>{t('studentDetails.btnResetPassword')}</span>
-            </button>
-            <button 
-              className="btn btn-secondary"
-              onClick={() => alert(isVi ? 'Đã thu hồi tất cả refresh_tokens của tài khoản thành công.' : 'All refresh tokens revoked.')}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-            >
-              <RefreshCw size={16} />
-              <span>{isVi ? 'Đăng xuất khỏi mọi thiết bị (Revoke Sessions)' : 'Revoke All Active Sessions'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Reset Password Modal */}
-      {showPasswordModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '24px' }}>
-            <h3 className="headline-md" style={{ marginBottom: '8px' }}>{t('studentDetails.btnResetPassword')}</h3>
-            <p className="body-sm text-on-surface-variant" style={{ marginBottom: '16px' }}>
-              {isVi ? `Đặt lại mật khẩu cho học viên ${student.name} (${student.code})` : `Set new password for ${student.name}`}
-            </p>
-            {passwordSuccess ? (
-              <div style={{ padding: '16px', borderRadius: '8px', background: '#f0fdf4', color: '#16a34a', fontWeight: 600, textAlign: 'center' }}>
-                <CheckCircle2 size={24} style={{ margin: '0 auto 8px' }} />
-                {isVi ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!'}
-              </div>
-            ) : (
-              <form onSubmit={handleResetPassword}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label className="label-md" style={{ display: 'block', marginBottom: '6px' }}>
-                    {isVi ? 'Mật khẩu mới' : 'New Password'}
-                  </label>
-                  <input
-                    type="password"
-                    className="input"
-                    placeholder="Tối thiểu 6 ký tự..."
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    style={{ width: '100%' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    onClick={() => setShowPasswordModal(false)}
+              <div
+                className="card"
+                style={{
+                  width: '100%',
+                  maxWidth: '440px',
+                  padding: '24px',
+                  borderRadius: '12px',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  background: 'var(--surface, #FFFFFF)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <h3 id="student-reset-password-success-title" style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #171412)' }}>
+                      {isVi ? 'Đặt lại mật khẩu thành công' : 'Password Reset Successful'}
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetResultPassword(null);
+                      setCopied(false);
+                    }}
+                    className="btn-ghost"
+                    style={{ padding: '4px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-secondary, #736B63)' }}
+                    aria-label={isVi ? 'Đóng' : 'Close'}
                   >
-                    {isVi ? 'Hủy' : 'Cancel'}
-                  </button>
-                  <button type="submit" className="btn btn-primary">
-                    {isVi ? 'Xác nhận' : 'Confirm'}
+                    <X size={18} />
                   </button>
                 </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #736B63)', lineHeight: 1.5 }}>
+                    {isVi
+                      ? 'Vui lòng sao chép mật khẩu mới này và gửi cho học viên. Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.'
+                      : 'Please copy this new password and send it to the student. This password will only be displayed once here.'}
+                  </p>
+
+                  <div style={{ padding: '12px', background: 'var(--surface-dim, #F5F5F4)', borderRadius: '8px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary, #736B63)', marginBottom: '8px', fontWeight: 500 }}>
+                      {isVi ? 'Học viên:' : 'Student:'} {studentName} ({studentUser?.email || studentCode})
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--surface, #FFFFFF)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                      <code style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-primary, #0284C7)', userSelect: 'all', letterSpacing: '0.5px' }}>
+                        {resetResultPassword}
+                      </code>
+                      <Button
+                        variant={copied ? 'primary' : 'secondary'}
+                        size="sm"
+                        icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                        onClick={handleCopyPassword}
+                        title={copied ? (isVi ? 'Đã sao chép' : 'Copied') : (isVi ? 'Sao chép' : 'Copy')}
+                      >
+                        {copied ? (isVi ? 'Đã sao chép' : 'Copied') : (isVi ? 'Sao chép' : 'Copy')}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    style={{ marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                    onClick={() => {
+                      setResetResultPassword(null);
+                      setCopied(false);
+                    }}
+                  >
+                    {isVi ? 'Đã hiểu' : 'Got it'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <AdminUserProfileDrawer
+            profile={studentUser}
+            isOpen={isProfileDrawerOpen}
+            onClose={() => setIsProfileDrawerOpen(false)}
+            onSaved={handleProfileSaved}
+          />
+
+          {/* Two-Step Confirmation Modal for Student Status Change */}
+          {showStatusConfirmModal && canChangeStatus && (
+            <ConfirmModal
+              isOpen={showStatusConfirmModal}
+              title={
+                isActive
+                  ? (isVi ? 'Xác nhận khóa tài khoản học viên' : 'Lock Student Account')
+                  : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock Student Account')
+              }
+              message={
+                isActive
+                  ? (isVi
+                      ? `Bạn có chắc chắn muốn khóa tài khoản học viên "${studentName}" (${studentCode})? Học viên này sẽ không thể đăng nhập hoặc làm bài tập.`
+                      : `Are you sure you want to lock student account "${studentName}" (${studentCode})? The student will lose access to assignments and classes.`)
+                  : (isVi
+                      ? `Khôi phục quyền truy cập cho học viên "${studentName}" (${studentCode})?`
+                      : `Restore system access for student "${studentName}" (${studentCode})?`)
+              }
+              confirmText={
+                isActive
+                  ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+                  : (isVi ? 'Mở khóa' : 'Unlock Account')
+              }
+              cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+              variant={isActive ? 'danger' : 'primary'}
+              isLoading={isTogglingStatus}
+              onConfirm={async () => {
+                await handleToggleSuspend();
+                setShowStatusConfirmModal(false);
+              }}
+              onCancel={() => setShowStatusConfirmModal(false)}
+            />
+          )}
+        </>
+      ) : null}
     </div>
   );
-};
+}
 
 export default StudentDetails;

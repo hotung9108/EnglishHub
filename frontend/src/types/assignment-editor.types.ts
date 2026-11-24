@@ -66,20 +66,21 @@ export interface SpeakingRubricWeights {
 }
 
 export interface SpeakingConfig {
-  partType: SpeakingPartType;
-  cueCardTopic: string;
-  cueCardBullets: string[];
-  prepTimeSeconds: number;
-  speakingTimeSeconds: number;
-  maxRetries: number;
+  promptText: string;
+  aiInstruction?: string;
+  partType?: SpeakingPartType;
+  cueCardTopic?: string;
+  cueCardBullets?: string[];
+  prepTimeSeconds?: number;
+  speakingTimeSeconds?: number;
+  maxRetries?: number;
   audioPromptUrl?: string;
   examinerSampleAudioUrl?: string;
   examinerTranscript?: string;
-  followUpQuestions: SpeakingQuestionItem[];
-  rubrics: SpeakingRubricWeights;
-  enableAi: boolean;
-  aiModel: string;
-  aiInstruction: string;
+  followUpQuestions?: SpeakingQuestionItem[];
+  rubrics?: SpeakingRubricWeights;
+  enableAi?: boolean;
+  aiModel?: string;
 }
 
 // ---------------- READING TYPES ----------------
@@ -90,7 +91,7 @@ export interface ReadingParagraph {
   content: string;
 }
 
-export type ReadingQuestionType = 'multiple_choice' | 'true_false_not_given' | 'matching_headings' | 'gap_fill';
+export type ReadingQuestionType = 'multiple_choice' | 'short_answer' | 'true_false_not_given' | 'matching_headings' | 'gap_fill';
 
 export interface ReadingQuestionItem {
   id: string;
@@ -107,13 +108,14 @@ export interface ReadingQuestionItem {
 
 export interface ReadingConfig {
   passageTitle: string;
-  passageSubtitle: string;
-  passageSource: string;
-  paragraphs: ReadingParagraph[];
+  passageContent?: string;
   questions: ReadingQuestionItem[];
-  timeLimitMinutes: number;
-  enableAiExplanation: boolean;
-  aiInstruction: string;
+  paragraphs?: ReadingParagraph[];
+  passageSubtitle?: string;
+  passageSource?: string;
+  timeLimitMinutes?: number;
+  enableAiExplanation?: boolean;
+  aiInstruction?: string;
 }
 
 // ---------------- LISTENING TYPES ----------------
@@ -122,33 +124,141 @@ export type ListeningSectionType = 'section1' | 'section2' | 'section3' | 'secti
 export interface ListeningQuestionItem {
   id: string;
   order: number;
-  section: ListeningSectionType;
-  type: 'form_completion' | 'multiple_choice' | 'map_labeling' | 'short_answer';
+  type: 'multiple_choice' | 'short_answer' | 'form_completion' | 'map_labeling';
   prompt: string;
   options?: string[];
   correctAnswer: string;
-  acceptableAnswers?: string[];
-  timestampClue?: string; // e.g. "01:45"
   points: number;
+  section?: ListeningSectionType;
+  acceptableAnswers?: string[];
+  timestampClue?: string;
 }
 
 export interface ListeningConfig {
-  audioTitle: string;
   audioUrl: string;
-  audioDurationSeconds: number;
-  playbackLimit: 'single' | 'double' | 'unlimited';
+  audioFile?: File | null;
+  audioPreviewUrl?: string;
   transcript: string;
-  hideTranscriptUntilGraded: boolean;
-  activeSection: ListeningSectionType;
   questions: ListeningQuestionItem[];
-  enableAiDistractorCheck: boolean;
-  aiInstruction: string;
+  audioTitle?: string;
+  audioDurationSeconds?: number;
+  playbackLimit?: 'single' | 'double' | 'unlimited';
+  hideTranscriptUntilGraded?: boolean;
+  activeSection?: ListeningSectionType;
+  enableAiDistractorCheck?: boolean;
+  aiInstruction?: string;
+}
+
+// ---------------- MODULE ITEM TYPE ----------------
+export interface EditorModuleItem {
+  id: string; // client UUID (e.g. `mod-${Date.now()}-${idx}`)
+  dbId?: number; // backend module id if editing existing
+  skill: AssignmentSkill; // 'writing' | 'speaking' | 'reading' | 'listening'
+  title?: string; // Optional custom title e.g. "Passage 1", "Task 1: Chart Description"
+  orderIndex: number;
+  maxScore: number;
+  config: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+}
+
+// ---------------- FACTORY HELPERS ----------------
+export function createDefaultWritingConfig(taskType: WritingTaskType = 'task2'): WritingConfig {
+  return {
+    taskType,
+    promptText: '',
+    minWords: taskType === 'task1' ? 150 : 250,
+    scale: '10',
+    rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
+    enableAi: true,
+    aiInstruction: '',
+    enablePlagiarismCheck: true,
+    modelAnswer: '',
+    attachments: []
+  };
+}
+
+export function createDefaultSpeakingConfig(partType: SpeakingPartType = 'part2'): SpeakingConfig {
+  return {
+    promptText: '',
+    aiInstruction: '',
+    partType,
+    cueCardTopic: '',
+    cueCardBullets: [],
+    prepTimeSeconds: 60,
+    speakingTimeSeconds: 120,
+    maxRetries: 3,
+    examinerSampleAudioUrl: '',
+    examinerTranscript: '',
+    followUpQuestions: [],
+    rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
+    enableAi: true,
+    aiModel: 'Whisper V3 Large'
+  };
+}
+
+export function createDefaultReadingConfig(): ReadingConfig {
+  return {
+    passageTitle: '',
+    passageContent: '',
+    questions: [],
+    paragraphs: [],
+    timeLimitMinutes: 20,
+    enableAiExplanation: true,
+    aiInstruction: ''
+  };
+}
+
+export function createDefaultListeningConfig(): ListeningConfig {
+  return {
+    audioUrl: '',
+    transcript: '',
+    questions: [],
+    audioDurationSeconds: 180,
+    playbackLimit: 'double',
+    hideTranscriptUntilGraded: true,
+    enableAiDistractorCheck: true,
+    aiInstruction: ''
+  };
+}
+
+export function createDefaultModuleItem(
+  skill: AssignmentSkill,
+  orderIndex: number,
+  title?: string
+): EditorModuleItem {
+  const timestamp = Date.now();
+  const id = `mod-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+  
+  let config: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+  switch (skill) {
+    case 'writing':
+      config = createDefaultWritingConfig();
+      break;
+    case 'speaking':
+      config = createDefaultSpeakingConfig();
+      break;
+    case 'reading':
+      config = createDefaultReadingConfig();
+      break;
+    case 'listening':
+      config = createDefaultListeningConfig();
+      break;
+  }
+
+  return {
+    id,
+    skill,
+    title: title || '',
+    orderIndex,
+    maxScore: 10,
+    config
+  };
 }
 
 // Combined Assignment Editor State
 export interface AssignmentEditorData extends BaseAssignmentData {
-  writing: WritingConfig;
-  speaking: SpeakingConfig;
-  reading: ReadingConfig;
-  listening: ListeningConfig;
+  modules: EditorModuleItem[];
+  writing?: WritingConfig;
+  speaking?: SpeakingConfig;
+  reading?: ReadingConfig;
+  listening?: ListeningConfig;
 }

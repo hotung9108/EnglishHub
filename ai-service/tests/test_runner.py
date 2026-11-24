@@ -2,19 +2,29 @@ import unittest
 import base64
 import os
 import sys
+from unittest.mock import AsyncMock, patch
 
 # Ensure app package is in python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 os.environ["MOCK_MODE"] = "true"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
 
 from fastapi.testclient import TestClient
+from app.core.config import settings
+
+settings.MOCK_MODE = True
+settings.GEMINI_API_KEY = ""
+settings.OPENROUTER_API_KEY = ""
+INTERNAL_SECRET_HEADERS = {"X-Internal-Secret": os.environ.get("INTERNAL_SECRET", "test-internal-secret")}
+
 from app.main import app
+from app.services.audio_processor import AudioProcessor
 
 
 class TestSpeakingApi(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
 
     def test_health_check(self):
         response = self.client.get("/health")
@@ -26,11 +36,12 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertIn("openrouterConfigured", data)
         self.assertIn("openrouterModel", data)
 
-    def test_analyze_speaking_qa21_benchmark(self):
-        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_qa21_benchmark(self, converter: AsyncMock, downloader: AsyncMock):
         payload = {
             "submissionModuleId": 14,
-            "audioBase64": mock_audio_b64,
+            "audioUrl": "https://storage.example.com/speaking/14.mp3?presigned=true",
             "audioStorageKey": "submissions/speaking_14.mp3",
             "moduleInstructions": "Describe a book you enjoyed reading recently.",
             "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
@@ -38,6 +49,8 @@ class TestSpeakingApi(unittest.TestCase):
         }
 
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/14.mp3?presigned=true")
+        converter.assert_awaited_once_with(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
 
         data = response.json()
@@ -77,50 +90,53 @@ class TestSpeakingApi(unittest.TestCase):
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
         self.assertEqual(response.status_code, 400)
 
-    def test_analyze_speaking_direct_upload(self):
-        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
-        files = {
-            "file": ("test.mp3", fake_audio, "audio/mp3")
-        }
-        data = {
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_presigned_url(self, converter: AsyncMock, downloader: AsyncMock):
+        payload = {
             "submissionModuleId": 14,
-            "maxScore": "9.0"
+            "audioUrl": "https://storage.example.com/speaking/14.mp3?presigned=true",
+            "maxScore": 9.0
         }
-        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/14.mp3?presigned=true")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         res_json = response.json()
         self.assertEqual(res_json["submissionModuleId"], 14)
         self.assertGreaterEqual(res_json["overallScore"], 6.5)
 
-    def test_analyze_speaking_dynamic_model_and_provider(self):
-        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_dynamic_model_and_provider(self, converter: AsyncMock, downloader: AsyncMock):
         payload = {
             "submissionModuleId": 15,
-            "audioBase64": mock_audio_b64,
+            "audioUrl": "https://storage.example.com/speaking/15.mp3?presigned=true",
             "moduleInstructions": "Describe your favorite hobby.",
             "maxScore": 9.0,
             "model": "anthropic/claude-3.5-sonnet",
             "aiProvider": "openrouter"
         }
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/15.mp3?presigned=true")
+        converter.assert_awaited_once_with(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         data = response.json()
         self.assertEqual(data["submissionModuleId"], 15)
         self.assertEqual(data["modelUsed"], "anthropic/claude-3.5-sonnet")
         self.assertEqual(data["providerUsed"], "openrouter-mock")
 
-    def test_analyze_speaking_direct_upload_with_custom_model(self):
-        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
-        files = {
-            "file": ("test.mp3", fake_audio, "audio/mp3")
-        }
-        data = {
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_presigned_url_with_custom_model(self, converter: AsyncMock, downloader: AsyncMock):
+        payload = {
             "submissionModuleId": 16,
-            "maxScore": "9.0",
+            "audioUrl": "https://storage.example.com/speaking/16.mp3?presigned=true",
+            "maxScore": 9.0,
             "model": "google/gemini-1.5-pro",
             "aiProvider": "gemini"
         }
-        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/16.mp3?presigned=true")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         res_json = response.json()
         self.assertEqual(res_json["submissionModuleId"], 16)
@@ -163,7 +179,7 @@ class TestSpeakingApi(unittest.TestCase):
 
 class TestWritingApi(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
         self.essay = (
             "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
             "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"
