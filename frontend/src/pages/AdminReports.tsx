@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
 import { 
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
-  TrendingDown, User, ChevronDown, Clock, Download
+  TrendingDown, User, ChevronDown, Clock, Download, Award,
+  School, BarChart3, Users, FileText
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ThemeContext } from '../contexts/ThemeContext';
 import { reportService } from '../api/services/report.service';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
+import { submissionService } from '../api/services/submission.service';
 import type { 
   ReportOverviewResponse, 
   ReportClassSummary, 
@@ -23,13 +26,78 @@ import {
   computeReportPagination,
 } from '../utils/reportFilters.utils';
 
+type TotalState = 'loading' | 'error' | number;
+
+const totalRequests = {
+  users: (signal: AbortSignal) => userService.listUsers({ page: 1, limit: 1 }, { signal }),
+  submitted: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'SUBMITTED' }, { signal }),
+  graded: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'GRADED' }, { signal }),
+};
+type TotalSource = keyof typeof totalRequests;
+
+function getSubmissionTotal(submitted: TotalState, graded: TotalState): TotalState {
+  if (submitted === 'error' || graded === 'error') return 'error';
+  if (submitted === 'loading' || graded === 'loading') return 'loading';
+  return submitted + graded;
+}
+
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
+  const themeContext = useContext(ThemeContext);
   const isVi = language === 'vi';
+  const isDark = themeContext ? themeContext.theme === 'dark' : false;
+
+  const palette = {
+    emerald: isDark ? '#34d399' : '#059669',
+    gold: isDark ? '#fbbf24' : '#d97706',
+    sky: isDark ? '#38bdf8' : '#0284c7',
+    rose: isDark ? '#fb7185' : '#e11d48',
+  };
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableError, setTableError] = useState<string | null>(null);
+  const [totals, setTotals] = useState<Record<TotalSource, TotalState>>({
+    users: 'loading', submitted: 'loading', graded: 'loading',
+  });
+  const totalsRequest = useRef<AbortController | null>(null);
+
+  const loadTotal = useCallback(async (source: TotalSource, signal: AbortSignal) => {
+    let result: TotalState;
+    try {
+      const response = await totalRequests[source](signal);
+      const total = response.pagination?.total;
+      result = typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : 'error';
+    } catch {
+      result = 'error';
+    }
+    if (!signal.aborted) setTotals(previous => ({ ...previous, [source]: result }));
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    totalsRequest.current = controller;
+    // StrictMode can clean up the first effect before starting its replacement.
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      void loadTotal('users', controller.signal);
+      void loadTotal('submitted', controller.signal);
+      void loadTotal('graded', controller.signal);
+    });
+    return () => controller.abort();
+  }, [loadTotal]);
+
+  const retryTotal = (...sources: TotalSource[]) => {
+    const controller = totalsRequest.current;
+    if (!controller) return;
+    for (const source of sources) {
+      if (totals[source] !== 'error') continue;
+      setTotals(previous => ({ ...previous, [source]: 'loading' }));
+      void loadTotal(source, controller.signal);
+    }
+  };
 
   // Filters
   const [fromDate, setFromDate] = useState('');
@@ -119,12 +187,48 @@ export const AdminReports: React.FC = () => {
   const [reportClasses, setReportClasses] = useState<ReportClassSummary[]>([]);
   const [teachers, setTeachers] = useState<UserListItem[]>([]);
   const [allClasses, setAllClasses] = useState<ClassSummary[]>([]);
+  const showOverview = !loading && !error && overview;
+  const noMatchingClasses = showOverview && overview.classCount === 0;
+  const noAssignedWork = showOverview
+    && overview.classCount > 0
+    && overview.assignedAssignmentCount === 0
+    && overview.pendingGradingCount === 0
+    && (overview.averageScorePercent ?? 0) === 0;
 
   // Available classes for dropdown based on selected teacher
   const availableClasses = filterAvailableClasses(allClasses, selectedTeacherId);
 
   // Filtered report classes based on selected class cohort
   const filteredClasses = filterReportClasses(reportClasses, selectedClassId);
+
+  // Score distribution calculation across filtered classes (Issue #374)
+  const scoreDistribution = useMemo(() => {
+    let excellent = 0; // >= 85%
+    let good = 0;      // 70 - 84%
+    let average = 0;   // 50 - 69%
+    let poor = 0;      // < 50%
+
+    filteredClasses.forEach((cls) => {
+      const score = cls.averageScorePercent;
+      if (score >= 85) excellent++;
+      else if (score >= 70) good++;
+      else if (score >= 50) average++;
+      else poor++;
+    });
+
+    const total = filteredClasses.length;
+    return {
+      excellent,
+      good,
+      average,
+      poor,
+      total,
+      pctExcellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
+      pctGood: total > 0 ? Math.round((good / total) * 100) : 0,
+      pctAverage: total > 0 ? Math.round((average / total) * 100) : 0,
+      pctPoor: total > 0 ? Math.round((poor / total) * 100) : 0,
+    };
+  }, [filteredClasses]);
 
   // Class Progress Modal
   const [inspectingClass, setInspectingClass] = useState<ReportClassSummary | null>(null);
@@ -320,12 +424,32 @@ export const AdminReports: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const totalCard = (
+    title: string, 
+    value: TotalState, 
+    retryLabel: string, 
+    options: { icon?: React.ReactNode; iconBgColor?: string; iconColor?: string; sources: TotalSource[] }
+  ) => (
+    <MetricCard
+      title={title}
+      value={typeof value === 'number' ? value : t(`adminReports.total.${value}`)}
+      icon={options.icon}
+      iconBgColor={options.iconBgColor}
+      iconColor={options.iconColor}
+      footerText={value === 'error' && (
+        <Button variant="secondary" size="sm" aria-label={retryLabel} onClick={() => retryTotal(...options.sources)}>
+          {t('adminReports.totalRetry')}
+        </Button>
+      )}
+    />
+  );
+
   return (
     <div className="adm-container">
       {/* Header */}
       <div className="adm-header mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="adm-title-group">
-          <h1 className="adm-title">
+          <h1 className="adm-title font-serif tracking-tight">
             <span>{t('adminReports.title')}</span>
           </h1>
         </div>
@@ -342,53 +466,242 @@ export const AdminReports: React.FC = () => {
         </div>
       </div>
 
-      {/* Modern Filter Toolbar */}
-      <div className="eh-card p-6 mb-6 border border-border shadow-xs rounded-xl bg-surface">
-        {/* Top Header Row: Title & Active Count on Left, Quick Presets & Reset on Right */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 mb-5 border-b border-border-light">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-              <Filter size={18} />
+      {error && (
+        <div className="adm-alert-error justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+          <Button 
+            variant="secondary"
+            size="sm"
+            onClick={() => setRefreshKey(prev => prev + 1)}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
+        </div>
+      )}
+
+      {/* Tier 1 Primary KPI Strip - 4 Operational Core Cards */}
+      <div className="adm-reports-kpi-tier1">
+        <MetricCard
+          title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
+          value={loading ? '...' : error ? '—' : (overview?.classCount ?? filteredClasses.length)}
+          icon={<School size={18} />}
+          iconBgColor={isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(5, 150, 105, 0.1)'}
+          iconColor={palette.emerald}
+        />
+
+        <MetricCard
+          title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
+          value={loading ? '...' : error ? '—' : `${overview?.completionRatePercent ?? 0}%`}
+          icon={<Award size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 191, 36, 0.12)' : 'rgba(217, 119, 6, 0.1)'}
+          iconColor={palette.gold}
+        />
+
+        <MetricCard
+          title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
+          value={loading ? '...' : error ? '—' : `${overview?.averageScorePercent ?? 0}%`}
+          icon={<BarChart3 size={18} />}
+          iconBgColor={isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.1)'}
+          iconColor={palette.sky}
+        />
+
+        <MetricCard
+          title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
+          value={loading ? '...' : error ? '—' : (overview?.pendingGradingCount ?? 0)}
+          icon={<Clock size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 113, 133, 0.12)' : 'rgba(225, 29, 72, 0.1)'}
+          iconColor={palette.rose}
+        />
+      </div>
+
+      {/* Tier 2 Secondary KPI Strip - 3 Volume & Telemetry Cards */}
+      <div className="adm-reports-kpi-tier2">
+        {totalCard(
+          t('adminReports.totalUsers'), 
+          totals.users, 
+          t('adminReports.retryTotalUsers'), 
+          {
+            icon: <Users size={18} />, 
+            iconBgColor: isDark ? 'rgba(99, 102, 241, 0.12)' : 'rgba(79, 70, 229, 0.1)', 
+            iconColor: '#6366f1', 
+            sources: ['users']
+          }
+        )}
+        {totalCard(
+          t('adminReports.totalSubmissions'),
+          getSubmissionTotal(totals.submitted, totals.graded),
+          t('adminReports.retryTotalSubmissions'),
+          {
+            icon: <FileText size={18} />,
+            iconBgColor: isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(5, 150, 105, 0.1)',
+            iconColor: palette.emerald,
+            sources: ['submitted', 'graded']
+          }
+        )}
+        <MetricCard
+          title={isVi ? 'TỔNG BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}
+          value={loading ? '...' : error ? '—' : (overview?.assignedAssignmentCount ?? 0)}
+          icon={<BookOpen size={18} />}
+          iconBgColor={isDark ? 'rgba(251, 191, 36, 0.12)' : 'rgba(217, 119, 6, 0.1)'}
+          iconColor={palette.gold}
+        />
+      </div>
+
+      {/* Phổ Điểm Hệ Thống Theo Lớp Học (Score Distribution - Issue #374) */}
+      {!loading && !error && filteredClasses.length > 0 && (
+        <div className="adm-reports-distribution-card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-4 border-b border-outline-variant/30">
+            <div className="font-bold text-sm text-on-surface flex items-center gap-2">
+              <Award size={18} style={{ color: palette.gold }} />
+              <span>{isVi ? 'Phổ điểm thống kê theo lớp học' : 'Cohort Score Distribution'}</span>
             </div>
-            <div>
-              <div className="text-base font-bold text-text-primary flex items-center gap-2.5">
-                <span>{isVi ? 'Bộ lọc dữ liệu báo cáo' : 'Report Analytics Filters'}</span>
-                {activeFilterCount > 0 && (
-                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-primary/15 text-primary">
-                    {activeFilterCount} {isVi ? 'đang áp dụng' : 'active'}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-text-muted mt-0.5">
-                {isVi ? 'Tùy chỉnh khoảng thời gian, giảng viên hoặc lớp học' : 'Filter telemetry metrics by date interval, instructor or class cohort'}
-              </p>
+            <div className="text-xs font-mono text-on-surface-variant">
+              {isVi ? `Dựa trên ${scoreDistribution.total} lớp học trong phạm vi lọc` : `Based on ${scoreDistribution.total} filtered cohorts`}
             </div>
           </div>
 
+          {/* Biểu đồ Cột đứng Phân bổ Năng lực */}
+          <div className="adm-dash-histogram mb-4">
+            {/* Xuất sắc */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctExcellent}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctExcellent > 0 ? `${Math.max(8, scoreDistribution.pctExcellent)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.emerald} 0%, rgba(16, 185, 129, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctExcellent > 0 ? `0 0 10px ${palette.emerald}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.excellent} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.emerald }} />
+                {isVi ? 'Xuất sắc (≥ 85%)' : 'Exc. (≥ 85%)'}
+              </span>
+            </div>
+
+            {/* Khá - Giỏi */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctGood}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctGood > 0 ? `${Math.max(8, scoreDistribution.pctGood)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.sky} 0%, rgba(56, 189, 248, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctGood > 0 ? `0 0 10px ${palette.sky}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.good} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.sky }} />
+                {isVi ? 'Khá - Giỏi (70-84%)' : 'Good (70-84%)'}
+              </span>
+            </div>
+
+            {/* Trung bình */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctAverage}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctAverage > 0 ? `${Math.max(8, scoreDistribution.pctAverage)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.gold} 0%, rgba(245, 158, 11, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctAverage > 0 ? `0 0 10px ${palette.gold}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.average} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.gold }} />
+                {isVi ? 'Trung bình (50-69%)' : 'Avg. (50-69%)'}
+              </span>
+            </div>
+
+            {/* Cần cải thiện */}
+            <div className="adm-dash-histogram-col group">
+              <span className="adm-dash-histogram-val">{scoreDistribution.pctPoor}%</span>
+              <div className="adm-dash-histogram-bar-wrap">
+                <div 
+                  className="adm-dash-histogram-bar" 
+                  style={{ 
+                    height: scoreDistribution.pctPoor > 0 ? `${Math.max(8, scoreDistribution.pctPoor)}%` : '0%',
+                    background: `linear-gradient(180deg, ${palette.rose} 0%, rgba(244, 63, 94, 0.3) 100%)`,
+                    boxShadow: scoreDistribution.pctPoor > 0 ? `0 0 10px ${palette.rose}40` : 'none'
+                  }} 
+                />
+              </div>
+              <span className="adm-dash-histogram-sub">{scoreDistribution.poor} {isVi ? 'lớp' : 'cls'}</span>
+              <span className="adm-dash-histogram-label">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.rose }} />
+                {isVi ? 'Cần cải thiện (< 50%)' : 'Needs Focus'}
+              </span>
+            </div>
+          </div>
+
+          {/* Horizon Multi-Segment Glowing Progress Track */}
+          <div className="adm-dash-track" style={{ height: '7px' }}>
+            <div className="w-full h-full flex">
+              {scoreDistribution.pctExcellent > 0 && (
+                <div style={{ width: `${scoreDistribution.pctExcellent}%`, backgroundColor: palette.emerald }} title={`Xuất sắc: ${scoreDistribution.pctExcellent}%`} />
+              )}
+              {scoreDistribution.pctGood > 0 && (
+                <div style={{ width: `${scoreDistribution.pctGood}%`, backgroundColor: palette.sky }} title={`Khá: ${scoreDistribution.pctGood}%`} />
+              )}
+              {scoreDistribution.pctAverage > 0 && (
+                <div style={{ width: `${scoreDistribution.pctAverage}%`, backgroundColor: palette.gold }} title={`Trung bình: ${scoreDistribution.pctAverage}%`} />
+              )}
+              {scoreDistribution.pctPoor > 0 && (
+                <div style={{ width: `${scoreDistribution.pctPoor}%`, backgroundColor: palette.rose }} title={`Cần cải thiện: ${scoreDistribution.pctPoor}%`} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Filter Toolbar - Directly Above Table */}
+      <div className="adm-reports-filter-box">
+        {/* Top Header Row: Clean Title on Left, Quick Presets & Reset on Right */}
+        <div className="adm-reports-filter-header">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+              <Filter size={16} />
+            </div>
+            <h2 className="text-sm font-bold text-on-surface">
+              {isVi ? 'Bộ lọc dữ liệu báo cáo' : 'Report Analytics Filters'}
+            </h2>
+          </div>
+
           {/* Quick Date Presets & Reset Button */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-text-secondary flex items-center gap-1.5 mr-1">
-              <Clock size={14} className="text-primary" />
-              {isVi ? 'Mốc nhanh:' : 'Quick Range:'}
-            </span>
-            <div className="inline-flex items-center gap-1 bg-surface-variant/30 p-1 rounded-lg border border-border-light">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="adm-reports-presets-container">
+              <div 
+                className="adm-reports-presets-lead"
+                title={isVi ? 'Mốc thời gian nhanh' : 'Quick time presets'}
+                aria-hidden="true"
+              >
+                <Clock size={13} />
+              </div>
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  !fromDate && !toDate
-                    ? 'bg-primary text-white shadow-xs font-semibold'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-                }`}
+                className={`adm-reports-preset-btn ${!fromDate && !toDate ? 'active' : ''}`}
                 onClick={() => handleApplyPreset('all')}
               >
-                {isVi ? 'Toàn thời gian' : 'All time'}
+                {isVi ? 'Tất cả' : 'All'}
               </button>
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`adm-reports-preset-btn ${
                   fromDate === getPresetDates('today').from && toDate === getPresetDates('today').to
-                    ? 'bg-primary text-white shadow-xs font-semibold'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    ? 'active'
+                    : ''
                 }`}
                 onClick={() => handleApplyPreset('today')}
               >
@@ -396,59 +709,59 @@ export const AdminReports: React.FC = () => {
               </button>
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`adm-reports-preset-btn ${
                   fromDate === getPresetDates('7days').from && toDate === getPresetDates('7days').to
-                    ? 'bg-primary text-white shadow-xs font-semibold'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    ? 'active'
+                    : ''
                 }`}
                 onClick={() => handleApplyPreset('7days')}
               >
-                {isVi ? '7 ngày qua' : 'Last 7 days'}
+                {isVi ? '7 ngày qua' : '7 Days'}
               </button>
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`adm-reports-preset-btn ${
                   fromDate === getPresetDates('30days').from && toDate === getPresetDates('30days').to
-                    ? 'bg-primary text-white shadow-xs font-semibold'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    ? 'active'
+                    : ''
                 }`}
                 onClick={() => handleApplyPreset('30days')}
               >
-                {isVi ? '30 ngày qua' : 'Last 30 days'}
+                {isVi ? '30 ngày qua' : '30 Days'}
               </button>
               <button
                 type="button"
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`adm-reports-preset-btn ${
                   fromDate === getPresetDates('thisMonth').from && toDate === getPresetDates('thisMonth').to
-                    ? 'bg-primary text-white shadow-xs font-semibold'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                    ? 'active'
+                    : ''
                 }`}
                 onClick={() => handleApplyPreset('thisMonth')}
               >
-                {isVi ? 'Tháng này' : 'This month'}
+                {isVi ? 'Tháng này' : 'This Month'}
               </button>
             </div>
 
             {activeFilterCount > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<RotateCcw size={14} />}
+              <button
+                type="button"
+                className="adm-reports-reset-btn"
                 onClick={handleResetFilters}
-                className="h-8 text-xs font-medium px-3 ml-1"
+                aria-label={isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                title={isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
               >
-                {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
-              </Button>
+                <RotateCcw size={13} />
+                <span>{isVi ? 'Xóa bộ lọc' : 'Reset Filters'}</span>
+              </button>
             )}
           </div>
         </div>
 
-        {/* Filter Input Grid - Roomy, clearly labeled, standard readable typography */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* Filter Input Grid - 4 Columns Across Desktop */}
+        <div className="adm-reports-filter-grid">
           {/* From Date */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <Calendar size={15} className="text-primary" />
               <span>{isVi ? 'Từ ngày' : 'From Date'}</span>
             </label>
             <div className="adm-filter-control-wrap">
@@ -467,7 +780,6 @@ export const AdminReports: React.FC = () => {
           {/* To Date */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <Calendar size={15} className="text-primary" />
               <span>{isVi ? 'Đến ngày' : 'To Date'}</span>
             </label>
             <div className="adm-filter-control-wrap">
@@ -486,7 +798,6 @@ export const AdminReports: React.FC = () => {
           {/* Teacher Filter */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <User size={15} className="text-primary" />
               <span>{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</span>
             </label>
             <div className="adm-filter-control-wrap">
@@ -514,7 +825,6 @@ export const AdminReports: React.FC = () => {
           {/* Class Filter */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <BookOpen size={15} className="text-primary" />
               <span>{isVi ? 'Lớp học' : 'Class Cohort'}</span>
             </label>
             <div className="adm-filter-control-wrap">
@@ -541,44 +851,20 @@ export const AdminReports: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="adm-alert-error justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <AlertCircle size={18} />
-            <span>{error}</span>
-          </div>
-          <Button 
-            variant="secondary"
-            size="sm"
-            onClick={() => setRefreshKey(prev => prev + 1)}
-          >
-            {isVi ? 'Thử lại' : 'Retry'}
-          </Button>
-        </div>
+      {noMatchingClasses && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noMatchingClasses')}
+          description={t('adminReports.noMatchingClassesDescription')}
+        />
       )}
-
-      {/* Main KPI Strip */}
-      <div className="adm-kpi-grid mb-6">
-        <MetricCard
-          title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
-          value={loading ? '...' : error ? '—' : (overview?.classCount ?? filteredClasses.length)}
+      {noAssignedWork && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noAssignedWork')}
+          description={t('adminReports.noAssignedWorkDescription')}
         />
-
-        <MetricCard
-          title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
-          value={loading ? '...' : error ? '—' : `${overview?.completionRatePercent ?? 0}%`}
-        />
-
-        <MetricCard
-          title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
-          value={loading ? '...' : error ? '—' : `${overview?.averageScorePercent ?? 0}%`}
-        />
-
-        <MetricCard
-          title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
-          value={loading ? '...' : error ? '—' : (overview?.pendingGradingCount ?? 0)}
-        />
-      </div>
+      )}
 
       {loading ? (
         <div className="p-8 text-center text-muted">
@@ -602,15 +888,42 @@ export const AdminReports: React.FC = () => {
               </Button>
             </div>
           ) : filteredClasses.length === 0 ? (
-            <EmptyState
-              icon={<BookOpen size={36} />}
-              title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
-              description={
-                selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
-                  ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
-                  : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
-              }
-            />
+            <div className="flex flex-col items-center">
+              <EmptyState
+                icon={<BookOpen size={36} />}
+                title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
+                description={
+                  selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
+                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                    : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
+                }
+              />
+              {(fromDate || toDate) && (
+                <div className="flex items-center gap-2 pb-6">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('30days')}
+                  >
+                    {isVi ? 'Xem 30 ngày qua' : 'View Last 30 Days'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('all')}
+                  >
+                    {isVi ? 'Xem toàn thời gian' : 'View All Time'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleResetFilters}
+                  >
+                    {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             (() => {
               const { totalPages, safeCurrentPage, startIndex, endIndex } = computeReportPagination(
@@ -638,13 +951,19 @@ export const AdminReports: React.FC = () => {
                       </thead>
                       <tbody>
                         {paginatedClasses.map((cls) => (
-                          <tr key={cls.classId}>
-                            <td className="font-semibold text-primary font-mono">ENG-{cls.classId}</td>
-                            <td className="font-medium">{cls.className}</td>
-                            <td>{cls.assignedAssignmentCount} {isVi ? 'bài' : 'hw'}</td>
-                            <td className="font-bold text-primary font-mono">{cls.averageScorePercent}%</td>
+                          <tr key={cls.classId} className="hover:bg-surface-hover/60 transition-colors">
                             <td>
-                              <span className="badge badge-active">{cls.completionRatePercent}%</span>
+                              <span className="badge badge-primary font-mono text-xs font-bold py-0.5 px-2">
+                                ENG-{cls.classId}
+                              </span>
+                            </td>
+                            <td className="font-semibold text-on-surface">{cls.className}</td>
+                            <td className="font-mono text-on-surface">{cls.assignedAssignmentCount} {isVi ? 'bài' : 'hw'}</td>
+                            <td className="font-bold font-mono" style={{ color: cls.averageScorePercent >= 80 ? palette.emerald : cls.averageScorePercent >= 60 ? palette.gold : 'inherit' }}>
+                              {cls.averageScorePercent}%
+                            </td>
+                            <td>
+                              <span className="badge badge-active font-mono text-xs font-bold">{cls.completionRatePercent}%</span>
                             </td>
                             <td>
                               <span className={`badge ${cls.completionRatePercent >= 70 ? 'badge-active' : 'badge-onleave'}`}>

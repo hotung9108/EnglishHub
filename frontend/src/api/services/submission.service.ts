@@ -13,6 +13,8 @@ export type SubmissionGradingMethod = 'AUTO' | 'TEACHER_MANUAL';
 export type SubmissionTaskType = 'QUIZ' | 'REWRITE' | 'RECORDING' | 'ESSAY';
 export type SubmissionSkill = AssignmentSkill;
 
+export const MAX_SUBMISSION_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 export interface SubmissionStartModuleResponse {
   id: number;
   moduleId: number;
@@ -416,25 +418,75 @@ export class SubmissionService {
 
   getAudioUploadUrl(
     submissionModuleId: number,
-    mimeType?: string,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    fileSizeBytesOrOptions?: number | ApiRequestOptions,
     options?: ApiRequestOptions
   ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let fileSizeBytes: number | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (typeof fileSizeBytesOrOptions === 'number') {
+      fileSizeBytes = fileSizeBytesOrOptions;
+    } else if (fileSizeBytesOrOptions && typeof fileSizeBytesOrOptions === 'object') {
+      requestOptions = fileSizeBytesOrOptions;
+    }
+
+    const payload: { mimeType?: string; fileSizeBytes?: number } = {};
+    if (mimeType) {
+      payload.mimeType = mimeType;
+    }
+    if (typeof fileSizeBytes === 'number') {
+      payload.fileSizeBytes = fileSizeBytes;
+    }
+
     return this.http.post<UploadUrlResponse>(
       `/submission-modules/${submissionModuleId}/audio-upload-url`,
-      mimeType ? { mimeType } : {},
-      options
+      payload,
+      requestOptions
     );
   }
 
   getDocumentUploadUrl(
     submissionModuleId: number,
-    mimeType?: string,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    fileSizeBytesOrOptions?: number | ApiRequestOptions,
     options?: ApiRequestOptions
   ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let fileSizeBytes: number | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    if (typeof fileSizeBytesOrOptions === 'number') {
+      fileSizeBytes = fileSizeBytesOrOptions;
+    } else if (fileSizeBytesOrOptions && typeof fileSizeBytesOrOptions === 'object') {
+      requestOptions = fileSizeBytesOrOptions;
+    }
+
+    const payload: { mimeType?: string; fileSizeBytes?: number } = {};
+    if (mimeType) {
+      payload.mimeType = mimeType;
+    }
+    if (typeof fileSizeBytes === 'number') {
+      payload.fileSizeBytes = fileSizeBytes;
+    }
+
     return this.http.post<UploadUrlResponse>(
       `/submission-modules/${submissionModuleId}/document-upload-url`,
-      mimeType ? { mimeType } : {},
-      options
+      payload,
+      requestOptions
     );
   }
 
@@ -528,8 +580,17 @@ export class SubmissionService {
       requestOptions = mimeTypeOrOptions;
     }
 
+    if (fileOrBlob && typeof fileOrBlob.size === 'number' && fileOrBlob.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+      throw new Error(`Dung lượng tệp (${(fileOrBlob.size / (1024 * 1024)).toFixed(1)}MB) vượt quá giới hạn tối đa cho phép (10MB).`);
+    }
+
     const resolvedMime = mimeType || fileOrBlob.type || 'audio/webm';
-    const uploadRes = await this.getAudioUploadUrl(submissionModuleId, resolvedMime, requestOptions);
+    const uploadRes = await this.getAudioUploadUrl(
+      submissionModuleId,
+      resolvedMime,
+      fileOrBlob.size,
+      requestOptions
+    );
     await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
     return uploadRes;
   }
@@ -555,8 +616,17 @@ export class SubmissionService {
       requestOptions = mimeTypeOrOptions;
     }
 
+    if (fileOrBlob && typeof fileOrBlob.size === 'number' && fileOrBlob.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+      throw new Error(`Dung lượng tệp (${(fileOrBlob.size / (1024 * 1024)).toFixed(1)}MB) vượt quá giới hạn tối đa cho phép (10MB).`);
+    }
+
     const resolvedMime = mimeType || fileOrBlob.type || 'application/pdf';
-    const uploadRes = await this.getDocumentUploadUrl(submissionModuleId, resolvedMime, requestOptions);
+    const uploadRes = await this.getDocumentUploadUrl(
+      submissionModuleId,
+      resolvedMime,
+      fileOrBlob.size,
+      requestOptions
+    );
     await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
     return uploadRes;
   }

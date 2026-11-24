@@ -21,6 +21,8 @@ export const AddClass: React.FC = () => {
   const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState(false);
+  const [teacherError, setTeacherError] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -53,6 +55,7 @@ export const AddClass: React.FC = () => {
                 teacherName: res.data[0].fullName
               };
             });
+            setTeacherError(false);
           }
         }
       } catch {
@@ -77,10 +80,17 @@ export const AddClass: React.FC = () => {
     { num: 3 as const, title: isVi ? 'Sĩ số & Hoàn tất' : 'Capacity & Review' },
   ];
 
+  const validateTeacher = () => {
+    const hasTeacher = Boolean(formData.teacherId);
+    setTeacherError(!hasTeacher);
+    return hasTeacher;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      setSubmitError(isVi ? 'Vui lòng nhập tên lớp học.' : 'Please enter class name.');
+      setNameError(true);
+      setCurrentStep(1);
       return;
     }
     if (!formData.startDate) {
@@ -89,6 +99,10 @@ export const AddClass: React.FC = () => {
     }
     if (formData.endDate && formData.endDate < formData.startDate) {
       setSubmitError(isVi ? 'Ngày kết thúc phải sau ngày bắt đầu.' : 'End date must be after start date.');
+      return;
+    }
+    if (!validateTeacher()) {
+      setCurrentStep(2);
       return;
     }
 
@@ -104,7 +118,7 @@ export const AddClass: React.FC = () => {
         description,
         startDate: formData.startDate,
         endDate: formData.endDate || undefined,
-        teacherId: formData.teacherId ? Number(formData.teacherId) : undefined
+        teacherId: Number(formData.teacherId)
       });
 
       navigate('/admin/classes');
@@ -200,15 +214,28 @@ export const AddClass: React.FC = () => {
             {currentStep === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Tên lớp học đầy đủ' : 'Full Class Title'} *</label>
+                  <label className="adm-form-label" htmlFor="class-name">{isVi ? 'Tên lớp học đầy đủ' : 'Full Class Title'} *</label>
                   <input 
+                    id="class-name"
                     type="text"
-                    className="input"
+                    className={nameError ? 'input adm-input-error' : 'input'}
                     placeholder={isVi ? 'Ví dụ: Tiếng Anh Tổng Quát 4 Kỹ Năng K24' : 'e.g., General English 4 Skills K24'}
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      const name = e.currentTarget.value;
+                      setFormData({ ...formData, name });
+                      if (name.trim()) setNameError(false);
+                    }}
+                    onBlur={(e) => setNameError(!e.currentTarget.value.trim())}
+                    aria-invalid={nameError}
+                    aria-describedby={nameError ? 'class-name-error' : undefined}
                     required
                   />
+                  {nameError && (
+                    <span id="class-name-error" className="adm-form-field-error" role="alert">
+                      {t('addClass.nameRequired')}
+                    </span>
+                  )}
                 </div>
 
                 <div className="adm-form-grid">
@@ -298,14 +325,16 @@ export const AddClass: React.FC = () => {
             {/* Step 2: Teacher & Schedule */}
             {currentStep === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Giáo viên phụ trách chính' : 'Primary Instructor'}</label>
+                <div className="adm-form-group" role="group" aria-labelledby="class-teacher-label"
+                  aria-describedby={teacherError ? 'class-teacher-error' : undefined}>
+                  <label className="adm-form-label" id="class-teacher-label">{isVi ? 'Giáo viên phụ trách chính' : 'Primary Instructor'} *</label>
                   <TeacherPicker
                     teachers={teachers}
                     selectedTeacherId={formData.teacherId}
                     loading={loadingTeachers}
                     isVi={isVi}
                     onSelectTeacher={(tc) => {
+                      if (tc) setTeacherError(false);
                       setFormData({
                         ...formData,
                         teacherId: tc ? String(tc.id) : '',
@@ -313,10 +342,15 @@ export const AddClass: React.FC = () => {
                       });
                     }}
                   />
+                  {teacherError && (
+                    <span id="class-teacher-error" className="adm-form-field-error" role="alert">
+                      {t('addClass.teacherRequired')}
+                    </span>
+                  )}
                 </div>
 
                 <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Thời khóa biểu' : 'Class Schedule'} *</label>
+                  <label className="adm-form-label">{isVi ? 'Thời khóa biểu' : 'Class Schedule'}</label>
                   <ScheduleBuilder
                     value={formData.schedule}
                     onChange={(newSchedule) => setFormData({ ...formData, schedule: newSchedule })}
@@ -335,7 +369,9 @@ export const AddClass: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-primary"
-                    onClick={() => setCurrentStep(3)}
+                    onClick={() => {
+                      if (validateTeacher()) setCurrentStep(3);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addClass.btnNextStep3')}</span>

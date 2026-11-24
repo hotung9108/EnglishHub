@@ -24,6 +24,8 @@ public class StorageProperties {
 
 	private boolean pathStyle = true;
 
+	private long maxSubmissionFileSizeBytes = 10L * 1024 * 1024;
+
 	public boolean isEnabled() {
 		return enabled;
 	}
@@ -78,5 +80,13 @@ public class StorageProperties {
 
 	public void setPathStyle(boolean pathStyle) {
 		this.pathStyle = pathStyle;
+	}
+
+	public long getMaxSubmissionFileSizeBytes() {
+		return maxSubmissionFileSizeBytes;
+	}
+
+	public void setMaxSubmissionFileSizeBytes(long maxSubmissionFileSizeBytes) {
+		this.maxSubmissionFileSizeBytes = maxSubmissionFileSizeBytes;
 	}
 }

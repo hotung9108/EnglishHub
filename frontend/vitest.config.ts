@@ -1,6 +1,13 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.ts'
 
+const fe99Thresholds = {
+  statements: 81,
+  branches: 81,
+  functions: 81,
+  lines: 81,
+}
+
 export default mergeConfig(
   viteConfig,
   defineConfig({
@@ -20,6 +27,14 @@ export default mergeConfig(
           'src/pages/TeacherCreateAssignment.tsx',
           'src/pages/StudentAssignmentWriting.tsx',
           'src/pages/TeacherSubmissionDetails.tsx',
+          'src/pages/TeacherAssignments.tsx',
+          'src/components/assignments/AssignmentCard.tsx',
+          'src/components/classes/DateRangeFilter.tsx',
+          'src/components/classes/StudentEvaluationAvailabilityNotice.tsx',
+          'src/utils/gradebookDateRange.utils.ts',
+          'src/utils/studentEvaluationAvailability.utils.ts',
+          'src/pages/Teachers.tsx',
+          'src/components/admin/AdminUserProfileDrawer.tsx',
         ],
         thresholds: {
           perFile: true,
@@ -27,6 +42,8 @@ export default mergeConfig(
           branches: 80,
           functions: 80,
           lines: 80,
+          'src/pages/Teachers.tsx': fe99Thresholds,
+          'src/components/admin/AdminUserProfileDrawer.tsx': fe99Thresholds,
         },
       },
     },

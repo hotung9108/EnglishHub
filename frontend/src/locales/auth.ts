@@ -1,4 +1,8 @@
 export const authVi = {
+  emailValidation: {
+    required: 'Vui lòng nhập email.',
+    invalid: 'Email không đúng định dạng.',
+  },
   profile: {
     title: 'Quản Lý Tài Khoản Cá Nhân',
     cardInfoTitle: 'Hồ sơ tài khoản cá nhân',
@@ -170,6 +174,10 @@ export const authVi = {
 };
 
 export const authEn = {
+  emailValidation: {
+    required: 'Please enter your email.',
+    invalid: 'Enter a valid email address.',
+  },
   profile: {
     title: 'Personal Account Management',
     cardInfoTitle: 'Personal account profile',

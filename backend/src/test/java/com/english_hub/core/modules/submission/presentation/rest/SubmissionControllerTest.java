@@ -314,6 +314,22 @@ class SubmissionControllerTest {
 	}
 
 	@Test
+	void mapsTheAudioUploadUrlResultWithFileSizeToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/audio.webm",
+				"submissions/88/module-150/audio.webm",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getAudioUploadUrl(150L, "audio/webm", 5000L)).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getAudioUploadUrl(150L, new UploadUrlRequest("audio/webm", 5000L));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/audio.webm");
+	}
+
+	@Test
 	void mapsTheDocumentUploadUrlResultToAnOkResponse() {
 		UploadUrlResult result = new UploadUrlResult(
 				"https://bucket/essay.pdf",
@@ -329,6 +345,22 @@ class SubmissionControllerTest {
 		assertThat(body.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
 		assertThat(body.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
 		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+	}
+
+	@Test
+	void mapsTheDocumentUploadUrlResultWithFileSizeToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/essay.pdf",
+				"submissions/88/module-151/essay.pdf",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getDocumentUploadUrl(151L, "application/pdf", 10000L)).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getDocumentUploadUrl(151L, new UploadUrlRequest("application/pdf", 10000L));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
 	}
 
 	@Test

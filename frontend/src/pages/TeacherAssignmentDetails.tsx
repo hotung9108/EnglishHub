@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, FileText, 
   RefreshCw, AlertCircle, CheckCircle2, HelpCircle, Lock, Headphones,
-  Users, Clock, PenTool, Mic, BookOpen, Trash2
+  Users, Clock, PenTool, Mic, BookOpen, Trash2, Download
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -18,6 +18,7 @@ import {
 import { moduleService } from '../api/services/module.service';
 import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
 import { Button, MetricCard, LoadingState } from '../components/common';
+import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
 
 export interface AssignmentModuleData {
   id: number;
@@ -55,6 +56,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const [isClosing, setIsClosing] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const { user } = useAuth();
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
@@ -147,6 +149,50 @@ export const TeacherAssignmentDetails: React.FC = () => {
       showToast(errorMsg);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleExportSubmissions = async () => {
+    if (isExporting || !id) return;
+    if (students.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu bài nộp để xuất file.' : 'No submission data to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      try {
+        const blob = await assignmentService.exportSubmissionsExcel(Number(id));
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateStr = new Date().toISOString().slice(0, 10);
+          link.download = `submissions-assignment-${id}-${dateStr}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+          return;
+        }
+      } catch {
+        // Fallback to client-side CSV export
+      }
+
+      exportSubmissionsToCsv({
+        assignmentId: id,
+        assignmentTitle: assignment?.title,
+        className,
+        students,
+        isVi
+      });
+      showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+    } catch (err) {
+      console.error('Export submissions failed:', err);
+      showToast(isVi ? 'Không thể xuất danh sách bài nộp. Vui lòng thử lại!' : 'Failed to export submissions. Please try again!');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -495,6 +541,18 @@ export const TeacherAssignmentDetails: React.FC = () => {
             >
               {isVi ? 'Quản lý bài nộp' : 'Manage Submissions'}
               {metrics.pendingCount > 0 ? ` (${metrics.pendingCount} ${isVi ? 'chờ chấm' : 'pending'})` : ''}
+            </Button>
+
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              disabled={isLoading || isExporting || students.length === 0}
+              loading={isExporting}
+              onClick={handleExportSubmissions}
+              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
+            >
+              {t('assignmentDetails.btnExport')}
             </Button>
 
             {isOwner && assignment.status !== 'CLOSED' && (

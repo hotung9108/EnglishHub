@@ -6,7 +6,6 @@ import {
   GraduationCap, 
   User as UserIcon, 
   BarChart3, 
-  Settings, 
   LogOut,
   BookOpen,
   ClipboardList,
@@ -108,12 +107,6 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
     : normalizedRole === 'teacher' 
       ? '/teacher/profile' 
       : '/student/profile';
-
-  const settingsBasePath = normalizedRole === 'admin'
-    ? '/admin/settings'
-    : normalizedRole === 'teacher'
-      ? '/teacher/settings'
-      : '/student/settings';
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
@@ -265,21 +258,9 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
         ))}
       </nav>
 
-      {/* Consolidated Footer: Language, Admin System Settings & Floating User Profile */}
+      {/* Consolidated Footer: Language, Floating User Profile */}
       <div className="sidebar-footer" ref={userMenuRef}>
         <div className="sidebar-divider" />
-
-        {/* 1. Admin System Settings Link (Only visible for Admin; Teachers & Students access Profile/Security via User Card) */}
-        {normalizedRole === 'admin' && (
-          <NavLink
-            to={settingsBasePath}
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-            onClick={handleLinkClick}
-          >
-            <Settings size={18} strokeWidth={2} />
-            <span>{language === 'vi' ? 'Cài đặt hệ thống' : 'System Settings'}</span>
-          </NavLink>
-        )}
 
         {/* 2. Language & Theme Switcher Rows */}
         <div className="sidebar-lang-row">
@@ -402,20 +383,6 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
                 <ShieldCheck size={15} />
                 <span>{t('settings.tabSecurity')}</span>
               </Link>
-
-              {normalizedRole === 'admin' && (
-                <Link 
-                  to={settingsBasePath}
-                  className="sidebar-popover-item"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    handleLinkClick();
-                  }}
-                >
-                  <Settings size={15} />
-                  <span>{language === 'vi' ? 'Cài đặt hệ thống' : 'System Settings'}</span>
-                </Link>
-              )}
 
               <button
                 type="button"

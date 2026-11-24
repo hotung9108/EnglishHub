@@ -66,6 +66,10 @@ export interface UserListResponse {
 export interface CreateUserResponse extends MessageResponse {
   user: Pick<UserListItem, 'id' | 'email' | 'role'>;
 }
+export interface AdminResetPasswordResponse {
+  message: string;
+  newPassword: string;
+}
 
 const USERS_ENDPOINT = '/admin/users';
 
@@ -90,6 +94,10 @@ export class UserService {
 
   async updateStatus(id: number, status: 'ACTIVE' | 'LOCKED'): Promise<UserProfile> {
     return this.http.patch<UserProfile>(`${USERS_ENDPOINT}/${id}/status`, { status });
+  }
+
+  async getAdminUserDetail(id: UserId, options?: ApiRequestOptions): Promise<UserProfile> {
+    return this.http.get<UserProfile>(`${USERS_ENDPOINT}/${id}`, options);
   }
 
   async getUserById(
@@ -146,6 +154,10 @@ export class UserService {
 
   async deleteUser(id: UserId): Promise<MessageResponse> {
     return this.http.delete<MessageResponse>(`${USERS_ENDPOINT}/${id}`);
+  }
+
+  async resetPassword(id: UserId): Promise<AdminResetPasswordResponse> {
+    return this.http.post<AdminResetPasswordResponse>(`${USERS_ENDPOINT}/${id}/reset-password`);
   }
 }
 
