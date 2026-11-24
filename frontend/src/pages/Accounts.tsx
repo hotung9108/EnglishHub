@@ -426,8 +426,17 @@ export const Accounts: React.FC = () => {
                           <Button 
                             variant="secondary"
                             size="sm"
-                            onClick={() => setResetPasswordUser(user)}
-                            title={t('accounts.actionResetPassword')}
+                            disabled={currentUser?.id === user.id}
+                            onClick={() => {
+                              if (currentUser?.id === user.id) {
+                                toastError(isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.' : 'Please use your personal profile to change your own password.');
+                                return;
+                              }
+                              setResetPasswordUser(user);
+                            }}
+                            title={currentUser?.id === user.id 
+                              ? (isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình' : 'Please use your personal profile to change your password')
+                              : t('accounts.actionResetPassword')}
                             aria-label={t('accounts.actionResetPassword')}
                             icon={<Key size={14} />}
                           />
@@ -694,8 +703,8 @@ export const Accounts: React.FC = () => {
           title={t('accounts.resetPasswordConfirmTitle')}
           message={
             isVi
-              ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản "${resetPasswordUser.fullName || resetPasswordUser.email}"? Một mật khẩu ngẫu nhiên mới sẽ được tạo.`
-              : `Are you sure you want to reset the password for "${resetPasswordUser.fullName || resetPasswordUser.email}"? A new random password will be generated.`
+              ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản "${resetPasswordUser.fullName || resetPasswordUser.email}"? Một mật khẩu ngẫu nhiên mới sẽ được tạo và hiển thị để bạn sao chép gửi cho người dùng.`
+              : `Are you sure you want to reset the password for "${resetPasswordUser.fullName || resetPasswordUser.email}"? A new random password will be generated and displayed for you to copy and send to the user.`
           }
           confirmText={isVi ? 'Đặt lại mật khẩu' : 'Reset Password'}
           cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
@@ -711,16 +720,47 @@ export const Accounts: React.FC = () => {
       {/* Success Modal Showing Generated Temporary Password */}
       {resetPasswordResult && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
           role="dialog"
           aria-modal="true"
           aria-labelledby="reset-password-success-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99990,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            padding: '16px',
+            animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onClick={() => {
+            setResetPasswordResult(null);
+            setCopied(false);
+          }}
         >
-          <div className="bg-surface rounded-xl shadow-xl max-w-md w-full border border-border p-6 animate-scale-in">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2 text-success">
+          <div 
+            style={{
+              background: 'var(--surface, #FFFFFF)',
+              color: 'var(--text-primary, #171412)',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--border-color, #EAE6DF)',
+              width: '100%',
+              maxWidth: '460px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color, #EAE6DF)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success, #16A34A)' }}>
                 <CheckCircle2 size={20} />
-                <h3 id="reset-password-success-title" className="font-semibold text-surface">
+                <h3 id="reset-password-success-title" style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #171412)' }}>
                   {t('accounts.resetPasswordSuccessTitle')}
                 </h3>
               </div>
@@ -730,24 +770,25 @@ export const Accounts: React.FC = () => {
                   setResetPasswordResult(null);
                   setCopied(false);
                 }}
-                className="btn-ghost p-1 cursor-pointer text-muted hover:text-surface"
+                className="btn-ghost"
+                style={{ padding: '4px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-secondary, #736B63)' }}
                 aria-label={isVi ? 'Đóng' : 'Close'}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="py-4 space-y-3">
-              <p className="text-sm text-muted">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #736B63)', lineHeight: 1.5 }}>
                 {t('accounts.resetPasswordSuccessDesc')}
               </p>
 
-              <div className="p-3 bg-surface-low rounded-lg border border-border">
-                <div className="text-xs text-muted mb-1 font-medium">
+              <div style={{ padding: '12px', background: 'var(--surface-dim, #F5F5F4)', borderRadius: '8px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary, #736B63)', marginBottom: '8px', fontWeight: 500 }}>
                   {isVi ? 'Tài khoản:' : 'Account:'} {resetPasswordResult.user.fullName} ({resetPasswordResult.user.email})
                 </div>
-                <div className="flex items-center justify-between gap-2 mt-2 bg-surface p-2.5 rounded border border-border">
-                  <code className="font-mono text-base font-semibold text-primary select-all">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--surface, #FFFFFF)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                  <code style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-primary, #0284C7)', userSelect: 'all', letterSpacing: '0.5px' }}>
                     {resetPasswordResult.newPassword}
                   </code>
                   <Button
@@ -762,8 +803,8 @@ export const Accounts: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-xs text-warning flex items-center gap-1.5 mt-2">
-                <AlertCircle size={14} className="shrink-0" />
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-warning, #D97706)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
                 <span>
                   {isVi 
                     ? 'Lưu ý: Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.' 
@@ -772,7 +813,7 @@ export const Accounts: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-border">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, #EAE6DF)', paddingTop: '14px' }}>
               <Button
                 variant="primary"
                 onClick={() => {
