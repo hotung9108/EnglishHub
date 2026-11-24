@@ -675,4 +675,40 @@ describe('FE-94: Rich Text Toolbar and Editor Formatting', () => {
     // Total words: Hello, world, test, item, one, item, two -> 7 words
     expect(screen.getByText(/Đếm từ:/)).toHaveTextContent('Đếm từ: 7 / tối thiểu 150 từ');
   });
+
+  it('applies placeholder formatting and list prefix when editor is empty', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: '' } });
+
+    // Bold on empty editor inserts placeholder
+    const boldBtn = screen.getByRole('button', { name: /In đậm/ });
+    await user.click(boldBtn);
+    expect(editor).toHaveValue('**nội dung in đậm**');
+
+    // Bullet list on empty line inserts - 
+    fireEvent.change(editor, { target: { value: '' } });
+    const listBtn = screen.getByRole('button', { name: /Danh sách dấu đầu dòng/ });
+    await user.click(listBtn);
+    expect(editor).toHaveValue('- ');
+
+    // Ordered list on empty line inserts 1. 
+    fireEvent.change(editor, { target: { value: '' } });
+    const orderedListBtn = screen.getByRole('button', { name: /Danh sách số/ });
+    await user.click(orderedListBtn);
+    expect(editor).toHaveValue('1. ');
+  });
+
+  it('centers entire text when alignment is clicked with no selection', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'My Whole Essay' } });
+
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 0);
+    const centerBtn = screen.getByRole('button', { name: /Căn giữa/ });
+    await user.click(centerBtn);
+    expect(editor).toHaveValue('<div align="center">\nMy Whole Essay\n</div>');
+
+    const leftBtn = screen.getByRole('button', { name: /Căn trái/ });
+    await user.click(leftBtn);
+    expect(editor).toHaveValue('My Whole Essay');
+  });
 });

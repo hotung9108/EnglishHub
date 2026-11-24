@@ -449,22 +449,13 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const getActiveSelection = () => {
     const textarea = textareaRef.current;
-    if (!textarea) return { start: 0, end: 0 };
-    let start = textarea.selectionStart;
-    let end = textarea.selectionEnd;
-
-    if (
-      (start === undefined || (start === 0 && end === 0)) &&
-      (selectionRef.current.start > 0 || selectionRef.current.end > 0)
-    ) {
-      start = selectionRef.current.start;
-      end = selectionRef.current.end;
+    if (!textarea) return selectionRef.current;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    if (start === 0 && end === 0 && selectionRef.current.end > 0) {
+      return selectionRef.current;
     }
-
-    const textLen = editorText.length;
-    const safeStart = Math.max(0, Math.min(start ?? 0, textLen));
-    const safeEnd = Math.max(safeStart, Math.min(end ?? safeStart, textLen));
-    return { start: safeStart, end: safeEnd };
+    return { start, end };
   };
 
   const applyWrap = (before: string, after: string, placeholder = 'nội dung') => {
@@ -1041,14 +1032,6 @@ const StudentAssignmentWriting: React.FC = () => {
                 value={editorText}
                 onChange={handleEditorChange}
                 onSelect={(e) => {
-                  const el = e.currentTarget;
-                  selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
-                }}
-                onKeyUp={(e) => {
-                  const el = e.currentTarget;
-                  selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
-                }}
-                onMouseUp={(e) => {
                   const el = e.currentTarget;
                   selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
                 }}
