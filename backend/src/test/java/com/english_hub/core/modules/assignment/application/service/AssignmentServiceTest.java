@@ -22,7 +22,6 @@ import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
-import com.english_hub.core.modules.assignment.domain.repository.AssignmentAttemptCountRepository;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
 import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
@@ -69,18 +68,11 @@ class AssignmentServiceTest {
 	@Mock
 	private CurrentUserProvider currentUserProvider;
 
-	@Mock
-	private AssignmentAttemptCountRepository attemptCountRepository;
-
 	private AssignmentService assignmentService;
 
 	@BeforeEach
 	void setUp() {
-		assignmentService = new AssignmentService(
-				assignmentRepository,
-				classRepository,
-				currentUserProvider,
-				attemptCountRepository);
+		assignmentService = new AssignmentService(assignmentRepository, classRepository, currentUserProvider);
 	}
 
 	@Test
@@ -584,7 +576,6 @@ class AssignmentServiceTest {
 				() -> assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(null, null, null, null, 1)),
 				"Tài nguyên đang được cập nhật, vui lòng thử lại.");
 		assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-		verifyNoInteractions(attemptCountRepository);
 		verify(assignmentRepository, never()).save(any());
 	}
 
@@ -603,32 +594,13 @@ class AssignmentServiceTest {
 		assertThat(result.maxSubmissions()).isEqualTo(3);
 		assertThat(assignment.maxSubmissions()).isEqualTo(3);
 		verify(assignmentRepository).save(assignment);
-		verifyNoInteractions(attemptCountRepository);
 	}
 
 	@ParameterizedTest
-	@CsvSource(value = {"3, 1, 2", "null, 1, 2"}, nullValues = "null")
-	void rejectsCapBelowHighestAttemptCountWithoutChangingAssignment(Integer currentCap, int requestedCap, long highest) {
+	@CsvSource(value = {"3, 1", "null, 1", "3, 2", "null, 2"}, nullValues = "null")
+	void savesAndReturnsLowerOrNewCap(Integer currentCap, int requestedCap) {
 		Assignment assignment = assignmentWithCap(currentCap);
 		givenOwnedAssignment(assignment);
-		when(attemptCountRepository.findHighestAttemptCount(assignment.id())).thenReturn(highest);
-
-		ApiException exception = assertApiException(
-				() -> assignmentService.updateAssignment(assignment.id(),
-						new UpdateAssignmentCommand("Updated", "New instructions", null, CLOSE_AT.plusDays(1), requestedCap)),
-				"Số lần nộp tối đa không được nhỏ hơn số lượt đã làm cao nhất của học viên (%d lượt).".formatted(highest));
-
-		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
-		assertThat(assignment).usingRecursiveComparison().isEqualTo(assignmentWithCap(currentCap));
-		verify(assignmentRepository, never()).save(any());
-	}
-
-	@ParameterizedTest
-	@CsvSource(value = {"3, 2, 2", "3, 1, 0", "null, 2, 2"}, nullValues = "null")
-	void savesLowerOrNewCapWhenItCoversTheHighestAttemptCount(Integer currentCap, int requestedCap, long highest) {
-		Assignment assignment = assignmentWithCap(currentCap);
-		givenOwnedAssignment(assignment);
-		when(attemptCountRepository.findHighestAttemptCount(assignment.id())).thenReturn(highest);
 		when(assignmentRepository.save(assignment)).thenReturn(assignment);
 
 		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(assignment.id(),
@@ -641,7 +613,7 @@ class AssignmentServiceTest {
 
 	@ParameterizedTest
 	@CsvSource(value = {"2, 2, 2", "2, 3, 3", "2, null, 2", "null, null, null"}, nullValues = "null")
-	void updatesWithoutCountingAttemptsWhenCapDoesNotDecrease(Integer currentCap, Integer requestedCap, Integer expectedCap) {
+	void savesCapWhenUnchangedIncreasedOrOmitted(Integer currentCap, Integer requestedCap, Integer expectedCap) {
 		Assignment assignment = assignmentWithCap(currentCap);
 		givenOwnedAssignment(assignment);
 		when(assignmentRepository.save(assignment)).thenReturn(assignment);
@@ -652,12 +624,12 @@ class AssignmentServiceTest {
 		assertThat(result.maxSubmissions()).isEqualTo(expectedCap);
 		assertThat(assignment.maxSubmissions()).isEqualTo(expectedCap);
 		assertThat(assignment.title()).isEqualTo("Updated title");
-		verifyNoInteractions(attemptCountRepository);
+		verify(assignmentRepository).save(assignment);
 	}
 
 	@ParameterizedTest
 	@ValueSource(ints = {0, -1})
-	void rejectsNonPositiveCapBeforeCountingAttempts(int requestedCap) {
+	void rejectsNonPositiveCapWithoutSavingAssignment(int requestedCap) {
 		Assignment assignment = assignmentWithCap(2);
 		givenOwnedAssignment(assignment);
 
@@ -668,7 +640,6 @@ class AssignmentServiceTest {
 
 		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
 		assertThat(assignment.maxSubmissions()).isEqualTo(2);
-		verifyNoInteractions(attemptCountRepository);
 		verify(assignmentRepository, never()).save(any());
 	}
 
@@ -959,7 +930,7 @@ class AssignmentServiceTest {
 
 	private AssignmentService serviceWithFixedClock() {
 		Clock clock = Clock.fixed(REOPEN_NOW.toInstant(), ZoneOffset.UTC);
-		return new AssignmentService(assignmentRepository, classRepository, currentUserProvider, attemptCountRepository, clock);
+		return new AssignmentService(assignmentRepository, classRepository, currentUserProvider, clock);
 	}
 
 	private Assignment assignmentWithCap(Integer cap) {

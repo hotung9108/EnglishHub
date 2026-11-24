@@ -82,6 +82,7 @@ export const TeacherEditAssignment: React.FC = () => {
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   // Assignment Editor state
+  const [savedCap, setSavedCap] = useState<{ assignmentId: number; value: number | undefined } | null>(null);
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
     id: id || '1',
     code: `HW-${(id || '1').padStart(2, '0')}`,
@@ -95,7 +96,6 @@ export const TeacherEditAssignment: React.FC = () => {
     status: 'active',
     targetAudience: 'all',
     notifyStudents: true,
-    maxSubmissions: 3,
     modules: [createDefaultModuleItem('writing', 1)]
   }));
 
@@ -365,6 +365,9 @@ export const TeacherEditAssignment: React.FC = () => {
           loadedModules.push(createDefaultModuleItem('writing', 1));
         }
 
+        if (!isMounted) return;
+        const savedValue = detail.maxSubmissions ?? undefined;
+        setSavedCap({ assignmentId: assignmentIdNum, value: savedValue });
         setAssignmentData({
           id: String(detail.id),
           code: `HW-${String(detail.id).padStart(2, '0')}`,
@@ -378,7 +381,7 @@ export const TeacherEditAssignment: React.FC = () => {
           status: detail.status === 'PUBLISHED' ? 'active' : 'draft',
           targetAudience: 'all',
           notifyStudents: true,
-          maxSubmissions: detail.maxSubmissions ?? 1,
+          maxSubmissions: savedValue,
           modules: loadedModules
         });
       } catch (err) {
@@ -628,13 +631,19 @@ export const TeacherEditAssignment: React.FC = () => {
         .join('\n\n');
 
       // 1. Update assignment basics
+      const draftCap = assignmentData.maxSubmissions;
+      const capChanged = savedCap?.assignmentId === assignmentIdNum
+        && draftCap !== undefined && draftCap !== savedCap.value;
       await assignmentService.updateAssignment(assignmentIdNum, {
         title: assignmentData.title,
         description: mainDescription,
         openAt: openDate,
         closeAt: closeDate,
-        maxSubmissions: assignmentData.maxSubmissions ?? 1
+        ...(capChanged ? { maxSubmissions: draftCap } : {}),
       });
+      if (capChanged) {
+        setSavedCap((current) => current === savedCap ? { assignmentId: assignmentIdNum, value: draftCap } : current);
+      }
 
       // 2. Update status if changed
       if (publishStatus && publishStatus !== currentDbStatus) {
@@ -1132,20 +1141,17 @@ export const TeacherEditAssignment: React.FC = () => {
                     min="1"
                     max="10"
                     className="tae-stepper-input"
-                    value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
-                    placeholder="1"
+                    aria-label={isVi ? 'Số lần nộp tối đa' : 'Maximum submissions'}
+                    value={assignmentData.maxSubmissions ?? ''}
+                    placeholder={isVi ? 'Không giới hạn' : 'Unlimited'}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (raw === '') {
-                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
-                        return;
-                      }
-                      const clean = raw.replace(/^0+/, '');
-                      setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                      const value = raw === '' ? undefined : Math.max(1, Number(raw));
+                      setAssignmentData({ ...assignmentData, maxSubmissions: value });
                     }}
                     onBlur={() => {
-                      if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
-                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                      if (assignmentData.maxSubmissions === undefined) {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: savedCap?.value });
                       }
                     }}
                   />
@@ -1154,7 +1160,7 @@ export const TeacherEditAssignment: React.FC = () => {
                     type="button"
                     className="tae-stepper-btn"
                     disabled={(assignmentData.maxSubmissions ?? 1) >= 10}
-                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.min(10, (assignmentData.maxSubmissions || 1) + 1) })}
+                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.min(10, (assignmentData.maxSubmissions ?? 0) + 1) })}
                     title={isVi ? 'Tăng số lần nộp' : 'Increase max submissions'}
                   >
                     <Plus size={14} />

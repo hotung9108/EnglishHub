@@ -32,6 +32,7 @@ import com.english_hub.core.modules.submission.domain.repository.AnswerRepositor
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
+import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataGradingRepository;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
@@ -74,6 +75,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 @Testcontainers
@@ -86,11 +88,14 @@ class SubmissionApiIntegrationTest {
 
 	private final EntityManager entityManager;
 	private final ObjectMapper objectMapper;
+	private final SpringDataGradingRepository gradingJpaRepository;
 
 	@Autowired
-	SubmissionApiIntegrationTest(EntityManager entityManager, ObjectMapper objectMapper) {
+	SubmissionApiIntegrationTest(EntityManager entityManager, ObjectMapper objectMapper,
+			SpringDataGradingRepository gradingJpaRepository) {
 		this.entityManager = entityManager;
 		this.objectMapper = objectMapper;
+		this.gradingJpaRepository = gradingJpaRepository;
 	}
 
 	@Container
@@ -263,6 +268,102 @@ class SubmissionApiIntegrationTest {
 	void incrementsAttemptNumberForASecondAttempt() throws Exception {
 		assertAttemptNumber(1);
 		assertAttemptNumber(2);
+	}
+
+	@Test
+	void lowerCapPreservesExistingAttemptsAndAllowsFinishingAnInProgressAttempt() throws Exception {
+		long gradedId = startSubmissionAsStudentMember();
+		long reviewedModuleId = quizSubmissionModuleId(gradedId);
+		submitQuizModule(reviewedModuleId);
+		submitOfficialAsStudentMember(gradedId);
+		grade(gradedId);
+		OffsetDateTime reviewedAt = OffsetDateTime.parse("2026-11-15T09:00:00Z");
+		String transcript = "{\"text\":\"Reviewed fixture\"}";
+		var gradeToReview = gradingJpaRepository.findBySubmissionModuleId(reviewedModuleId).getFirst();
+		gradeToReview.updateTeacherGrade(gradeToReview.getFinalScore(), "Teacher feedback", teacherId, reviewedAt,
+				gradeToReview.getMaxScoreSnapshot());
+		gradeToReview.setAiTranscriptJson(transcript);
+		long inProgressId = startSubmissionAsStudentMember();
+
+		entityManager.flush();
+		entityManager.clear();
+		List<Long> attemptIds = List.of(gradedId, inProgressId);
+		List<Submission> attemptsBefore = attemptIds.stream()
+				.map(id -> submissionRepository.findById(id).orElseThrow()).toList();
+		List<SubmissionModule> modulesBefore = attemptIds.stream()
+				.flatMap(id -> submissionModuleRepository.findBySubmissionId(id).stream()).toList();
+		List<Long> moduleIds = modulesBefore.stream().map(SubmissionModule::getId).toList();
+		List<Answer> answersBefore = moduleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		var gradingsBefore = gradingJpaRepository.findBySubmissionModuleIdIn(moduleIds);
+		assertThat(attemptsBefore).extracting(Submission::getStatus)
+				.containsExactly(SubmissionStatus.GRADED, SubmissionStatus.IN_PROGRESS);
+		assertThat(modulesBefore).hasSize(4);
+		assertThat(answersBefore).hasSize(2);
+		assertThat(gradingsBefore).extracting(grading -> grading.getStatus().name())
+				.containsExactlyInAnyOrder(GradingStatus.COMPLETED.name(), GradingStatus.COMPLETED.name(),
+						GradingStatus.PENDING.name(), GradingStatus.PENDING.name());
+		var reviewedGrade = gradingsBefore.stream()
+				.filter(grading -> grading.getSubmissionModuleId().equals(reviewedModuleId)).findFirst().orElseThrow();
+		assertThat(reviewedGrade.getReviewedBy()).isEqualTo(teacherId);
+		assertThat(reviewedGrade.getReviewedAt()).isEqualTo(reviewedAt);
+		assertThat(reviewedGrade.getGradedAt()).isEqualTo(reviewedAt);
+		assertThat(objectMapper.readTree(reviewedGrade.getAiTranscript())).isEqualTo(objectMapper.readTree(transcript));
+
+		mockMvc.perform(put("/api/v1/assignments/{id}", publishedAssignmentId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"maxSubmissions\":1}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(1));
+
+		entityManager.flush();
+		entityManager.clear();
+		List<Submission> attemptsAfter = attemptIds.stream()
+				.map(id -> submissionRepository.findById(id).orElseThrow()).toList();
+		List<SubmissionModule> modulesAfter = attemptIds.stream()
+				.flatMap(id -> submissionModuleRepository.findBySubmissionId(id).stream()).toList();
+		List<Answer> answersAfter = moduleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		assertThat(attemptsAfter).usingRecursiveComparison().isEqualTo(attemptsBefore);
+		assertThat(modulesAfter).usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(modulesBefore);
+		assertThat(answersAfter).usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(answersBefore);
+		assertThat(gradingJpaRepository.findBySubmissionModuleIdIn(moduleIds))
+				.usingRecursiveComparison().ignoringCollectionOrder().isEqualTo(gradingsBefore);
+
+		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Không thể bắt đầu làm bài tập này lúc này."));
+		assertThat(submissionRepository.countByAssignmentIdAndStudentId(publishedAssignmentId, studentMemberId))
+				.isEqualTo(attemptIds.size());
+		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+						.header("Authorization", bearer(studentClassmateId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.attemptNumber").value(1));
+
+		submitQuizModule(quizSubmissionModuleId(inProgressId));
+		submitOfficialAsStudentMember(inProgressId);
+
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(submissionRepository.findById(inProgressId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(submissionRepository.findById(gradedId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(attemptsBefore.getFirst());
+		List<SubmissionModule> gradedModules = submissionModuleRepository.findBySubmissionId(gradedId);
+		assertThat(gradedModules).usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(modulesBefore.stream().filter(module -> module.getSubmissionId().equals(gradedId)).toList());
+		List<Long> gradedModuleIds = gradedModules.stream().map(SubmissionModule::getId).toList();
+		List<Answer> gradedAnswers = gradedModuleIds.stream()
+				.flatMap(id -> answerRepository.findBySubmissionModuleId(id).stream()).toList();
+		assertThat(gradedAnswers).usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(answersBefore.stream().filter(answer -> gradedModuleIds.contains(answer.getSubmissionModuleId()))
+						.toList());
+		assertThat(gradingJpaRepository.findBySubmissionModuleIdIn(gradedModuleIds))
+				.usingRecursiveComparison().ignoringCollectionOrder()
+				.isEqualTo(gradingsBefore.stream().filter(grading -> gradedModuleIds.contains(grading.getSubmissionModuleId()))
+						.toList());
 	}
 
 	@Test
