@@ -515,3 +515,22 @@
   cursor: not-allowed;
   transform: none;
 }
+
+@media (max-width: 768px) {
+  .overview-container {
+    padding: 12px 14px 40px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .overview-breadcrumbs {
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .overview-card {
+    padding: 16px 14px;
+    box-sizing: border-box;
+  }
+}
