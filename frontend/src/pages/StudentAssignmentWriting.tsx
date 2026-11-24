@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, FileText, 
@@ -18,7 +18,7 @@ import {
 import { parseApiError } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/common/ToastContext';
-import { Button } from '../components/common';
+import { Button, MarkdownView } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
@@ -28,10 +28,9 @@ import {
   resolveEffectiveModules,
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
+import { MIN_WRITING_WORDS, countWritingWords } from '../utils/writingEditor.utils';
 import '../styles/student-exam.css';
 import '../styles/student-writing.css';
-
-export const MIN_WRITING_WORDS = 20;
 
 const StudentAssignmentWriting: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,10 +52,20 @@ const StudentAssignmentWriting: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const selectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editorText, setEditorText] = useState(() => {
     return localStorage.getItem(`eh_draft_writing_${id}`) || localStorage.getItem(`eh_last_writing_${id}`) || '';
   });
+  const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
+  const [historyState, setHistoryState] = useState<{ entries: string[]; index: number }>(() => {
+    const init = localStorage.getItem(`eh_draft_writing_${id}`) || localStorage.getItem(`eh_last_writing_${id}`) || '';
+    return { entries: [init], index: 0 };
+  });
+  const history = historyState.entries;
+  const historyIndex = historyState.index;
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -359,7 +368,214 @@ const StudentAssignmentWriting: React.FC = () => {
     [assignment?.modules, submission?.modules]
   );
 
-  const wordCount = editorText.trim() === '' ? 0 : editorText.trim().split(/\s+/).length;
+  const wordCount = useMemo(() => countWritingWords(editorText), [editorText]);
+
+  const pushHistoryEntry = useCallback((newText: string, baseText?: string) => {
+    setHistoryState((prev) => {
+      const trimmed = prev.entries.slice(0, prev.index + 1);
+      const next = [...trimmed];
+      if (baseText !== undefined && (next.length === 0 || next[next.length - 1] !== baseText)) {
+        next.push(baseText);
+      }
+      if (next.length === 0 || next[next.length - 1] !== newText) {
+        next.push(newText);
+      }
+      return {
+        entries: next,
+        index: next.length - 1,
+      };
+    });
+  }, []);
+
+  const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const target = e.target;
+    selectionRef.current = { start: target.selectionStart, end: target.selectionEnd };
+    const currentBase = editorText;
+    setEditorText(val);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    typingTimerRef.current = setTimeout(() => {
+      pushHistoryEntry(val, currentBase);
+    }, 400);
+  };
+
+  const updateTextWithHistory = (newText: string, newCursorStart?: number, newCursorEnd?: number) => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    const currentBase = editorText;
+    setEditorText(newText);
+    pushHistoryEntry(newText, currentBase);
+
+    const targetStart = newCursorStart !== undefined ? newCursorStart : newText.length;
+    const targetEnd = newCursorEnd !== undefined ? newCursorEnd : targetStart;
+    selectionRef.current = { start: targetStart, end: targetEnd };
+
+    if (textareaRef.current) {
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(targetStart, targetEnd);
+        }
+      }, 0);
+    }
+  };
+
+  const handleUndo = () => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    setHistoryState((prev) => {
+      if (prev.index <= 0) return prev;
+      const nextIdx = prev.index - 1;
+      setEditorText(prev.entries[nextIdx]);
+      return { ...prev, index: nextIdx };
+    });
+  };
+
+  const handleRedo = () => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    setHistoryState((prev) => {
+      if (prev.index >= prev.entries.length - 1) return prev;
+      const nextIdx = prev.index + 1;
+      setEditorText(prev.entries[nextIdx]);
+      return { ...prev, index: nextIdx };
+    });
+  };
+
+  const getActiveSelection = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return selectionRef.current;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    if (start === 0 && end === 0 && selectionRef.current.end > 0) {
+      return selectionRef.current;
+    }
+    return { start, end };
+  };
+
+  const applyWrap = (before: string, after: string, placeholder = 'nội dung') => {
+    const { start, end } = getActiveSelection();
+    const selected = editorText.substring(start, end);
+
+    // Check if selection is already wrapped with before/after
+    if (
+      selected.startsWith(before) &&
+      selected.endsWith(after) &&
+      selected.length >= before.length + after.length
+    ) {
+      const unwrapped = selected.substring(before.length, selected.length - after.length);
+      const nextText = editorText.substring(0, start) + unwrapped + editorText.substring(end);
+      updateTextWithHistory(nextText, start, start + unwrapped.length);
+      return;
+    }
+
+    // Check if surrounding text outside selection is before/after
+    const outerBefore = editorText.substring(start - before.length, start);
+    const outerAfter = editorText.substring(end, end + after.length);
+    if (outerBefore === before && outerAfter === after) {
+      const nextText = editorText.substring(0, start - before.length) + selected + editorText.substring(end + after.length);
+      updateTextWithHistory(nextText, start - before.length, start - before.length + selected.length);
+      return;
+    }
+
+    const content = selected || placeholder;
+    const newSegment = `${before}${content}${after}`;
+    const nextText = editorText.substring(0, start) + newSegment + editorText.substring(end);
+    const newStart = selected ? start : start + before.length;
+    const newEnd = selected ? start + newSegment.length : start + before.length + content.length;
+    updateTextWithHistory(nextText, newStart, newEnd);
+  };
+
+  const applyList = (ordered: boolean) => {
+    const { start, end } = getActiveSelection();
+
+    const lineStart = editorText.lastIndexOf('\n', start - 1) + 1;
+    const nextNewline = editorText.indexOf('\n', end);
+    const lineEnd = nextNewline === -1 ? editorText.length : nextNewline;
+
+    const targetText = editorText.substring(lineStart, lineEnd);
+    if (!targetText.trim()) {
+      const placeholder = ordered ? '1. ' : '- ';
+      const nextText = editorText.substring(0, lineStart) + placeholder + editorText.substring(lineEnd);
+      updateTextWithHistory(nextText, lineStart + placeholder.length, lineStart + placeholder.length);
+      return;
+    }
+
+    const lines = targetText.split('\n');
+    const isAlreadyBullet = lines.every((l) => l.trim().startsWith('- '));
+    const isAlreadyOrdered = lines.every((l) => /^\d+\.\s/.test(l.trim()));
+
+    let transformed: string[];
+    if ((!ordered && isAlreadyBullet) || (ordered && isAlreadyOrdered)) {
+      transformed = lines.map((l) => l.replace(/^\s*(- |\d+\.\s)/, ''));
+    } else {
+      transformed = lines.map((l, idx) => {
+        const clean = l.replace(/^\s*(- |\d+\.\s)/, '');
+        return ordered ? `${idx + 1}. ${clean}` : `- ${clean}`;
+      });
+    }
+
+    const joined = transformed.join('\n');
+    const nextText = editorText.substring(0, lineStart) + joined + editorText.substring(lineEnd);
+    updateTextWithHistory(nextText, lineStart, lineStart + joined.length);
+  };
+
+  const applyAlignment = (alignment: 'left' | 'center') => {
+    const { start, end } = getActiveSelection();
+    const selected = editorText.substring(start, end) || editorText;
+
+    if (alignment === 'left') {
+      const cleaned = selected
+        .replace(/<div align=["']?(?:center|right|left)["']?>\s*/gi, '')
+        .replace(/\s*<\/div>/gi, '');
+      if (selected === editorText) {
+        updateTextWithHistory(cleaned, 0, cleaned.length);
+      } else {
+        const nextText = editorText.substring(0, start) + cleaned + editorText.substring(end);
+        updateTextWithHistory(nextText, start, start + cleaned.length);
+      }
+    } else {
+      const centerWrapped = `<div align="center">\n${selected.trim()}\n</div>`;
+      if (selected === editorText) {
+        updateTextWithHistory(centerWrapped, 0, centerWrapped.length);
+      } else {
+        const nextText = editorText.substring(0, start) + centerWrapped + editorText.substring(end);
+        updateTextWithHistory(nextText, start, start + centerWrapped.length);
+      }
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    if (isMod) {
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        applyWrap('**', '**', 'nội dung in đậm');
+      } else if (key === 'i') {
+        e.preventDefault();
+        applyWrap('*', '*', 'nội dung in nghiêng');
+      } else if (key === 'u') {
+        e.preventDefault();
+        applyWrap('<u>', '</u>', 'nội dung gạch chân');
+      } else if (key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if (key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    }
+  };
 
   // Auto-save draft with debounce when typing
   useEffect(() => {
@@ -388,7 +604,12 @@ const StudentAssignmentWriting: React.FC = () => {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
     setEditorText('');
+    setHistoryState({ entries: [''], index: 0 });
     localStorage.removeItem(`eh_draft_writing_${id}`);
   };
 
@@ -681,27 +902,154 @@ const StudentAssignmentWriting: React.FC = () => {
 
             {/* Toolbar */}
             <div className="writing-toolbar">
-              <button type="button" className="writing-tool-btn"><Bold size={16} /></button>
-              <button type="button" className="writing-tool-btn"><Italic size={16} /></button>
-              <button type="button" className="writing-tool-btn"><Underline size={16} /></button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyWrap('**', '**', 'nội dung in đậm')} 
+                title="In đậm (Ctrl+B)" 
+                aria-label="In đậm (Ctrl+B)"
+                disabled={editorMode === 'preview'}
+              >
+                <Bold size={16} />
+              </button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyWrap('*', '*', 'nội dung in nghiêng')} 
+                title="In nghiêng (Ctrl+I)" 
+                aria-label="In nghiêng (Ctrl+I)"
+                disabled={editorMode === 'preview'}
+              >
+                <Italic size={16} />
+              </button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyWrap('<u>', '</u>', 'nội dung gạch chân')} 
+                title="Gạch chân (Ctrl+U)" 
+                aria-label="Gạch chân (Ctrl+U)"
+                disabled={editorMode === 'preview'}
+              >
+                <Underline size={16} />
+              </button>
               <div className="writing-tool-divider" />
-              <button type="button" className="writing-tool-btn"><List size={16} /></button>
-              <button type="button" className="writing-tool-btn"><ListOrdered size={16} /></button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyList(false)} 
+                title="Danh sách dấu đầu dòng" 
+                aria-label="Danh sách dấu đầu dòng"
+                disabled={editorMode === 'preview'}
+              >
+                <List size={16} />
+              </button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyList(true)} 
+                title="Danh sách số" 
+                aria-label="Danh sách số"
+                disabled={editorMode === 'preview'}
+              >
+                <ListOrdered size={16} />
+              </button>
               <div className="writing-tool-divider" />
-              <button type="button" className="writing-tool-btn"><AlignLeft size={16} /></button>
-              <button type="button" className="writing-tool-btn"><AlignCenter size={16} /></button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyAlignment('left')} 
+                title="Căn trái" 
+                aria-label="Căn trái"
+                disabled={editorMode === 'preview'}
+              >
+                <AlignLeft size={16} />
+              </button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => applyAlignment('center')} 
+                title="Căn giữa" 
+                aria-label="Căn giữa"
+                disabled={editorMode === 'preview'}
+              >
+                <AlignCenter size={16} />
+              </button>
               <div className="writing-tool-divider" />
-              <button type="button" className="writing-tool-btn"><Undo size={16} /></button>
-              <button type="button" className="writing-tool-btn"><Redo size={16} /></button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleUndo} 
+                title="Hoàn tác (Ctrl+Z)" 
+                aria-label="Hoàn tác (Ctrl+Z)"
+                disabled={historyIndex <= 0 || editorMode === 'preview'}
+              >
+                <Undo size={16} />
+              </button>
+              <button 
+                type="button" 
+                className="writing-tool-btn" 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleRedo} 
+                title="Làm lại (Ctrl+Y)" 
+                aria-label="Làm lại (Ctrl+Y)"
+                disabled={historyIndex >= history.length - 1 || editorMode === 'preview'}
+              >
+                <Redo size={16} />
+              </button>
+
+              <div className="writing-editor-mode-toggle">
+                <button
+                  type="button"
+                  className={`writing-mode-tab ${editorMode === 'edit' ? 'is-active' : ''}`}
+                  onClick={() => setEditorMode('edit')}
+                  aria-label="Chế độ soạn thảo"
+                >
+                  Soạn thảo
+                </button>
+                <button
+                  type="button"
+                  className={`writing-mode-tab ${editorMode === 'preview' ? 'is-active' : ''}`}
+                  onClick={() => setEditorMode('preview')}
+                  aria-label="Chế độ xem trước định dạng"
+                >
+                  Xem trước
+                </button>
+              </div>
             </div>
 
-            {/* Textarea */}
-            <textarea 
-              value={editorText}
-              onChange={(e) => setEditorText(e.target.value)}
-              placeholder="Nhập nội dung bài luận Writing của bạn tại đây... (Ví dụ: The given topic presents significant implications for...)"
-              className="writing-textarea"
-            />
+            {/* Editor or Preview Container */}
+            {editorMode === 'edit' ? (
+              <textarea 
+                ref={textareaRef}
+                value={editorText}
+                onChange={handleEditorChange}
+                onSelect={(e) => {
+                  const el = e.currentTarget;
+                  selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Nhập nội dung bài luận Writing của bạn tại đây... (Ví dụ: The given topic presents significant implications for...)"
+                className="writing-textarea"
+              />
+            ) : (
+              <div className="writing-preview-container">
+                {editorText.trim() ? (
+                  <MarkdownView content={editorText} />
+                ) : (
+                  <div className="writing-preview-empty">
+                    Chưa có nội dung để xem trước định dạng. Hãy chuyển sang tab "Soạn thảo" để nhập bài viết.
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Footer Editor */}
             <div className="writing-editor-footer">
