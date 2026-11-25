@@ -15,6 +15,7 @@ import { assignmentService, type AssignmentSummary } from '../api/services/assig
 import { classService, type ClassSummary } from '../api/services/class.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
 import '../styles/student-ecosystem.css';
+import '../styles/student-feedback.css';
 
 interface FeedbackEntry {
   id: string;
@@ -316,221 +317,232 @@ export const StudentFeedback: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="std-eco-container pt-6">
-        <Skeleton width="320px" height="36px" className="mb-6" />
-        <Skeleton height="48px" className="mb-6" />
-        <div className="grid gap-5">
-          {[1, 2].map(i => (
-            <Skeleton key={i} height="240px" />
-          ))}
+      <div className="fb-page-wrapper">
+        <div className="fb-luxury-container">
+          <Skeleton width="320px" height="36px" className="mb-6" />
+          <Skeleton height="56px" className="mb-6" />
+          <div className="flex flex-col gap-5">
+            {[1, 2].map(i => (
+              <Skeleton key={i} height="240px" borderRadius="18px" />
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="std-eco-container pt-6">
-      {/* Header */}
-      <div className="std-eco-header">
-        <div>
-          <h1 className="std-eco-title">
-            {isVi ? 'Nhận xét & Phản hồi' : 'Feedback'}
-          </h1>
-        </div>
-      </div>
-
-      {error && (
-        <div className="std-error-banner mb-6">
-          <div className="std-error-msg">
-            <AlertCircle size={20} />
-            <span>{error}</span>
+    <div className="fb-page-wrapper">
+      <div className="fb-luxury-container">
+        {/* Header */}
+        <div className="fb-luxury-header">
+          <div>
+            <div className="fb-hero-pretitle">
+              <span className="fb-hero-pretitle-dot" />
+              {isVi ? 'Đánh giá học tập' : 'Academic Evaluation'}
+            </div>
+            <h1 className="fb-hero-title">
+              {isVi ? 'Nhận xét & Phản hồi' : 'Feedback & Reviews'}
+            </h1>
+            <p className="fb-hero-subtitle">
+              {isVi
+                ? 'Tổng hợp đánh giá định kỳ từ Giảng viên và phân tích chuyên sâu từ Trợ lý AI cho từng kỹ năng.'
+                : 'Comprehensive evaluations from your course instructors and diagnostic insights from AI across all skills.'}
+            </p>
           </div>
-          <Button variant="danger" size="sm" onClick={handleReload} icon={RotateCcw}>
-            {isVi ? 'Thử lại' : 'Retry'}
-          </Button>
-        </div>
-      )}
-
-      {/* Filter and Search Bar */}
-      <div className="std-eco-filter-bar">
-        <div className="std-eco-pills">
-          <button
-            type="button"
-            className={`std-eco-pill ${activeFilter === 'all' ? 'active' : ''}`}
-            onClick={() => handleActiveFilterChange('all')}
-          >
-            {isVi ? 'Tất cả phản hồi' : 'All Reviews'}
-            <span className="std-eco-pill-badge">{feedbackList.length}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`std-eco-pill ${activeFilter === 'teacher' ? 'active' : ''}`}
-            onClick={() => handleActiveFilterChange('teacher')}
-          >
-            <UserCheck size={14} />
-            {isVi ? 'Từ Giảng viên' : 'From Instructors'}
-            <span className="std-eco-pill-badge">{teacherFeedbackCount}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`std-eco-pill ${activeFilter === 'ai' ? 'active' : ''}`}
-            onClick={() => handleActiveFilterChange('ai')}
-          >
-            <Sparkles size={14} />
-            {isVi ? 'Từ Trợ lý AI' : 'From AI Diagnostic'}
-            <span className="std-eco-pill-badge">{aiFeedbackCount}</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Skill Filter Dropdown */}
-          <select
-            value={skillFilter}
-            onChange={(e) => handleSkillFilterChange(e.target.value)}
-            className="select-input"
-          >
-            <option value="all">{isVi ? 'Tất cả kỹ năng' : 'All Skills'}</option>
-            <option value="writing">Writing</option>
-            <option value="speaking">Speaking</option>
-            <option value="reading">Reading</option>
-            <option value="listening">Listening</option>
-          </select>
-
-          {/* Search box */}
-          <div className="std-eco-search-wrap">
-            <Search size={15} className="std-eco-search-icon" />
-            <input
-              type="text"
-              className="std-eco-search-input"
-              placeholder={isVi ? 'Tìm nhận xét, lớp, bài tập...' : 'Search feedback, teacher...'}
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
+          <div className="fb-stats-badge">
+            <span className="fb-stats-badge-num">{feedbackList.length}</span>
+            <span className="fb-stats-badge-text">{isVi ? 'phản hồi' : 'total feedback'}</span>
           </div>
         </div>
-      </div>
 
-      {/* Feedback List */}
-      <div className="flex flex-col gap-5">
-        {paginatedFeedback.map((item) => (
-          <div key={item.id} className="feedback-card">
-            {/* Header */}
-            <div className="feedback-header">
-              <div className="flex items-center gap-4">
-                <div className={`feedback-reviewer-avatar ${item.reviewerType}`}>
-                  {item.reviewerType === 'teacher' ? (
-                    <UserCheck size={22} />
-                  ) : (
-                    <Sparkles size={22} />
+        {error && (
+          <div className="std-error-banner mb-6">
+            <div className="std-error-msg">
+              <AlertCircle size={20} />
+              <span>{error}</span>
+            </div>
+            <Button variant="danger" size="sm" onClick={handleReload} icon={RotateCcw}>
+              {isVi ? 'Thử lại' : 'Retry'}
+            </Button>
+          </div>
+        )}
+
+        {/* Filter and Search Bar */}
+        <div className="fb-filter-bar">
+          <div className="fb-segmented-tabs">
+            <button
+              type="button"
+              className={`fb-tab-pill ${activeFilter === 'all' ? 'active' : ''}`}
+              onClick={() => handleActiveFilterChange('all')}
+            >
+              {isVi ? 'Tất cả' : 'All'}
+              <span className="fb-tab-pill-badge">{feedbackList.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`fb-tab-pill ${activeFilter === 'teacher' ? 'active' : ''}`}
+              onClick={() => handleActiveFilterChange('teacher')}
+            >
+              <UserCheck size={14} />
+              {isVi ? 'Từ Giảng viên' : 'Instructors'}
+              <span className="fb-tab-pill-badge">{teacherFeedbackCount}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`fb-tab-pill ${activeFilter === 'ai' ? 'active' : ''}`}
+              onClick={() => handleActiveFilterChange('ai')}
+            >
+              <Sparkles size={14} />
+              {isVi ? 'Trợ lý AI' : 'AI Diagnostic'}
+              <span className="fb-tab-pill-badge">{aiFeedbackCount}</span>
+            </button>
+          </div>
+
+          <div className="fb-filter-controls-right">
+            {/* Skill Filter Dropdown */}
+            <select
+              value={skillFilter}
+              onChange={(e) => handleSkillFilterChange(e.target.value)}
+              className="fb-skill-select"
+            >
+              <option value="all">{isVi ? 'Tất cả kỹ năng' : 'All Skills'}</option>
+              <option value="writing">Writing</option>
+              <option value="speaking">Speaking</option>
+              <option value="reading">Reading</option>
+              <option value="listening">Listening</option>
+            </select>
+
+            {/* Search box */}
+            <div className="fb-search-wrap">
+              <Search size={15} className="fb-search-icon" />
+              <input
+                type="text"
+                className="fb-search-input"
+                placeholder={isVi ? 'Tìm nhận xét, lớp, bài tập...' : 'Search feedback, teacher...'}
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Feedback List */}
+        <div className="flex flex-col gap-5">
+          {paginatedFeedback.map((item) => (
+            <div key={item.id} className="fb-card">
+              {/* Header */}
+              <div className="fb-card-header">
+                <div className="fb-reviewer-meta">
+                  <div className={`fb-reviewer-avatar-wrap ${item.reviewerType}`}>
+                    {item.reviewerType === 'teacher' ? (
+                      <UserCheck size={20} />
+                    ) : (
+                      <Sparkles size={20} />
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="fb-reviewer-title-row">
+                      <span className="fb-reviewer-name">
+                        {item.reviewerName}
+                      </span>
+                      <span className={`fb-reviewer-tag ${item.reviewerType}`}>
+                        {item.reviewerRole}
+                      </span>
+                    </div>
+
+                    <div className="fb-card-context">
+                      {item.className} {item.date ? `• ${item.date}` : ''}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Band Score & Skill Tag */}
+                <div className="fb-card-badges">
+                  {item.skill && (
+                    <span className="fb-skill-pill">
+                      {getSkillIcon(item.skill)}
+                      {item.skill.charAt(0).toUpperCase() + item.skill.slice(1)}
+                    </span>
+                  )}
+
+                  {item.score && (
+                    <span className="fb-score-pill">
+                      <Star size={13} fill="#15803d" />
+                      {item.score}
+                    </span>
                   )}
                 </div>
+              </div>
 
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-bold text-slate-900 text-sm">
-                      {item.reviewerName}
-                    </span>
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded border ${
-                        item.reviewerType === 'teacher' 
-                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}
-                    >
-                      {item.reviewerRole}
-                    </span>
-                  </div>
+              {/* Assignment Title Banner */}
+              <div className="fb-assignment-banner">
+                <span className="fb-banner-label">
+                  {item.type === 'submission' 
+                    ? (isVi ? 'Bài tập được đánh giá' : 'Evaluated Assignment') 
+                    : (isVi ? 'Đánh giá học tập' : 'Class Evaluation')}
+                </span>
+                <h3 className="fb-banner-title">
+                  {item.targetTitle}
+                </h3>
+              </div>
 
-                  <div className="text-xs text-slate-500">
-                    {item.className} {item.date ? `• ${item.date}` : ''}
-                  </div>
+              {/* Quote Box: General Evaluation */}
+              <div className="fb-quote-box">
+                <div className="fb-quote-box-header">
+                  {item.reviewerType === 'ai'
+                    ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
+                    : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
+                </div>
+                <div className="fb-quote-content">
+                  <MarkdownView content={item.content} />
                 </div>
               </div>
 
-              {/* Band Score & Skill Tag */}
-              <div className="flex items-center gap-3">
-                {item.skill && (
-                  <span className={`std-skill-tag ${item.skill}`}>
-                    {getSkillIcon(item.skill)}
-                    {item.skill.charAt(0).toUpperCase() + item.skill.slice(1)}
-                  </span>
-                )}
-
-                {item.score && (
-                  <span className="grade-score-pill high">
-                    <Star size={13} fill="var(--eh-success, #155d47)" />
-                    {item.score}
-                  </span>
-                )}
+              {/* Action Footer */}
+              <div className="fb-card-footer">
+                <button
+                  type="button"
+                  className="fb-view-btn"
+                  onClick={() => navigate(item.actionUrl)}
+                >
+                  <span>{item.actionLabel}</span>
+                  <ArrowRight size={14} />
+                </button>
               </div>
             </div>
+          ))}
 
-            {/* Target Title */}
-            <div className="mb-2">
-              <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">
-                {item.type === 'submission' 
-                  ? (isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:') 
-                  : (isVi ? 'Đánh giá học tập lớp:' : 'Class Evaluation:')}
-              </span>
-              <h3 className="text-base font-bold text-primary m-0 mt-1">
-                {item.targetTitle}
-              </h3>
-            </div>
+          {filtered.length === 0 && (
+            <EmptyState
+              icon={AlertCircle}
+              title={isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
+              description={isVi ? 'Hiện chưa có nhận xét nào hoặc hãy thử đổi từ khóa tìm kiếm.' : 'No feedback entries available or try adjusting your search.'}
+            />
+          )}
 
-            {/* Quote Box: General Evaluation */}
-            <div className="feedback-quote-box">
-              <div className="text-xs font-bold uppercase text-primary tracking-wider mb-2">
-                {item.reviewerType === 'ai'
-                  ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
-                  : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
-              </div>
-              <div className="text-slate-700 leading-relaxed text-sm">
-                <MarkdownView content={item.content} />
-              </div>
-            </div>
-
-            {/* Action Footer */}
-            <div className="flex justify-end pt-3 border-t border-slate-100">
-              <Button
-                variant="primary"
-                onClick={() => navigate(item.actionUrl)}
-                icon={ArrowRight}
-                iconPosition="right"
-              >
-                {item.actionLabel}
-              </Button>
-            </div>
-          </div>
-        ))}
-
-        {filtered.length === 0 && (
-          <EmptyState
-            icon={AlertCircle}
-            title={isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
-            description={isVi ? 'Hiện chưa có nhận xét nào hoặc hãy thử đổi từ khóa tìm kiếm.' : 'No feedback entries available or try adjusting your search.'}
-          />
-        )}
-
-        {/* Pagination */}
-        {filtered.length > 0 && (
-          <Pagination
-            currentPage={safeCurrentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalItems={filtered.length}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setCurrentPage(1);
-            }}
-            pageSizeOptions={[5, 10, 20]}
-            itemLabel={isVi ? 'nhận xét' : 'feedback'}
-            isVi={isVi}
-            variant="standalone"
-          />
-        )}
+          {/* Pagination */}
+          {filtered.length > 0 && (
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={filtered.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              pageSizeOptions={[5, 10, 20]}
+              itemLabel={isVi ? 'nhận xét' : 'feedback'}
+              isVi={isVi}
+              variant="standalone"
+            />
+          )}
+        </div>
       </div>
     </div>
   );
