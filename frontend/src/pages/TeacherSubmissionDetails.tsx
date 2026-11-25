@@ -2734,9 +2734,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
               {/* Display text essay if available */}
               {studentAnswerText ? (
-                <p className="tsd-essay-paragraph whitespace-pre-line">
-                  {studentAnswerText}
-                </p>
+                <div className="tsd-essay-paragraph">
+                  <MarkdownView content={studentAnswerText} className="tsd-student-essay-markdown" />
+                </div>
               ) : attachedDocAnswers.length > 0 ? (
                 <div className="tsd-file-only-note">
                   <p>{isVi ? 'Học viên đã nộp bài hoàn chỉnh qua tệp đính kèm ở trên. Hãy bấm "Xem" hoặc "Tải xuống" để kiểm tra bài làm.' : 'Student submitted their assignment via the attached document above. Click "View" or "Download" to review.'}</p>

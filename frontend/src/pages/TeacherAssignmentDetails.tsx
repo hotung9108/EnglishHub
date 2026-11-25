@@ -18,7 +18,7 @@ import {
 import { moduleService } from '../api/services/module.service';
 import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
 import { Button, MetricCard, LoadingState, useToast } from '../components/common';
-import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
+import { exportSubmissionsToExcel } from '../utils/submissionExport.utils';
 
 export interface AssignmentModuleData {
   id: number;
@@ -182,7 +182,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
         // Fallback to client-side CSV export
       }
 
-      exportSubmissionsToCsv({
+      exportSubmissionsToExcel({
         assignmentId: id,
         assignmentTitle: assignment?.title,
         className,
@@ -966,8 +966,8 @@ export const TeacherAssignmentDetails: React.FC = () => {
             </h3>
             <p className="tad-modal-description">
               {isVi 
-                ? 'Bạn có chắc chắn muốn xóa bài tập này không? Bài tập này có thể đã có bài nộp của học viên. Xóa bài tập sẽ xóa mềm và ẩn toàn bộ dữ liệu bài tập và bài nộp liên quan.'
-                : 'Are you sure you want to delete this assignment? It may contain student submissions and associated data. Soft deleting will archive this assignment and its related submission data.'}
+                ? 'Bạn có chắc chắn muốn xóa bài tập này không? Bài tập này có thể đã có bài nộp của học viên. Thao tác xóa mềm sẽ ẩn bài tập khỏi danh sách làm bài, nhưng toàn bộ kết quả điểm số và lịch sử bài nộp của học viên trước đó vẫn được bảo lưu an toàn trong báo cáo và sổ điểm.'
+                : 'Are you sure you want to delete this assignment? It may contain student submissions. Soft deleting will hide the assignment from the active list, but all student grades and submission records will be safely preserved in reports and gradebook.'}
             </p>
             <div className="tad-modal-actions">
               <Button
