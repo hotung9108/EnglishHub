@@ -1144,16 +1144,18 @@
   }
   .exam-header {
     padding: 8px 12px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
     width: 100%;
     max-width: 100vw;
     box-sizing: border-box;
     background: #ffffff;
     border-bottom: 1px solid #e2e8f0;
     min-height: 48px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
   }
   .exam-header-left {
     width: 100%;
@@ -1198,20 +1200,63 @@
     gap: 4px !important;
   }
   .exam-header-right {
-    display: none !important;
+    display: flex !important;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    box-sizing: border-box;
+    padding: 2px 0 4px 0;
+  }
+  .exam-header-right::-webkit-scrollbar {
+    display: none;
+  }
+  .exam-header-right .eh-stepper-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    max-width: none;
+  }
+  .exam-header-right .eh-stepper-compact-step {
+    padding: 5px 10px;
+    min-height: 34px;
+    font-size: 12px;
+    font-weight: 600;
+    touch-action: manipulation;
+    border-radius: 6px;
+  }
+  .exam-header-right .eh-stepper-compact-step.interactive {
+    cursor: pointer;
+    background-color: rgba(15, 118, 110, 0.06);
+    color: #0f766e;
+  }
+  .exam-header-right .eh-stepper-compact-step.interactive:active {
+    background-color: rgba(15, 118, 110, 0.15);
+  }
+  .exam-header-right .eh-stepper-compact-step.active {
+    background-color: #ffffff;
+    color: #1b4d3e;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   .exam-mobile-tab-bar {
     display: flex;
     width: calc(100% - 24px);
-    margin: 8px 12px;
+    margin: 6px 12px 10px 12px;
     padding: 4px;
     background-color: #f1f5f9;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
     box-sizing: border-box;
-    position: sticky;
-    top: 52px;
-    z-index: 25;
+    position: relative;
+    top: auto;
+    z-index: 10;
   }
   .exam-mobile-tab-btn {
     flex: 1;
