@@ -5,6 +5,7 @@ import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.CorrectAnswerDeserializer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
@@ -14,7 +15,8 @@ public record UpdateQuestionRequest(
 		String content,
 		@JsonDeserialize(using = CorrectAnswerDeserializer.class)
 		@Valid CorrectAnswer correctAnswer,
-		@DecimalMin(value = "0.00", message = "score không được âm.") BigDecimal score,
+		@DecimalMin(value = "0.00", message = "score không được âm.")
+		@DecimalMax(value = "100.00", message = "Điểm số không được vượt quá 100.00") BigDecimal score,
 		@Positive(message = "orderIndex phải lớn hơn 0.") Integer orderIndex,
 		QuestionType questionType) {
 

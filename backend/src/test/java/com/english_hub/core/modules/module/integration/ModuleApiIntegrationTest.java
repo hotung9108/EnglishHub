@@ -70,6 +70,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
@@ -101,6 +102,9 @@ class ModuleApiIntegrationTest {
 	private static final String S3_ACCESS_KEY = "minioadmin";
 	private static final String S3_SECRET_KEY = "minioadmin";
 	private static final byte[] AUDIO_BYTES = new byte[] {'I', 'D', '3', 1, 2, 3};
+	private static final int SCORE_TEST_CREATE_ORDER_INDEX = 3;
+	private static final String MAX_SCORE_ERROR = "Điểm số không được vượt quá 100.00";
+	private static final String MIN_MAX_SCORE_ERROR = "maxScore phải lớn hơn 0.";
 
 	@Container
 	static final GenericContainer<?> S3 = new GenericContainer<>("localstack/localstack:3")
@@ -353,6 +357,138 @@ class ModuleApiIntegrationTest {
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("{\"skill\":\"WRITING\",\"taskType\":\"ESSAY\",\"orderIndex\":5}"))
 				.andExpect(status().isForbidden());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidModuleCreateScores")
+	void rejectsInvalidModuleCreateScoresWithoutCreatingAModule(
+			String caseId,
+			String scoreJson,
+			String expectedError) throws Exception {
+		assertRejectedModuleCreate(caseId, createModuleScoreBody(scoreJson), expectedError);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidModuleUpdateScores")
+	void rejectsInvalidModuleUpdateScoresWithoutChangingTheStoredScore(
+			String caseId,
+			String scoreJson,
+			String expectedError) throws Exception {
+		assertRejectedModuleUpdate(caseId, updateModuleScoreBody(scoreJson), expectedError);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("validModuleScoreMutations")
+	void acceptsModuleScoreBoundariesAndRestoresFixture(
+			String caseId,
+			boolean create,
+			String scoreJson,
+			String expectedStoredScoreJson) throws Exception {
+		BigDecimal expectedStoredScore = new BigDecimal(expectedStoredScoreJson);
+		if (create) {
+			try {
+				MvcResult response = createModule(createModuleScoreBody(scoreJson));
+				assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(201);
+				assertThat(objectMapper.readTree(response.getResponse().getContentAsString()).path("message").asText())
+						.isEqualTo("Thêm module thành công.");
+				assertThat(moduleAtScoreTestOrder().getMaxScore()).isEqualByComparingTo(expectedStoredScore);
+			} finally {
+				deleteModuleAtScoreTestOrder();
+			}
+			return;
+		}
+
+		BigDecimal originalScore = readModuleMaxScore(readingModuleId);
+		try {
+			MvcResult response = updateModule(updateModuleScoreBody(scoreJson));
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(200);
+			assertThat(objectMapper.readTree(response.getResponse().getContentAsString()).path("message").asText())
+					.isEqualTo("Cập nhật module thành công.");
+			assertThat(readModuleMaxScore(readingModuleId)).isEqualByComparingTo(expectedStoredScore);
+		} finally {
+			restoreModuleMaxScore(originalScore);
+		}
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nullableCreateScoreBodies")
+	void createUsesDefaultScoreForNullOrMissingMaxScore(String caseId, String body) throws Exception {
+		try {
+			MvcResult response = createModule(body);
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(201);
+			assertThat(moduleAtScoreTestOrder().getMaxScore()).isEqualByComparingTo(BigDecimal.TEN);
+		} finally {
+			deleteModuleAtScoreTestOrder();
+		}
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nullableUpdateScoreBodies")
+	void updateKeepsStoredScoreForNullOrMissingMaxScore(String caseId, String body) throws Exception {
+		BigDecimal originalScore = readModuleMaxScore(readingModuleId);
+		try {
+			MvcResult response = updateModule(body);
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(200);
+			assertThat(readModuleMaxScore(readingModuleId)).isEqualByComparingTo(originalScore);
+		} finally {
+			restoreModuleMaxScore(originalScore);
+		}
+	}
+
+	@Test
+	void nonNumericModuleCreateScoreUsesTheCommonBadRequestMessage() throws Exception {
+		assertRejectedModuleCreate(
+				"ED-407-MODULE-CREATE-NONNUMERIC",
+				createModuleScoreBody("\"not-a-number\""),
+				"Dữ liệu không hợp lệ.");
+	}
+
+	@Test
+	void nonNumericModuleUpdateScoreUsesTheCommonBadRequestMessage() throws Exception {
+		assertRejectedModuleUpdate(
+				"ED-407-MODULE-UPDATE-NONNUMERIC",
+				updateModuleScoreBody("\"not-a-number\""),
+				"Dữ liệu không hợp lệ.");
+	}
+
+	@Test
+	void prioritizesMaxScoreWhenCreateAlsoHasAnInvalidSkill() throws Exception {
+		String body = "{\"skill\":null,\"taskType\":\"ESSAY\",\"orderIndex\":"
+				+ SCORE_TEST_CREATE_ORDER_INDEX + ",\"maxScore\":1000}";
+		assertRejectedModuleCreate("ED-407-04", body, MAX_SCORE_ERROR);
+	}
+
+	@Test
+	void preservesTheCommonHandlerMessageWhenOnlySkillIsInvalid() throws Exception {
+		String body = "{\"skill\":null,\"taskType\":\"ESSAY\",\"orderIndex\":"
+				+ SCORE_TEST_CREATE_ORDER_INDEX + ",\"maxScore\":10}";
+		assertRejectedModuleCreate("ED-407-05", body, "skill là bắt buộc.");
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("unauthorizedModuleScoreMutations")
+	void keepsModuleScoreAuthorizationAndDatabaseState(
+			String caseId,
+			boolean create,
+			UserRole role,
+			int expectedStatus,
+			String expectedError) throws Exception {
+		String authorization = role == null ? null : bearer(studentId, role);
+		if (create) {
+			long countBefore = moduleCountForAssignment();
+			MvcResult response = createModule(authorization, createModuleScoreBody("100"));
+			long countAfter = moduleCountForAssignment();
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(expectedStatus);
+			assertModuleApiError(response, expectedError);
+			assertThat(countAfter).isEqualTo(countBefore);
+			return;
+		}
+
+		BigDecimal scoreBefore = readModuleMaxScore(readingModuleId);
+		MvcResult response = updateModule(authorization, updateModuleScoreBody("100"));
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(expectedStatus);
+		assertModuleApiError(response, expectedError);
+		assertThat(readModuleMaxScore(readingModuleId)).isEqualByComparingTo(scoreBefore);
 	}
 
 	@Test
@@ -828,6 +964,185 @@ class ModuleApiIntegrationTest {
 					.content("{\"storageKey\":\"" + storageKey + "\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("READY"));
+	}
+
+	private static Stream<Arguments> invalidModuleCreateScores() {
+		return Stream.of(
+				Arguments.of("CH-407-01", "1000", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-10001-MODULE-CREATE", "100.01", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-NEG-MODULE-CREATE", "-1", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-02 / ED-407-MODULE-CREATE-ZERO", "0", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-03", "0.00", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-03", "0.001", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "-1000", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1000.123", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "100.001", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1E+3", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "999999999999999999999999999999", MAX_SCORE_ERROR));
+	}
+
+	private static Stream<Arguments> invalidModuleUpdateScores() {
+		return Stream.of(
+				Arguments.of("CH-407-02", "1000", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-10001-MODULE-UPDATE", "100.01", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-NEG-MODULE-UPDATE", "-1", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-02 / ED-407-MODULE-UPDATE-ZERO", "0", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-03", "0.00", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-03", "0.001", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "-1000", MIN_MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1000.123", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "100.001", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1E+3", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "999999999999999999999999999999", MAX_SCORE_ERROR));
+	}
+
+	private static Stream<Arguments> validModuleScoreMutations() {
+		return Stream.of(
+				Arguments.of("PH-407-01 / PH-407-MODULE-CREATE", true, "100.00", "100.00"),
+				Arguments.of("PH-407-01 / PH-407-MODULE-UPDATE", false, "100.00", "100.00"),
+				Arguments.of("ED-407-03", true, "100", "100.00"),
+				Arguments.of("ED-407-03", false, "100", "100.00"),
+				Arguments.of("ED-407-03", true, "100.0", "100.00"),
+				Arguments.of("ED-407-03", false, "100.0", "100.00"),
+				Arguments.of("ED-407-03", true, "99.99", "99.99"),
+				Arguments.of("ED-407-03", false, "99.99", "99.99"),
+				Arguments.of("ED-407-03", true, "0.01", "0.01"),
+				Arguments.of("ED-407-03", false, "0.01", "0.01"),
+				Arguments.of("ED-407-03", true, "3.333333", "3.33"),
+				Arguments.of("ED-407-03", false, "3.333333", "3.33"),
+				Arguments.of("ED-407-99999-MODULE-CREATE", true, "99.999", "100.00"),
+				Arguments.of("ED-407-99999-MODULE-UPDATE", false, "99.999", "100.00"));
+	}
+
+	private static Stream<Arguments> nullableCreateScoreBodies() {
+		return Stream.of(
+				Arguments.of("ED-407-02 / ED-407-MODULE-CREATE-NULL", createModuleScoreBody("null")),
+				Arguments.of("ED-407-02 / ED-407-MODULE-CREATE-MISSING", createModuleBodyWithoutScore()));
+	}
+
+	private static Stream<Arguments> nullableUpdateScoreBodies() {
+		return Stream.of(
+				Arguments.of("ED-407-02 / ED-407-MODULE-UPDATE-NULL", "{\"maxScore\":null,\"orderIndex\":1}"),
+				Arguments.of("ED-407-02 / ED-407-MODULE-UPDATE-MISSING", "{\"orderIndex\":1}"));
+	}
+
+	private static Stream<Arguments> unauthorizedModuleScoreMutations() {
+		return Stream.of(
+				Arguments.of("ED-AUTH-NO-TOKEN-MODULE-CREATE", true, (UserRole) null, 401,
+						"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."),
+				Arguments.of("ED-AUTH-NO-TOKEN-MODULE-UPDATE", false, (UserRole) null, 401,
+						"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."),
+				Arguments.of("ED-AUTH-STUDENT-MODULE-CREATE", true, UserRole.STUDENT, 403,
+						"Bạn không có quyền thực hiện thao tác này."),
+				Arguments.of("ED-AUTH-STUDENT-MODULE-UPDATE", false, UserRole.STUDENT, 403,
+						"Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	private void assertRejectedModuleCreate(String caseId, String body, String expectedError) throws Exception {
+		long countBefore = moduleCountForAssignment();
+		MvcResult response = createModule(body);
+		long countAfter = moduleCountForAssignment();
+
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(400);
+		assertModuleApiError(response, expectedError);
+		assertThat(countAfter).as(caseId + " must not create a module").isEqualTo(countBefore);
+	}
+
+	private void assertRejectedModuleUpdate(String caseId, String body, String expectedError) throws Exception {
+		BigDecimal scoreBefore = readModuleMaxScore(readingModuleId);
+		MvcResult response = updateModule(body);
+		BigDecimal scoreAfter = readModuleMaxScore(readingModuleId);
+
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(400);
+		assertModuleApiError(response, expectedError);
+		assertThat(scoreAfter).as(caseId + " must preserve maxScore")
+				.isEqualByComparingTo(scoreBefore);
+	}
+
+	private void assertModuleApiError(MvcResult response, String expectedMessage) throws Exception {
+		JsonNode body = objectMapper.readTree(response.getResponse().getContentAsString());
+		assertThat(body.size()).isEqualTo(1);
+		assertThat(body.path("error").asText()).isEqualTo(expectedMessage);
+	}
+
+	private MvcResult createModule(String body) throws Exception {
+		return createModule(bearer(teacherId, UserRole.TEACHER), body);
+	}
+
+	private MvcResult createModule(String authorization, String body) throws Exception {
+		var request = post("/api/v1/assignments/{id}/modules", assignmentId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+		if (authorization != null) {
+			request.header("Authorization", authorization);
+		}
+		return mockMvc.perform(request).andReturn();
+	}
+
+	private MvcResult updateModule(String body) throws Exception {
+		return updateModule(bearer(teacherId, UserRole.TEACHER), body);
+	}
+
+	private MvcResult updateModule(String authorization, String body) throws Exception {
+		var request = put("/api/v1/modules/{id}", readingModuleId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+		if (authorization != null) {
+			request.header("Authorization", authorization);
+		}
+		return mockMvc.perform(request).andReturn();
+	}
+
+	private static String createModuleScoreBody(String scoreJson) {
+		return "{\"skill\":\"WRITING\",\"taskType\":\"ESSAY\",\"orderIndex\":"
+				+ SCORE_TEST_CREATE_ORDER_INDEX + ",\"instructions\":\"Score validation test\",\"maxScore\":"
+				+ scoreJson + "}";
+	}
+
+	private static String createModuleBodyWithoutScore() {
+		return "{\"skill\":\"WRITING\",\"taskType\":\"ESSAY\",\"orderIndex\":"
+				+ SCORE_TEST_CREATE_ORDER_INDEX + ",\"instructions\":\"Score validation test\"}";
+	}
+
+	private static String updateModuleScoreBody(String scoreJson) {
+		return "{\"maxScore\":" + scoreJson + "}";
+	}
+
+	private long moduleCountForAssignment() {
+		moduleRepository.flush();
+		entityManager.clear();
+		return moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).size();
+	}
+
+	private BigDecimal readModuleMaxScore(long moduleId) {
+		moduleRepository.flush();
+		entityManager.clear();
+		return moduleRepository.findById(moduleId).orElseThrow().getMaxScore();
+	}
+
+	private AssignmentModule moduleAtScoreTestOrder() {
+		moduleRepository.flush();
+		entityManager.clear();
+		return moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).stream()
+				.filter(module -> module.getOrderIndex() == SCORE_TEST_CREATE_ORDER_INDEX)
+				.findFirst()
+				.orElseThrow();
+	}
+
+	private void deleteModuleAtScoreTestOrder() {
+		moduleRepository.flush();
+		entityManager.clear();
+		moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).stream()
+				.filter(module -> module.getOrderIndex() == SCORE_TEST_CREATE_ORDER_INDEX)
+				.forEach(moduleRepository::delete);
+		moduleRepository.flush();
+		entityManager.clear();
+	}
+
+	private void restoreModuleMaxScore(BigDecimal score) throws Exception {
+		MvcResult response = updateModule(updateModuleScoreBody(score.toPlainString()));
+		assertThat(response.getResponse().getStatus()).isEqualTo(200);
+		assertThat(readModuleMaxScore(readingModuleId)).isEqualByComparingTo(score);
 	}
 
 	private void deleteCommittedFixtures() {

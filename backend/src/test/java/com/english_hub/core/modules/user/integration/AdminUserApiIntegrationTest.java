@@ -504,6 +504,47 @@ class AdminUserApiIntegrationTest {
 		assertThat(studentProfileRepository.existsById(userId)).isFalse();
 	}
 
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("passwordByteCases")
+	void adminUserCreateEnforcesTheUtf8PasswordByteLimit(
+			String caseId, String password, int expectedStatus) throws Exception {
+		String email = uniqueEmail("password-byte-limit");
+		CreateUserRequest createRequest = new CreateUserRequest(
+				ADMIN_FULL_NAME, email, password, UserRole.ADMIN.name(), null, null, null, null);
+		MvcResult response = mockMvc.perform(post(ADMIN_USERS_PATH)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(createRequest)))
+				.andReturn();
+		JsonNode body = objectMapper.readTree(response.getResponse().getContentAsString());
+		Long createdId = response.getResponse().getStatus() == 201 ? body.path("user").path("id").asLong() : null;
+
+		try {
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(expectedStatus);
+			if (expectedStatus == 400) {
+				assertThat(body.size()).as(caseId).isEqualTo(1);
+				assertThat(body.path("error").asText()).as(caseId)
+						.isEqualTo("Mật khẩu mới không được vượt quá 72 byte UTF-8.");
+				entityManager.flush();
+				entityManager.clear();
+				assertThat(userRepository.existsByEmailIgnoreCase(email)).as(caseId).isFalse();
+				return;
+			}
+
+			assertThat(createdId).as(caseId).isNotNull().isPositive();
+			entityManager.flush();
+			entityManager.clear();
+			User created = userRepository.findById(createdId).orElseThrow();
+			assertThat(passwordEncoder.matches(password, created.getPasswordHash())).as(caseId).isTrue();
+		} finally {
+			if (createdId != null) {
+				userRepository.deleteById(createdId);
+				userRepository.flush();
+				entityManager.clear();
+			}
+		}
+	}
+
 	@Test
 	void filtersCreatedAdminByRole() throws Exception {
 		String email = uniqueEmail("created");
@@ -891,5 +932,17 @@ class AdminUserApiIntegrationTest {
 
 	private static String newTestPassword() {
 		return "Test1!" + UUID.randomUUID();
+	}
+
+	private static Stream<Arguments> passwordByteCases() {
+		return Stream.of(
+				Arguments.of("ED-ADMIN-USER-72B-01", asciiPassword(72), 201),
+				Arguments.of("ED-ADMIN-USER-72B-02", asciiPassword(73), 400),
+				Arguments.of("ED-ADMIN-USER-72B-03", asciiPassword(71) + "é", 400),
+				Arguments.of("ED-ADMIN-USER-72B-04", asciiPassword(70) + "é", 201));
+	}
+
+	private static String asciiPassword(int byteCount) {
+		return "A1" + "a".repeat(byteCount - 2);
 	}
 }
