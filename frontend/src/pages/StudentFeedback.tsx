@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Sparkles, UserCheck, Star,
+  UserCheck, Star,
   ArrowRight, Search, AlertCircle,
   PenTool, Mic, BookOpen, Headphones,
-  RotateCcw, GraduationCap
+  RotateCcw, GraduationCap, Bot
 } from 'lucide-react';
 import { Button, EmptyState, Skeleton, Pagination, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -218,11 +218,11 @@ export const StudentFeedback: React.FC = () => {
                 className,
                 skill,
                 reviewerType: 'ai',
-                reviewerName: 'EnglishHub AI Diagnostic Engine',
-                reviewerRole: isVi ? 'Đánh giá tự động AI' : 'AI Diagnostic',
+                reviewerName: isVi ? 'Hệ thống đánh giá tự động' : 'Automated Evaluation Engine',
+                reviewerRole: isVi ? 'Đánh giá tự động' : 'Automated Diagnostic',
                 date: formattedDate,
                 score: scoreStr,
-                badgeType: isVi ? 'Đánh giá AI' : 'AI Evaluation',
+                badgeType: isVi ? 'Đánh giá tự động' : 'Automated',
                 content: grading.aiFeedback.trim(),
                 actionUrl: `/student/submissions/${subDetail.id}`,
                 actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
@@ -346,8 +346,8 @@ export const StudentFeedback: React.FC = () => {
             </h1>
             <p className="fb-hero-subtitle">
               {isVi
-                ? 'Tổng hợp đánh giá định kỳ từ Giảng viên và phân tích chuyên sâu từ Trợ lý AI cho từng kỹ năng.'
-                : 'Comprehensive evaluations from your course instructors and diagnostic insights from AI across all skills.'}
+                ? 'Tổng hợp đánh giá định kỳ từ Giảng viên và kết quả đánh giá tự động theo từng kỹ năng.'
+                : 'Comprehensive evaluations from your course instructors and automated assessment results across all skills.'}
             </p>
           </div>
           <div className="fb-stats-badge">
@@ -395,8 +395,8 @@ export const StudentFeedback: React.FC = () => {
               className={`fb-tab-pill ${activeFilter === 'ai' ? 'active' : ''}`}
               onClick={() => handleActiveFilterChange('ai')}
             >
-              <Sparkles size={14} />
-              {isVi ? 'Trợ lý AI' : 'AI Diagnostic'}
+              <Bot size={14} />
+              {isVi ? 'Đánh giá tự động' : 'Automated'}
               <span className="fb-tab-pill-badge">{aiFeedbackCount}</span>
             </button>
           </div>
@@ -440,7 +440,7 @@ export const StudentFeedback: React.FC = () => {
                     {item.reviewerType === 'teacher' ? (
                       <UserCheck size={20} />
                     ) : (
-                      <Sparkles size={20} />
+                      <Bot size={20} />
                     )}
                   </div>
 
@@ -494,7 +494,7 @@ export const StudentFeedback: React.FC = () => {
               <div className="fb-quote-box">
                 <div className="fb-quote-box-header">
                   {item.reviewerType === 'ai'
-                    ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
+                    ? (isVi ? 'Đánh giá tự động của hệ thống' : 'Automated Assessment Result')
                     : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
                 </div>
                 <div className="fb-quote-content">

@@ -371,31 +371,32 @@ export const ClassDetails: React.FC = () => {
               <div className="adm-kpi-header">
                 <div>
                   <div className="adm-kpi-label">{isVi ? 'GIÁO VIÊN PHỤ TRÁCH' : 'INSTRUCTOR'}</div>
-                  <div className="adm-kpi-value text-lg font-bold mt-1">
+                  <div className="adm-kpi-value text-lg font-bold mt-1 text-primary">
                     {teacherName}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const curId = classDetail?.teacher?.id ? String(classDetail.teacher.id) : (classDetail?.teacherId ? String(classDetail.teacherId) : '');
-                      setQuickTeacherId(curId);
-                      setShowChangeTeacherModal(true);
-                    }}
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-outline-variant hover:bg-surface text-primary transition-colors flex items-center gap-1.5"
-                    title={isVi ? 'Đổi giáo viên phụ trách' : 'Change instructor'}
-                  >
-                    <ArrowRightLeft size={13} />
-                    <span>{isVi ? 'Đổi GV' : 'Change'}</span>
-                  </button>
-                  <div className="adm-kpi-icon adm-kpi-icon-primary">
-                    <Users size={20} />
-                  </div>
+                <div className="adm-kpi-icon adm-kpi-icon-primary">
+                  <Users size={20} />
                 </div>
               </div>
-              <div className="adm-kpi-footer text-on-surface-variant">
-                <span>{classDetail?.description || (isVi ? 'Lịch học tiêu chuẩn' : 'Standard schedule')}</span>
+              <div className="adm-kpi-footer flex items-center justify-between">
+                <span className="text-on-surface-variant truncate mr-2">
+                  {classDetail?.description || (isVi ? 'Lịch học tiêu chuẩn' : 'Standard schedule')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const curId = classDetail?.teacher?.id ? String(classDetail.teacher.id) : (classDetail?.teacherId ? String(classDetail.teacherId) : '');
+                    setQuickTeacherId(curId);
+                    setShowChangeTeacherModal(true);
+                  }}
+                  className="adm-change-teacher-btn"
+                  title={isVi ? 'Đổi giáo viên phụ trách' : 'Change instructor'}
+                  aria-label={isVi ? 'Đổi GV' : 'Change instructor'}
+                >
+                  <ArrowRightLeft size={12} />
+                  <span>{isVi ? 'Đổi GV' : 'Change'}</span>
+                </button>
               </div>
             </div>
 
