@@ -1635,18 +1635,18 @@ export const TeacherClassProgress: React.FC = () => {
 
       {/* 9. Modal Điều chỉnh điểm kèm Audit reason note (FE-90 / UC030 / UC031) */}
       {studentToAdjustGrade && !hasDateFilter && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+        <div className="eh-modal-backdrop" onClick={() => setStudentToAdjustGrade(null)}>
+          <div className="eh-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="eh-modal-header">
+              <div className="eh-modal-header-left">
+                <div className="eh-modal-header-icon">
                   <Edit3 size={18} />
                 </div>
                 <div>
-                  <h3 className="m-0 text-base font-bold text-foreground">
+                  <h3 className="eh-modal-title">
                     {isVi ? 'Điều chỉnh điểm số học viên' : 'Adjust Student Grade'}
                   </h3>
-                  <p className="m-0 text-xs text-muted-foreground mt-0.5">
+                  <p className="eh-modal-subtitle">
                     {studentToAdjustGrade.name} ({studentToAdjustGrade.code})
                   </p>
                 </div>
@@ -1654,7 +1654,7 @@ export const TeacherClassProgress: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStudentToAdjustGrade(null)}
-                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="eh-modal-close-btn"
               >
                 <X size={18} />
               </button>

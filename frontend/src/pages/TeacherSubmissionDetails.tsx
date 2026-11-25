@@ -2824,18 +2824,27 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
       {/* Modal: Bắt buộc nhập lý do điều chỉnh điểm đã chấm (UC030 / AD30) */}
       {showAuditReasonModal && pendingGradeAdjustment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full overflow-hidden animate-scale-up">
-            <div className="flex items-center justify-between p-6 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+        <div 
+          className="eh-modal-backdrop" 
+          onClick={() => {
+            setShowAuditReasonModal(false);
+            setPendingGradeAdjustment(null);
+          }}
+        >
+          <div 
+            className="eh-modal-dialog" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="eh-modal-header">
+              <div className="eh-modal-header-left">
+                <div className="eh-modal-header-icon">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-foreground">
+                  <h3 className="eh-modal-title">
                     {isVi ? 'Lý do điều chỉnh điểm số' : 'Grade Adjustment Audit Reason'}
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="eh-modal-subtitle">
                     {isVi ? 'Quy chuẩn kiểm toán điểm số yêu cầu ghi nhận lý do thay đổi điểm' : 'Audit policy requires recording the reason for changing grades'}
                   </p>
                 </div>
@@ -2847,7 +2856,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   setShowAuditReasonModal(false);
                   setPendingGradeAdjustment(null);
                 }}
-                className="p-1 rounded-lg text-muted-foreground hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+                className="eh-modal-close-btn"
               >
                 <X className="w-5 h-5" />
               </button>

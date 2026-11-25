@@ -912,39 +912,54 @@ export const ClassDetails: React.FC = () => {
             onCancel={() => setStatusModalAction(null)}                                                                                                                                     
           />                                                                                                                                                                                
                                                                                                                                                                                             
-          {/* Modal đổi giáo viên phụ trách (UC008 / Issue #344) */}                                                                                                                        
-          {showChangeTeacherModal && (                                                                                                                                                      
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">                                                           
-              <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant animate-in fade-in zoom-in-95">                                           
-                <div className="flex items-center justify-between mb-4">                                                                                                                    
-                  <h3 className="font-bold text-lg text-on-surface">
-                    {isVi ? 'Thay đổi giáo viên phụ trách' : 'Change Instructor'}
-                  </h3>
+          {/* Modal đổi giáo viên phụ trách (UC008 / Issue #344) */}
+          {showChangeTeacherModal && (
+            <div className="eh-modal-backdrop" onClick={() => setShowChangeTeacherModal(false)} role="dialog" aria-modal="true">
+              <div 
+                className="eh-modal-dialog" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="eh-modal-header">
+                  <div className="eh-modal-header-left">
+                    <div className="eh-modal-header-icon">
+                      <ArrowRightLeft size={18} />
+                    </div>
+                    <div>
+                      <h3 className="eh-modal-title">
+                        {isVi ? 'Thay đổi giáo viên phụ trách' : 'Change Instructor'}
+                      </h3>
+                      <p className="eh-modal-subtitle">
+                        {classDetail?.name || classCode}
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowChangeTeacherModal(false)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-hover hover:text-on-surface transition-colors"
+                    className="eh-modal-close-btn"
                     aria-label={isVi ? 'Đóng' : 'Close'}
                   >
                     <X size={18} />
                   </button>
                 </div>
-                <p className="text-sm text-on-surface-variant mb-4">
-                  {isVi
-                    ? `Chọn giảng viên mới để phụ trách lớp "${classDetail?.name || classCode}".`
-                    : `Select a new instructor to manage class "${classDetail?.name || classCode}".`}
-                </p>
-                <div className="mb-6">
-                  <TeacherPicker
-                    selectedTeacherId={quickTeacherId}
-                    isVi={isVi}
-                    onSelectTeacher={(tc) => {
-                      setQuickTeacher(tc);
-                      setQuickTeacherId(tc ? String(tc.id) : '');
-                    }}
-                  />
+                <div className="eh-modal-body">
+                  <p className="text-sm text-secondary mb-4 leading-relaxed">
+                    {isVi
+                      ? `Chọn giảng viên mới để phụ trách và quản lý lớp "${classDetail?.name || classCode}". Giảng viên sẽ tiếp nhận toàn bộ quyền chấm điểm và theo dõi tiến độ của lớp.`
+                      : `Select a new instructor to manage class "${classDetail?.name || classCode}". The instructor will receive grading and tracking permissions.`}
+                  </p>
+                  <div className="mb-2">
+                    <TeacherPicker
+                      selectedTeacherId={quickTeacherId}
+                      isVi={isVi}
+                      onSelectTeacher={(tc) => {
+                        setQuickTeacher(tc);
+                        setQuickTeacherId(tc ? String(tc.id) : '');
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-3">
+                <div className="eh-modal-footer">
                   <Button
                     variant="secondary"
                     onClick={() => setShowChangeTeacherModal(false)}
