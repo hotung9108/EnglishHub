@@ -246,5 +246,72 @@ describe('FE-108 Assignment Filters, Creation Guard & AI Refresh', () => {
 
       vi.useRealTimers();
     });
+
+    it('completes polling and triggers callback when AI grading transitions to FAILED status', async () => {
+      vi.useFakeTimers();
+
+      const pendingSub: SubmissionDetail = {
+        id: 51,
+        assignmentId: 1,
+        studentId: 2,
+        attemptNumber: 1,
+        status: 'SUBMITTED',
+        submittedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        modules: [
+          {
+            id: 502,
+            moduleId: 12,
+            skill: 'SPEAKING',
+            taskType: 'RECORDING',
+            status: 'SUBMITTED',
+            grading: null,
+          },
+        ],
+      };
+
+      const failedSub: SubmissionDetail = {
+        ...pendingSub,
+        modules: [
+          {
+            ...pendingSub.modules[0],
+            grading: {
+              id: 1001,
+              method: 'AUTO',
+              status: 'FAILED',
+              finalScore: null,
+              maxScoreSnapshot: 10,
+              aiFeedback: null,
+              finalFeedback: null,
+            },
+          },
+        ],
+      };
+
+      vi.mocked(submissionService.getSubmission).mockResolvedValueOnce(failedSub);
+
+      const onGradedMock = vi.fn();
+
+      const { result } = renderHook(() =>
+        useStudentSubmissionPolling({
+          submissionId: 51,
+          isGraded: false,
+          intervalMs: 1000,
+          timeoutMs: 10000,
+          onGraded: onGradedMock,
+        })
+      );
+
+      expect(result.current.isPolling).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+
+      expect(submissionService.getSubmission).toHaveBeenCalledTimes(1);
+      expect(onGradedMock).toHaveBeenCalledWith(failedSub);
+
+      vi.useRealTimers();
+    });
   });
 });
