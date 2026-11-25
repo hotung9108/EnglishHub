@@ -145,7 +145,10 @@ export const Accounts: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) {
+      setNameError(isVi ? 'Vui lòng nhập họ và tên.' : 'Please enter full name.');
+      return;
+    }
     if (!editingUser && !formData.email.trim()) {
       setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
       return;
@@ -505,7 +508,7 @@ export const Accounts: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} className="flex flex-col flex-1">
+            <form onSubmit={handleSaveUser} className="flex flex-col flex-1" noValidate>
               <div className="adm-drawer-body">
                 {actionError && (
                   <div className="adm-alert-error">
