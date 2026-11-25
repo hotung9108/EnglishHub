@@ -3,6 +3,7 @@ package com.english_hub.core.modules.user.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.common.utils.PasswordLengthGuard;
 import com.english_hub.core.modules.user.application.command.CreateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserStatusCommand;
@@ -116,6 +117,7 @@ public class AdminUserService {
 		}
 
 		String normalizedFullName = FullNameValidator.validateAndNormalize(request.fullName());
+		PasswordLengthGuard.validate(request.password());
 
 		try {
 			User user = User.create(

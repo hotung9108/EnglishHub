@@ -45,13 +45,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -304,6 +307,62 @@ class SoftDeletedAccountAuthIntegrationTest extends SoftDeletedAccountTestSuppor
 		refresh(second, 401);
 		loginError(account, account.password(), 401);
 		postOk("/auth/login", body("email", account.email(), "password", newPassword), 200);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("resetPasswordByteCases")
+	void resetPasswordEnforcesTheUtf8ByteLimitAfterConsumingToken(
+			String caseId, String newPassword, boolean shouldSucceed) throws Exception {
+		Account account = account(UserRole.STUDENT);
+		String originalHash = row(account).getPasswordHash();
+		String resetToken = UUID.randomUUID().toString();
+		challenges.store(account.email(), otp(), resetToken, 900);
+
+		try {
+			Map<String, Object> request = body(
+					"email", account.email(), "otp", null, "token", resetToken, "newPassword", newPassword);
+			if (shouldSucceed) {
+				JsonNode response = postOk("/auth/reset-password", request, 200);
+				assertThat(response.path("message").asText())
+						.isEqualTo("Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.");
+				assertThat(encoder.matches(newPassword, row(account).getPasswordHash())).as(caseId).isTrue();
+				return;
+			}
+
+		JsonNode rejected = postError("/auth/reset-password", request, 400);
+		assertThat(rejected.path("error").asText()).as(caseId)
+				.isEqualTo("Mật khẩu mới không được vượt quá 72 byte UTF-8.");
+		assertThat(row(account).getPasswordHash()).as(caseId).isEqualTo(originalHash);
+
+		JsonNode retry = postError("/auth/reset-password", body(
+				"email", account.email(), "otp", null, "token", resetToken,
+				"newPassword", asciiPassword(72)), 400);
+		assertThat(retry.path("error").asText()).as(caseId)
+				.isEqualTo("Mã xác thực hoặc liên kết không hợp lệ, hoặc đã hết hạn.");
+		assertThat(row(account).getPasswordHash()).as(caseId).isEqualTo(originalHash);
+		} finally {
+			inTransaction(() -> {
+				User user = users.findById(account.id()).orElseThrow();
+				user.updateFrom(user.getFullName(), user.getEmail(), user.getPhone(), user.getAvatarUrl(),
+						originalHash, user.getRole(), user.getStatus(), user.isDeleted());
+				users.saveAndFlush(user);
+				entityManager.clear();
+				return null;
+			});
+			challenges.clear(account.email());
+		}
+	}
+
+	private static Stream<Arguments> resetPasswordByteCases() {
+		return Stream.of(
+				Arguments.of("ED-RESET-72B-01", asciiPassword(72), true),
+				Arguments.of("ED-RESET-72B-02", asciiPassword(73), false),
+				Arguments.of("ED-RESET-72B-03", asciiPassword(71) + "é", false),
+				Arguments.of("ED-RESET-72B-04", asciiPassword(70) + "é", true));
+	}
+
+	private static String asciiPassword(int byteCount) {
+		return "A1" + "a".repeat(byteCount - 2);
 	}
 
 	@Test

@@ -23,9 +23,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
+import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -199,11 +201,66 @@ class UserProfileServiceTest {
 	}
 
 	@Test
+	void rejectsTheCurrentPasswordAsTheNewPassword() {
+		User currentUser = userWithPassword("Current05Password");
+		String currentHash = currentUser.passwordHash();
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		assertThatThrownBy(() -> userProfileService.changePassword(
+				new ChangePasswordCommand("Current05Password", "Current05Password")))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Mật khẩu mới không được trùng với mật khẩu hiện tại.");
+
+		assertThat(currentUser.passwordHash()).isEqualTo(currentHash);
+		verify(userRepository, never()).save(any(User.class));
+	}
+
+	@Test
+	void bcryptRejectsEncoding73BytesButMatchesDoesNotThrowFor73ByteCandidate() {
+		String password73Bytes = "A1" + "a".repeat(71);
+		String currentHash = passwordEncoder.encode("Current05Password");
+
+		assertThat(password73Bytes.getBytes(StandardCharsets.UTF_8)).hasSize(73);
+		assertThatThrownBy(() -> passwordEncoder.encode(password73Bytes))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThatCode(() -> passwordEncoder.matches(password73Bytes, currentHash))
+				.doesNotThrowAnyException();
+	}
+
+	@Test
+	void rejectsANewPasswordAbove72Utf8BytesBeforeSaving() {
+		User currentUser = userWithPassword("Current05Password");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		assertThatThrownBy(() -> userProfileService.changePassword(new ChangePasswordCommand(
+				"Current05Password", "A1" + "a".repeat(71))))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Mật khẩu mới không được vượt quá 72 byte UTF-8.");
+		verify(userRepository, never()).save(any(User.class));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"current05Password", "Current05Password "})
+	void acceptsPasswordThatOnlyDiffersByCaseOrTrailingSpace(String newPassword) {
+		User currentUser = userWithPassword("Current05Password");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		userProfileService.changePassword(new ChangePasswordCommand("Current05Password", newPassword));
+
+		ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+		verify(userRepository).save(captor.capture());
+		assertThat(passwordEncoder.matches(newPassword, captor.getValue().passwordHash())).isTrue();
+		assertThat(passwordEncoder.matches("Current05Password", captor.getValue().passwordHash())).isFalse();
+	}
+
+	@Test
 	void rejectsAnIncorrectCurrentPassword() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(userWithPassword("Current05Password"));
 
 		assertThatThrownBy(() -> userProfileService.changePassword(
-				new ChangePasswordCommand("Wrong05Password", "Newpass05")))
+				new ChangePasswordCommand("Wrong05Password", "Current05Password")))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Mật khẩu hiện tại không chính xác.");
 		verify(userRepository, never()).save(any(User.class));
@@ -220,15 +277,25 @@ class UserProfileServiceTest {
 		verify(userRepository, never()).save(any(User.class));
 	}
 
-	@Test
-	void rejectsMissingPasswordFields() {
+	@ParameterizedTest
+	@MethodSource("incompletePasswordRequests")
+	void rejectsMissingPasswordFields(ChangePasswordCommand request) {
 		when(currentUserProvider.requireActiveUser()).thenReturn(userWithPassword("Current05Password"));
 
-		assertThatThrownBy(() -> userProfileService.changePassword(
-				new ChangePasswordCommand("", "Newpass05")))
-				.isInstanceOf(ApiException.class)
+		assertThatThrownBy(() -> userProfileService.changePassword(request))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
 				.hasMessage("Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.");
 		verify(userRepository, never()).save(any(User.class));
+	}
+
+	private static Stream<Arguments> incompletePasswordRequests() {
+		return Stream.of(
+				Arguments.of((Object) null),
+				Arguments.of(new ChangePasswordCommand(null, "Newpass05")),
+				Arguments.of(new ChangePasswordCommand("", "Newpass05")),
+				Arguments.of(new ChangePasswordCommand("Current05Password", null)),
+				Arguments.of(new ChangePasswordCommand("Current05Password", "")));
 	}
 
 	private User user(long id) {
