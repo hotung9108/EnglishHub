@@ -13,7 +13,10 @@
 
 @media (max-width: 768px) {
   .adm-container {
-    padding: 0 16px 32px 16px;
+    padding: 0 12px 32px 12px;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 }
 
@@ -3981,6 +3984,108 @@
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+/* ================================================================
+   Mobile Responsive Optimizations for Admin Tables & Reports
+   ================================================================ */
+.adm-table-card {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.adm-table-card .overflow-x-auto,
+.adm-table-scroll-wrapper,
+.overflow-x-auto {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  /* Tables */
+  .adm-table {
+    min-width: 620px;
+  }
+
+  .adm-table th,
+  .adm-table td {
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  /* Reports Page Overflows */
+  .adm-reports-filter-box {
+    padding: 16px 12px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .adm-reports-filter-header {
+    gap: 12px;
+  }
+
+  .adm-reports-presets-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+    padding: 3px;
+    scrollbar-width: none;
+  }
+
+  .adm-reports-presets-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .adm-reports-preset-btn {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .adm-reports-distribution-card {
+    padding: 16px 12px;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .adm-dash-histogram {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 14px 6px 10px 6px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .adm-dash-histogram-bar-wrap {
+    max-width: 32px;
+    height: 72px;
+  }
+
+  .adm-dash-histogram-label {
+    font-size: 9px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+    word-break: break-word;
+    justify-content: center;
+  }
+
+  .adm-dash-histogram-val {
+    font-size: 10.5px;
+  }
+
+  .adm-dash-histogram-sub {
+    font-size: 9.5px;
+  }
 }
 
 

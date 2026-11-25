@@ -14,7 +14,8 @@ import {
   UploadCloud,
   FileAudio,
   Trash2,
-  Headphones
+  Headphones,
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/common/ToastContext';
@@ -27,8 +28,6 @@ import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
-  getNextIncompleteModule,
-  getSkillLabel,
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
@@ -572,23 +571,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
           navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
       } else {
-        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
-        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
-        if (nextMod) {
-          const nextSkillLabel = getSkillLabel(nextMod.skill);
-          const msg = `Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`;
-          toastSuccess(msg);
-          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
-          setTimeout(() => {
-            navigate(nextRoute, { replace: true });
-          }, 1200);
-        } else {
-          const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
-          toastSuccess(msg);
-          setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`, { replace: true });
-          }, 1200);
-        }
+        const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
+        toastSuccess(msg);
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
+        }, 1200);
       }
     } catch (err: unknown) {
       const apiErr = parseApiError(err);
@@ -1097,20 +1084,31 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
       {/* Modal xác nhận nộp Speaking rỗng khi không có bản ghi âm */}
       {showEmptyConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="eh-modal-backdrop" onClick={() => setShowEmptyConfirmModal(false)}>
+          <div className="eh-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="eh-modal-header">
+              <div className="eh-modal-header-left">
+                <div className="eh-modal-header-icon" style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', color: '#b45309' }}>
+                  <AlertCircle size={20} />
+                </div>
+                <h3 className="eh-modal-title">
                   Xác nhận nộp bài không ghi âm
                 </h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                  Bạn chưa thực hiện ghi âm bài nói. Bạn có chắc chắn muốn nộp bài trống (nhận 0 điểm phần này) để tiếp tục không?
-                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowEmptyConfirmModal(false)}
+                className="eh-modal-close-btn"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="eh-modal-body">
+              <p className="text-sm text-secondary leading-relaxed m-0">
+                Bạn chưa thực hiện ghi âm bài nói. Bạn có chắc chắn muốn nộp bài trống (nhận 0 điểm phần này) để tiếp tục không?
+              </p>
+            </div>
+            <div className="eh-modal-footer">
               <Button
                 variant="secondary"
                 onClick={() => setShowEmptyConfirmModal(false)}

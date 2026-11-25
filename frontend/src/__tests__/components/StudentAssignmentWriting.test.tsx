@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from 'react-router-dom';
@@ -17,7 +17,12 @@ vi.mock('../../api/services/submission.service', () => ({ submissionService: {
   listSubmissions: vi.fn(), getSubmission: vi.fn(), startAttempt: vi.fn(), submitModule: vi.fn(), submitSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getDocumentUploadUrl: vi.fn(), uploadDocument: vi.fn(),
 } }));
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
+  vi.useRealTimers();
   auth.user = { id: 5 };
   vi.mocked(assignmentService.getAssignment).mockResolvedValue({ id: 12, title: 'Writing practice', status: 'PUBLISHED', modules: [{ id: 30, skill: 'WRITING' }] });
   vi.mocked(moduleService.getModule).mockResolvedValue({ id: 30, skill: 'WRITING', taskType: 'ESSAY', instructions: 'Describe your city.', orderIndex: 1, maxScore: 10 });
@@ -198,7 +203,7 @@ it('blocks submitting a closed assignment', async () => {
   expect(submissionService.submitModule).not.toHaveBeenCalled();
 });
 it.each([
-  ['invalid.txt', 'text/plain', 4, 'Định dạng tệp không được hỗ trợ.'],
+  ['invalid.zip', 'application/zip', 4, 'Định dạng tệp không được hỗ trợ.'],
   ['large.pdf', 'application/pdf', 10 * 1024 * 1024 + 1, 'Kích thước tệp vượt quá giới hạn 10MB.'],
 ])('rejects invalid upload %s', async (name, type, size, message) => {
   const { container } = await setup();
@@ -509,6 +514,31 @@ it('rejects empty 0-byte file upload (FE-102)', async () => {
   const emptyFile = new File([], 'empty.pdf', { type: 'application/pdf' });
   fireEvent.drop(container.querySelector('.writing-dropzone')!, { dataTransfer: { files: [emptyFile] } });
   expect(screen.getByText(/Tệp tải lên không được rỗng \(0 bytes\)/)).toBeVisible();
+});
+
+it('rejects txt file with fewer than 20 words (FE-102)', async () => {
+  const { container } = await setup();
+  const shortText = 'One two three four five six words only.';
+  const txtFile = new File([shortText], 'short.txt', { type: 'text/plain' });
+  fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [txtFile] } });
+  expect(await screen.findByText(/Tệp bài viết chưa đạt độ dài tối thiểu/)).toBeVisible();
+  expect(screen.queryByText('short.txt')).not.toBeInTheDocument();
+});
+
+it('accepts txt file with at least 20 words and displays txt metadata (FE-102)', async () => {
+  const { container } = await setup();
+  const txtFile = new File([VALID_ESSAY_TEXT], 'valid_essay.txt', { type: 'text/plain' });
+  fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [txtFile] } });
+  expect(await screen.findByText('valid_essay.txt')).toBeVisible();
+  expect(screen.getByText(/Tệp văn bản \(\.TXT\)/)).toBeVisible();
+});
+
+it('rejects tiny binary files smaller than 1KB (FE-102)', async () => {
+  const { container } = await setup();
+  const tinyFile = new File(['abc'], 'tiny.pdf', { type: 'application/pdf' });
+  fireEvent.drop(container.querySelector('.writing-dropzone')!, { dataTransfer: { files: [tinyFile] } });
+  expect(await screen.findByText(/Tệp bài viết có dung lượng quá nhỏ/)).toBeVisible();
+  expect(screen.queryByText('tiny.pdf')).not.toBeInTheDocument();
 });
 
 describe('FE-94: Rich Text Toolbar and Editor Formatting', () => {

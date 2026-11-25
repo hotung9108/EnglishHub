@@ -202,7 +202,7 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
 
   if (externalLoading) {
     return (
-      <div className={`flex items-center gap-2 py-3 px-4 border border-outline-variant rounded-lg bg-surface ${className}`}>
+      <div className={`flex items-center gap-2 py-3 px-4 border border-outline-variant rounded-xl bg-surface ${className}`}>
         <Loader2 size={18} className="animate-spin text-primary" />
         <span className="text-sm text-on-surface-variant">
           {isVi ? 'Đang tải danh sách giảng viên...' : 'Loading teachers...'}
@@ -212,29 +212,29 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
   }
 
   return (
-    <div className={`relative ${className}`} ref={wrapperRef}>
+    <div className={`tp-wrapper ${className}`} ref={wrapperRef}>
       {/* Selected Teacher Display Card */}
       {selectedTeacher ? (
-        <div className="flex items-center justify-between p-3 border border-primary-fixed-dim bg-primary-light/40 rounded-xl transition-all">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-primary text-white font-bold flex items-center justify-center text-sm shadow-sm flex-shrink-0">
+        <div className="tp-selected-card">
+          <div className="tp-selected-info">
+            <div className="tp-avatar">
               {getInitials(selectedTeacher.fullName)}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-on-surface text-sm truncate">{selectedTeacher.fullName}</span>
-                <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary font-semibold flex-shrink-0">
+              <div className="tp-name-row">
+                <span className="tp-name truncate">{selectedTeacher.fullName}</span>
+                <span className="tp-code-badge flex-shrink-0">
                   GV-{String(selectedTeacher.id).padStart(3, '0')}
                 </span>
               </div>
-              <div className="text-xs text-on-surface-variant truncate">{selectedTeacher.email}</div>
+              <div className="tp-email truncate">{selectedTeacher.email}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <div className="tp-action-group">
             <button
               type="button"
               disabled={disabled}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-outline-variant hover:bg-surface text-on-surface transition-colors disabled:opacity-50"
+              className="tp-change-btn"
               onClick={handleToggleOpen}
             >
               {isVi ? 'Đổi giáo viên' : 'Change'}
@@ -242,7 +242,7 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
             <button
               type="button"
               disabled={disabled}
-              className="p-1.5 rounded-lg hover:bg-error/10 text-on-surface-variant hover:text-error transition-colors disabled:opacity-50"
+              className="tp-clear-btn"
               onClick={() => {
                 onSelectTeacher(null);
                 setResolvedTeacher(null);
@@ -259,28 +259,28 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
         <button
           type="button"
           disabled={disabled}
-          className="w-full flex items-center justify-between px-3.5 py-2.5 border border-outline-variant rounded-xl bg-surface hover:border-primary text-left text-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+          className="tp-trigger-btn"
           onClick={handleToggleOpen}
         >
-          <div className="flex items-center gap-2.5 text-on-surface-variant truncate">
-            <Search size={16} className="flex-shrink-0" />
+          <div className="flex items-center gap-2.5 truncate">
+            <Search size={16} className="flex-shrink-0 text-secondary" />
             <span className="truncate">
               {placeholder || (isVi ? '-- Tìm và chọn Giảng viên phụ trách --' : '-- Search & Select Instructor --')}
             </span>
           </div>
-          <ChevronDown size={16} className={`text-on-surface-variant transition-transform flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown size={16} className={`text-secondary transition-transform flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
         </button>
       )}
 
       {/* Dropdown Menu with Live Search and Pagination */}
       {isOpen && !disabled && (
-        <div className="absolute z-30 left-0 right-0 mt-1.5 bg-surface border border-outline-variant rounded-xl shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95">
-          <div className="p-2.5 border-b border-outline-variant bg-surface-low">
+        <div className="tp-dropdown">
+          <div className="tp-search-box">
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+              <Search size={15} className="tp-search-icon" />
               <input
                 type="text"
-                className="w-full pl-9 pr-8 py-1.5 text-sm bg-surface border border-outline-variant rounded-lg focus:outline-none focus:border-primary text-on-surface"
+                className="tp-search-input"
                 placeholder={isVi ? 'Tìm theo tên, email hoặc mã GV...' : 'Search by name, email or code...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -291,7 +291,7 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
               ) : searchQuery ? (
                 <button
                   type="button"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-secondary hover:text-primary cursor-pointer border-none bg-transparent"
                   onClick={() => setSearchQuery('')}
                 >
                   <X size={14} />
@@ -300,14 +300,14 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
             </div>
           </div>
 
-          <div className="max-h-60 overflow-y-auto py-1">
+          <div className="tp-item-list">
             {isSearching && activeTeachers.length === 0 ? (
-              <div className="py-6 flex flex-col items-center justify-center gap-2 text-sm text-on-surface-variant">
+              <div className="py-6 flex flex-col items-center justify-center gap-2 text-sm text-secondary">
                 <Loader2 size={20} className="animate-spin text-primary" />
                 <span>{isVi ? 'Đang tìm kiếm giảng viên...' : 'Searching instructors...'}</span>
               </div>
             ) : activeTeachers.length === 0 ? (
-              <div className="py-6 text-center text-sm text-on-surface-variant">
+              <div className="py-6 text-center text-sm text-secondary">
                 {isVi ? 'Không tìm thấy giảng viên nào phù hợp' : 'No instructors found'}
               </div>
             ) : (
@@ -316,9 +316,7 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
                 return (
                   <div
                     key={tc.id}
-                    className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer hover:bg-surface-hover transition-colors ${
-                      isSelected ? 'bg-primary-light/40 font-semibold' : ''
-                    }`}
+                    className={`tp-item ${isSelected ? 'selected' : ''}`}
                     onClick={() => {
                       onSelectTeacher(tc);
                       setResolvedTeacher(tc);
@@ -327,17 +325,17 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
                     }}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs flex-shrink-0">
+                      <div className="tp-item-avatar">
                         {getInitials(tc.fullName)}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm text-on-surface font-medium truncate">{tc.fullName}</span>
-                          <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-surface-low text-on-surface-variant flex-shrink-0">
+                          <span className="text-sm font-semibold truncate text-primary-dark">{tc.fullName}</span>
+                          <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-surface-dim text-secondary flex-shrink-0">
                             GV-{String(tc.id).padStart(3, '0')}
                           </span>
                         </div>
-                        <div className="text-xs text-on-surface-variant truncate">{tc.email}</div>
+                        <div className="text-xs text-secondary truncate">{tc.email}</div>
                       </div>
                     </div>
                     {isSelected && (
@@ -353,12 +351,12 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
 
           {/* Pagination / Load More Footer */}
           {hasMore && (
-            <div className="p-2 border-t border-outline-variant bg-surface-low text-center">
+            <div className="tp-item-footer">
               <button
                 type="button"
                 disabled={isLoadingMore}
                 onClick={handleLoadMore}
-                className="text-xs font-semibold text-primary hover:underline flex items-center justify-center gap-1.5 w-full py-1 disabled:opacity-50"
+                className="text-xs font-semibold text-primary hover:underline flex items-center justify-center gap-1.5 w-full py-1 border-none bg-transparent cursor-pointer disabled:opacity-50"
               >
                 {isLoadingMore && <Loader2 size={13} className="animate-spin" />}
                 <span>
@@ -372,7 +370,7 @@ export const TeacherPicker: React.FC<TeacherPickerProps> = ({
 
           {/* Total Count Info */}
           {totalCount > 0 && (
-            <div className="px-3 py-1.5 border-t border-outline-variant bg-surface-low text-[11px] text-on-surface-variant text-center">
+            <div className="tp-item-footer">
               {isVi
                 ? `Hiển thị ${activeTeachers.length}/${totalCount} giảng viên`
                 : `Showing ${activeTeachers.length}/${totalCount} instructors`}

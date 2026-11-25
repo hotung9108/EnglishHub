@@ -166,7 +166,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
         let statusMatches = rawStatus.includes(q);
         if (item.status === 'COMPLETED' && (q.includes('hoàn tất') || q.includes('hoàn thành') || q.includes('xong') || q.includes('complete'))) {
           statusMatches = true;
-        } else if (item.status === 'AI_GRADED' && (q.includes('ai') || q.includes('máy chấm') || q.includes('tự động'))) {
+        } else if (item.status === 'AI_GRADED' && (q.includes('ai') || q.includes('máy chấm') || q.includes('tự động') || q.includes('đánh giá tự động') || q.includes('auto'))) {
           statusMatches = true;
         } else if (item.status === 'PENDING' && (q.includes('chờ') || q.includes('duyệt') || q.includes('pend'))) {
           statusMatches = true;
@@ -247,7 +247,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
       case 'COMPLETED':
         return <span className="badge badge-active">{isVi ? 'Đã hoàn thành' : 'Completed'}</span>;
       case 'AI_GRADED':
-        return <span className="badge badge-secondary">{isVi ? 'AI Đã Chấm' : 'AI Graded'}</span>;
+        return <span className="badge badge-secondary">{isVi ? 'Đánh giá tự động' : 'Automated Evaluation'}</span>;
       case 'PENDING':
         return <span className="badge badge-onleave">{isVi ? 'Đang chờ duyệt' : 'Pending'}</span>;
       case 'FAILED':
@@ -320,7 +320,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
             className={`adm-pill ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
             onClick={() => handleStatusFilterChange('AI_GRADED')}
           >
-            <span>{isVi ? 'AI Đã chấm' : 'AI Graded'}</span>
+            <span>{isVi ? 'Đánh giá tự động' : 'Automated Evaluation'}</span>
             <span className="adm-pill-badge">{countAiGraded}</span>
           </button>
           <button
@@ -591,7 +591,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
                   {gradingDetail.aiFeedback && (
                     <div className="card adm-ai-feedback-card">
                       <div className="adm-ai-feedback-title">
-                        {isVi ? 'Nhận xét từ AI Engine' : 'AI Engine Feedback'}
+                        {isVi ? 'Nhận xét từ hệ thống đánh giá tự động' : 'Automated Evaluation Feedback'}
                       </div>
                       <div className="text-[13px] leading-relaxed">
                         {gradingDetail.aiFeedback}

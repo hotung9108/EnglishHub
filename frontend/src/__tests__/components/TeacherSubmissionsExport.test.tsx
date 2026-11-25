@@ -3,6 +3,8 @@ import {
   escapeCsv, 
   generateSubmissionsCsvContent, 
   exportSubmissionsToCsv, 
+  generateSubmissionsXlsxBlob,
+  exportSubmissionsToExcel,
   type EnrolledStudentSubmissionData 
 } from '../../utils/submissionExport.utils';
 
@@ -102,6 +104,50 @@ describe('FE-83: Teacher Submissions Export (Excel / CSV)', () => {
       exportSubmissionsToCsv({
         assignmentId: 42,
         assignmentTitle: 'Test Exam',
+        students: mockStudents,
+        isVi: true
+      });
+
+      expect(createObjectURLSpy).toHaveBeenCalledOnce();
+      expect(clickSpy).toHaveBeenCalledOnce();
+      expect(revokeObjectURLSpy).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('FE-83: exportSubmissionsToExcel (OpenXML .xlsx)', () => {
+    let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
+    let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
+    let clickSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-xlsx-url');
+      revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+      clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('generates a valid OpenXML .xlsx binary Blob', () => {
+      const blob = generateSubmissionsXlsxBlob({
+        assignmentId: 42,
+        assignmentTitle: 'IELTS Writing Task 2 Mock',
+        className: 'IELTS Advanced K2',
+        students: mockStudents,
+        isVi: true
+      });
+
+      expect(blob).toBeInstanceOf(Blob);
+      expect(blob.type).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(blob.size).toBeGreaterThan(1000);
+    });
+
+    it('triggers download with .xlsx extension and correct filename', () => {
+      exportSubmissionsToExcel({
+        assignmentId: 42,
+        assignmentTitle: 'IELTS Writing Task 2 Mock',
+        className: 'IELTS Advanced K2',
         students: mockStudents,
         isVi: true
       });

@@ -481,7 +481,7 @@ it('P3 Teachers aborts old page and page-size queues, ignores late replies, and 
   await findTeacherCard(teacher);
 
   const firstIds = teacherRows.slice(0, 4).map(({ id }) => id);
-  expect(detailRequests()).toEqual(firstIds);
+  await waitFor(() => expect(detailRequests()).toEqual(firstIds));
   await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Items per page' }), '3');
   await userEvent.click(screen.getByRole('button', { name: 'Next page' }));
   expect(screen.queryByRole('heading', { name: teacher.fullName })).not.toBeInTheDocument();
