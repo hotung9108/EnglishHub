@@ -456,9 +456,9 @@ it('P3 Teachers schedules at most four concurrent detail GETs and aborts on unmo
   const card = await findTeacherCard(teacher);
 
   expect(card.getByText('Loading specialization...')).toBeVisible();
-  expect(detailRequests()).toEqual(teacherRows.slice(0, 4).map(({ id }) => id));
+  await waitFor(() => expect(detailRequests()).toEqual(teacherRows.slice(0, 4).map(({ id }) => id)));
   await act(async () => pending[0].resolve({ ...teacher, specialization }));
-  expect(detailRequests()).toEqual(teacherRows.slice(0, 5).map(({ id }) => id));
+  await waitFor(() => expect(detailRequests()).toEqual(teacherRows.slice(0, 5).map(({ id }) => id)));
   expect(card.getByText(specialization)).toBeVisible();
 
   unmount();
