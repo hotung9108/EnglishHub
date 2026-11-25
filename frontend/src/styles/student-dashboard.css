@@ -316,3 +316,28 @@
   font-weight: 600;
 }
 
+@media (max-width: 768px) {
+  .std-dash-card-body {
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  .std-dash-card-header {
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  .std-deadline-item {
+    padding: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    box-sizing: border-box;
+  }
+  .std-deadline-item > div:last-child {
+    width: 100%;
+  }
+  .std-deadline-item > div:last-child .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

@@ -371,31 +371,32 @@ export const ClassDetails: React.FC = () => {
               <div className="adm-kpi-header">
                 <div>
                   <div className="adm-kpi-label">{isVi ? 'GIÁO VIÊN PHỤ TRÁCH' : 'INSTRUCTOR'}</div>
-                  <div className="adm-kpi-value text-lg font-bold mt-1">
+                  <div className="adm-kpi-value text-lg font-bold mt-1 text-primary">
                     {teacherName}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const curId = classDetail?.teacher?.id ? String(classDetail.teacher.id) : (classDetail?.teacherId ? String(classDetail.teacherId) : '');
-                      setQuickTeacherId(curId);
-                      setShowChangeTeacherModal(true);
-                    }}
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-outline-variant hover:bg-surface text-primary transition-colors flex items-center gap-1.5"
-                    title={isVi ? 'Đổi giáo viên phụ trách' : 'Change instructor'}
-                  >
-                    <ArrowRightLeft size={13} />
-                    <span>{isVi ? 'Đổi GV' : 'Change'}</span>
-                  </button>
-                  <div className="adm-kpi-icon adm-kpi-icon-primary">
-                    <Users size={20} />
-                  </div>
+                <div className="adm-kpi-icon adm-kpi-icon-primary">
+                  <Users size={20} />
                 </div>
               </div>
-              <div className="adm-kpi-footer text-on-surface-variant">
-                <span>{classDetail?.description || (isVi ? 'Lịch học tiêu chuẩn' : 'Standard schedule')}</span>
+              <div className="adm-kpi-footer flex items-center justify-between">
+                <span className="text-on-surface-variant truncate mr-2">
+                  {classDetail?.description || (isVi ? 'Lịch học tiêu chuẩn' : 'Standard schedule')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const curId = classDetail?.teacher?.id ? String(classDetail.teacher.id) : (classDetail?.teacherId ? String(classDetail.teacherId) : '');
+                    setQuickTeacherId(curId);
+                    setShowChangeTeacherModal(true);
+                  }}
+                  className="adm-change-teacher-btn"
+                  title={isVi ? 'Đổi giáo viên phụ trách' : 'Change instructor'}
+                  aria-label={isVi ? 'Đổi GV' : 'Change instructor'}
+                >
+                  <ArrowRightLeft size={12} />
+                  <span>{isVi ? 'Đổi GV' : 'Change'}</span>
+                </button>
               </div>
             </div>
 
@@ -548,76 +549,78 @@ export const ClassDetails: React.FC = () => {
 
                     return (
                       <>
-                        <table className="adm-table">
-                          <thead>
-                            <tr>
-                              <th>{isVi ? 'MÃ HV' : 'STUDENT ID'}</th>
-                              <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
-                              <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {paginatedRoster.map(st => {
-                              const studentCode = st.studentCode || `HV-${st.studentId}`;
-                              const initials = st.fullName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
+                        <div className="overflow-x-auto">
+                          <table className="adm-table">
+                            <thead>
+                              <tr>
+                                <th>{isVi ? 'MÃ HV' : 'STUDENT ID'}</th>
+                                <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
+                                <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedRoster.map(st => {
+                                const studentCode = st.studentCode || `HV-${st.studentId}`;
+                                const initials = st.fullName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
 
-                              return (
-                                <tr key={st.memberId}>
-                                  <td className="font-mono font-semibold text-primary">{studentCode}</td>
-                                  <td>
-                                    <div className="adm-cell-user">
-                                      <div className="adm-avatar" style={{ backgroundColor: 'var(--primary)' }}>
-                                        {initials}
+                                return (
+                                  <tr key={st.memberId}>
+                                    <td className="font-mono font-semibold text-primary">{studentCode}</td>
+                                    <td>
+                                      <div className="adm-cell-user">
+                                        <div className="adm-avatar" style={{ backgroundColor: 'var(--primary)' }}>
+                                          {initials}
+                                        </div>
+                                        <div className="adm-avatar-info">
+                                          <div className="adm-avatar-name">{st.fullName}</div>
+                                        </div>
                                       </div>
-                                      <div className="adm-avatar-info">
-                                        <div className="adm-avatar-name">{st.fullName}</div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td style={{ textAlign: 'right' }}>
-                                    <div style={{ display: 'inline-flex', gap: '8px' }}>
-                                      <Button 
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => navigate(`/admin/students/${st.studentId}`, {
-                                          state: {
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                        <Button 
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => navigate(`/admin/students/${st.studentId}`, {
+                                            state: {
+                                              studentId: st.studentId,
+                                              fullName: st.fullName,
+                                              studentCode: st.studentCode,
+                                            }
+                                          })}
+                                        >
+                                          {isVi ? 'Hồ sơ' : 'Profile'}
+                                        </Button>
+                                        <Button 
+                                          variant="secondary"
+                                          size="sm"
+                                          icon={ArrowRightLeft}
+                                          onClick={() => setStudentToTransfer({
                                             studentId: st.studentId,
                                             fullName: st.fullName,
                                             studentCode: st.studentCode,
-                                          }
-                                        })}
-                                      >
-                                        {isVi ? 'Hồ sơ' : 'Profile'}
-                                      </Button>
-                                      <Button 
-                                        variant="secondary"
-                                        size="sm"
-                                        icon={ArrowRightLeft}
-                                        onClick={() => setStudentToTransfer({
-                                          studentId: st.studentId,
-                                          fullName: st.fullName,
-                                          studentCode: st.studentCode,
-                                          currentMemberId: st.memberId
-                                        })}
-                                        title={isVi ? 'Điều chuyển học viên sang lớp khác' : 'Transfer to another class'}
-                                      >
-                                        {isVi ? 'Chuyển lớp' : 'Transfer'}
-                                      </Button>
-                                      <Button 
-                                        variant="secondary"
-                                        size="sm"
-                                        className="text-error"
-                                        icon={Trash2}
-                                        onClick={() => handleRemoveMember(st.memberId, st.fullName)}
-                                        title={isVi ? 'Xóa khỏi lớp' : 'Remove from class'}
-                                      />
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                                            currentMemberId: st.memberId
+                                          })}
+                                          title={isVi ? 'Điều chuyển học viên sang lớp khác' : 'Transfer to another class'}
+                                        >
+                                          {isVi ? 'Chuyển lớp' : 'Transfer'}
+                                        </Button>
+                                        <Button 
+                                          variant="secondary"
+                                          size="sm"
+                                          className="text-error"
+                                          icon={Trash2}
+                                          onClick={() => handleRemoveMember(st.memberId, st.fullName)}
+                                          title={isVi ? 'Xóa khỏi lớp' : 'Remove from class'}
+                                        />
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
 
                         {studentsRoster.length > 0 && (
                           <Pagination
@@ -689,29 +692,31 @@ export const ClassDetails: React.FC = () => {
                   />
                 </div>
               ) : (
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      <th>{isVi ? 'MÃ BÀI' : 'CODE'}</th>
-                      <th>{isVi ? 'TIÊU ĐỀ BÀI TẬP' : 'ASSIGNMENT'}</th>
-                      <th className="text-center">{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {assignments.map(hw => (
-                      <tr key={hw.id}>
-                        <td className="font-mono font-semibold text-primary">HW-{hw.id}</td>
-                        <td className="font-medium">{hw.title}</td>
-                        <td className="text-center">
-                          <StatusBadge 
-                            status={hw.status === 'PUBLISHED' ? 'success' : hw.status === 'CLOSED' ? 'warning' : 'neutral'}
-                            label={hw.status}
-                          />
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>{isVi ? 'MÃ BÀI' : 'CODE'}</th>
+                        <th>{isVi ? 'TIÊU ĐỀ BÀI TẬP' : 'ASSIGNMENT'}</th>
+                        <th className="text-center">{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {assignments.map(hw => (
+                        <tr key={hw.id}>
+                          <td className="font-mono font-semibold text-primary">HW-{hw.id}</td>
+                          <td className="font-medium">{hw.title}</td>
+                          <td className="text-center">
+                            <StatusBadge 
+                              status={hw.status === 'PUBLISHED' ? 'success' : hw.status === 'CLOSED' ? 'warning' : 'neutral'}
+                              label={hw.status}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -908,39 +913,54 @@ export const ClassDetails: React.FC = () => {
             onCancel={() => setStatusModalAction(null)}                                                                                                                                     
           />                                                                                                                                                                                
                                                                                                                                                                                             
-          {/* Modal đổi giáo viên phụ trách (UC008 / Issue #344) */}                                                                                                                        
-          {showChangeTeacherModal && (                                                                                                                                                      
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">                                                           
-              <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant animate-in fade-in zoom-in-95">                                           
-                <div className="flex items-center justify-between mb-4">                                                                                                                    
-                  <h3 className="font-bold text-lg text-on-surface">
-                    {isVi ? 'Thay đổi giáo viên phụ trách' : 'Change Instructor'}
-                  </h3>
+          {/* Modal đổi giáo viên phụ trách (UC008 / Issue #344) */}
+          {showChangeTeacherModal && (
+            <div className="eh-modal-backdrop" onClick={() => setShowChangeTeacherModal(false)} role="dialog" aria-modal="true">
+              <div 
+                className="eh-modal-dialog" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="eh-modal-header">
+                  <div className="eh-modal-header-left">
+                    <div className="eh-modal-header-icon">
+                      <ArrowRightLeft size={18} />
+                    </div>
+                    <div>
+                      <h3 className="eh-modal-title">
+                        {isVi ? 'Thay đổi giáo viên phụ trách' : 'Change Instructor'}
+                      </h3>
+                      <p className="eh-modal-subtitle">
+                        {classDetail?.name || classCode}
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowChangeTeacherModal(false)}
-                    className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-hover hover:text-on-surface transition-colors"
+                    className="eh-modal-close-btn"
                     aria-label={isVi ? 'Đóng' : 'Close'}
                   >
                     <X size={18} />
                   </button>
                 </div>
-                <p className="text-sm text-on-surface-variant mb-4">
-                  {isVi
-                    ? `Chọn giảng viên mới để phụ trách lớp "${classDetail?.name || classCode}".`
-                    : `Select a new instructor to manage class "${classDetail?.name || classCode}".`}
-                </p>
-                <div className="mb-6">
-                  <TeacherPicker
-                    selectedTeacherId={quickTeacherId}
-                    isVi={isVi}
-                    onSelectTeacher={(tc) => {
-                      setQuickTeacher(tc);
-                      setQuickTeacherId(tc ? String(tc.id) : '');
-                    }}
-                  />
+                <div className="eh-modal-body">
+                  <p className="text-sm text-secondary mb-4 leading-relaxed">
+                    {isVi
+                      ? `Chọn giảng viên mới để phụ trách và quản lý lớp "${classDetail?.name || classCode}". Giảng viên sẽ tiếp nhận toàn bộ quyền chấm điểm và theo dõi tiến độ của lớp.`
+                      : `Select a new instructor to manage class "${classDetail?.name || classCode}". The instructor will receive grading and tracking permissions.`}
+                  </p>
+                  <div className="mb-2">
+                    <TeacherPicker
+                      selectedTeacherId={quickTeacherId}
+                      isVi={isVi}
+                      onSelectTeacher={(tc) => {
+                        setQuickTeacher(tc);
+                        setQuickTeacherId(tc ? String(tc.id) : '');
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-3">
+                <div className="eh-modal-footer">
                   <Button
                     variant="secondary"
                     onClick={() => setShowChangeTeacherModal(false)}

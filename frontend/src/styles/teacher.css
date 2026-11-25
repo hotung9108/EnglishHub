@@ -2795,3 +2795,63 @@
   font-weight: 700;
   color: var(--primary, #1b4d3e);
 }
+
+@media (max-width: 768px) {
+  .teacher-container {
+    padding: 12px 14px 48px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .teacher-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .teacher-pills {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    box-sizing: border-box;
+  }
+  .teacher-pills::-webkit-scrollbar {
+    display: none;
+  }
+  .teacher-pill {
+    flex-shrink: 0;
+  }
+  .teacher-filter-bar > div:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 10px;
+  }
+  .teacher-search-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+  .teacher-classes-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .teacher-class-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 16px 14px;
+    overflow-x: hidden;
+  }
+  .teacher-class-meta-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}

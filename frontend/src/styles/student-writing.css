@@ -454,6 +454,59 @@
   color: #047857;
 }
 
+@media (max-width: 768px) {
+  .writing-container {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    padding: 12px 14px 48px;
+    box-sizing: border-box;
+  }
+  .writing-grid {
+    gap: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .writing-card {
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  .writing-toolbar {
+    padding: 6px 8px;
+    gap: 4px;
+    overflow-x: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .writing-editor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .writing-word-counter-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .writing-editor-area {
+    min-height: 240px;
+    padding: 12px;
+    box-sizing: border-box;
+    word-break: break-word;
+  }
+  .writing-submission-actions {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    padding: 12px 14px 16px;
+    z-index: 20;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
 .writing-file-info {
   flex: 1;
   min-width: 0;
