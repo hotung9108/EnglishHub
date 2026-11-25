@@ -44,11 +44,11 @@ const scenarios = [
   { skill: 'READING' as const, Page: StudentAssignmentReading, route: '/student/assignments/reading',
     moduleId: 13, mcqId: 51, shortId: 53, submissionModuleId: 1182,
     prompt: 'What is the opposite of passing an exam?', shortPrompt: 'What do you use to unlock a door?',
-    contents: ['Failing', 'Winning', 'Arriving', 'Borrowing'], nextRoute: '/student/assignments/listening/4' },
+    contents: ['Failing', 'Winning', 'Arriving', 'Borrowing'], nextRoute: '/student/assignments/listening/4', overviewRoute: '/student/assignments/4/overview' },
   { skill: 'LISTENING' as const, Page: StudentAssignmentListening, route: '/student/assignments/listening',
     moduleId: 14, mcqId: 59, shortId: 60, submissionModuleId: 1183,
     prompt: 'Where can students borrow books?', shortPrompt: 'What should you show at an airport before an international flight?',
-    contents: ['At a library', 'At a bakery', 'At an airport gate', 'At a petrol station'], nextRoute: '/student/assignments/writing/4' },
+    contents: ['At a library', 'At a bakery', 'At an airport gate', 'At a petrol station'], nextRoute: '/student/assignments/writing/4', overviewRoute: '/student/assignments/4/overview' },
 ];
 
 function ChangeQuizLanguage() {
@@ -398,7 +398,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     ] }, SIGNAL_OPTIONS);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
     await act(() => vi.advanceTimersByTimeAsync(1200));
-    expect(screen.getByTestId('location')).toHaveTextContent(scenario.nextRoute);
+    expect(screen.getByTestId('location')).toHaveTextContent(scenario.overviewRoute);
   });
 
   it('does not report success or navigate while the module request is pending', async () => {
@@ -420,7 +420,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
       await pending.promise;
     });
     await act(() => vi.advanceTimersByTimeAsync(1200));
-    expect(screen.getByTestId('location')).toHaveTextContent(scenario.nextRoute);
+    expect(screen.getByTestId('location')).toHaveTextContent(scenario.overviewRoute);
   });
 
   it('keeps the existing successful final submit path when this is the only module', async () => {
@@ -616,7 +616,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     expect(submissionService.getSubmission).toHaveBeenLastCalledWith(SUBMISSION_ID, SIGNAL_OPTIONS);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
     await act(() => vi.advanceTimersByTimeAsync(1200));
-    expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/writing/4');
+    expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/4/overview');
   });
 
   it.each([0, 408, 500])('keeps saved answers pending on FINAL %i before commit, then retries only FINAL', async status => {
