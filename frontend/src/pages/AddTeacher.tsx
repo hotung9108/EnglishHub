@@ -33,8 +33,33 @@ export const AddTeacher: React.FC = () => {
     assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState<'invalid' | 'duplicate' | null>(null);
+  const [emailError, setEmailError] = useState<'required' | 'invalid' | 'duplicate' | null>(null);
   const emailInput = useRef<HTMLInputElement>(null);
+
+  const handleNextStep1 = () => {
+    let hasError = false;
+    const res = validateFullName(formData.name, isVi);
+    if (!res.isValid) {
+      setNameError(res.errorMessage || (isVi ? 'Vui lòng nhập họ và tên của giảng viên' : 'Full name is required'));
+      hasError = true;
+    } else {
+      setNameError('');
+    }
+
+    if (!formData.email.trim()) {
+      setEmailError('required');
+      hasError = true;
+    } else if (emailInput.current?.validity.typeMismatch || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setEmailError('invalid');
+      hasError = true;
+    } else if (emailError === 'duplicate') {
+      hasError = true;
+    }
+
+    if (hasError) return;
+    setFormData(prev => ({ ...prev, name: res.normalized }));
+    setCurrentStep(2);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -186,11 +211,15 @@ export const AddTeacher: React.FC = () => {
                       if (nameError) setNameError('');
                     }}
                     onBlur={() => {
-                      const res = validateFullName(formData.name, isVi);
-                      if (!res.isValid) {
-                        setNameError(res.errorMessage || '');
+                      if (!formData.name.trim()) {
+                        setNameError(isVi ? 'Vui lòng nhập họ và tên giảng viên' : 'Full name is required');
                       } else {
-                        setNameError('');
+                        const res = validateFullName(formData.name, isVi);
+                        if (!res.isValid) {
+                          setNameError(res.errorMessage || '');
+                        } else {
+                          setNameError('');
+                        }
                       }
                     }}
                     required
@@ -243,13 +272,32 @@ export const AddTeacher: React.FC = () => {
                       setFormData({ ...formData, email: e.target.value });
                       setEmailError(null);
                     }}
+                    onBlur={() => {
+                      if (!formData.email.trim()) {
+                        setEmailError('required');
+                      } else if (emailInput.current?.validity.typeMismatch || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+                        setEmailError('invalid');
+                      } else {
+                        setEmailError(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleNextStep1();
+                      }
+                    }}
                     aria-invalid={Boolean(emailError)}
                     aria-describedby={emailError ? 'teacher-email-error' : undefined}
                     required
                   />
                   {emailError && (
                     <span id="teacher-email-error" className="adm-form-field-error" role="alert">
-                      {t(emailError === 'duplicate' ? 'addTeacher.emailDuplicate' : 'emailValidation.invalid')}
+                      {emailError === 'duplicate'
+                        ? t('addTeacher.emailDuplicate')
+                        : emailError === 'required'
+                        ? (t('emailValidation.required') || (isVi ? 'Vui lòng nhập địa chỉ email của giảng viên' : 'Email is required'))
+                        : (t('emailValidation.invalid') || (isVi ? 'Email không đúng định dạng.' : 'Enter a valid email address.'))}
                     </span>
                   )}
                 </div>
@@ -269,16 +317,7 @@ export const AddTeacher: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-primary adm-btn-with-icon"
-                    disabled={!formData.name.trim() || !formData.email.trim()}
-                    onClick={() => {
-                      const res = validateFullName(formData.name, isVi);
-                      const invalidEmail = emailInput.current?.validity.typeMismatch;
-                      if (invalidEmail) setEmailError('invalid');
-                      setNameError(res.errorMessage || '');
-                      if (!res.isValid || invalidEmail) return;
-                      setFormData(prev => ({ ...prev, name: res.normalized }));
-                      setCurrentStep(2);
-                    }}
+                    onClick={handleNextStep1}
                   >
                     <span>{t('addTeacher.btnNextStep3')}</span>
                     <ArrowRight size={16} />

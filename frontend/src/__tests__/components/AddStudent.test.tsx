@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { classService } from '../../api/services/class.service';
 import AddStudent from '../../pages/AddStudent';
@@ -26,4 +26,26 @@ it('Issue #340: auto-generates student code STU2026xxxx and locks input to readO
   expect(codeInput).toBeInTheDocument();
   expect(codeInput).toHaveAttribute('readonly');
   expect(codeInput).toBeDisabled();
+});
+
+it('Issue #377: validates email field on blur and blocks next step when email is empty', async () => {
+  renderPage(<AddStudent />, '/admin/students/add', undefined, undefined, 'vi');
+
+  const nameInput = await screen.findByPlaceholderText('Nguyễn Văn A...');
+  const emailInput = screen.getByPlaceholderText('student@center.edu.vn');
+
+  fireEvent.change(nameInput, { target: { value: 'Lê Văn Học Viên' } });
+
+  // Focus and blur email without entering text
+  fireEvent.focus(emailInput);
+  fireEvent.blur(emailInput);
+
+  expect(screen.getByText(/Vui lòng nhập địa chỉ email của học viên/i)).toBeInTheDocument();
+
+  // Click next button
+  const nextBtn = screen.getByRole('button', { name: /Tiếp theo: Ghi danh lớp học/i });
+  fireEvent.click(nextBtn);
+
+  // Still on step 1 with error
+  expect(screen.getByText(/Vui lòng nhập địa chỉ email của học viên/i)).toBeInTheDocument();
 });

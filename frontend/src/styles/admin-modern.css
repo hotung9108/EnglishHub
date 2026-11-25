@@ -3659,6 +3659,70 @@
   background: var(--surface-container-low);
 }
 
+/* === Report No-Data Empty State === */
+.adm-report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.adm-report-empty-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--surface-container-high, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--outline-variant, rgba(0, 0, 0, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary, #1b4d3e);
+  margin-bottom: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.adm-report-empty-date-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  border: 1px solid var(--outline-variant);
+  margin-bottom: 12px;
+}
+
+.adm-report-empty-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.adm-report-empty-desc {
+  font-size: 13.5px;
+  color: var(--on-surface-variant);
+  line-height: 1.55;
+  max-width: 420px;
+  margin: 0 auto 24px;
+}
+
+.adm-report-empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .adm-drawer-metric-val {
   font-size: 20px;
   font-weight: 700;
