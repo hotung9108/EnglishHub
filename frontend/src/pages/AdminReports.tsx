@@ -866,6 +866,21 @@ export const AdminReports: React.FC = () => {
           icon={<BookOpen size={36} />}
           title={t('adminReports.noAssignedWork')}
           description={t('adminReports.noAssignedWorkDescription')}
+          action={
+            (fromDate || toDate) ? (
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <Button variant="secondary" size="sm" onClick={() => handleApplyPreset('30days')}>
+                  {isVi ? 'Xem 30 ngày qua' : 'View Last 30 Days'}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => handleApplyPreset('all')}>
+                  {isVi ? 'Xem toàn thời gian' : 'View All Time'}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={handleResetFilters}>
+                  {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                </Button>
+              </div>
+            ) : undefined
+          }
         />
       )}
 
@@ -876,6 +891,16 @@ export const AdminReports: React.FC = () => {
         </div>
       ) : (
         <div className="adm-table-card">
+          {noAssignedWork && (fromDate || toDate) && (
+            <div className="adm-alert-banner mb-4" role="status">
+              <AlertCircle size={18} className="shrink-0" />
+              <span>
+                {isVi
+                  ? `Không có bài tập hoặc bài nộp nào phát sinh trong khoảng thời gian đã chọn (${fromDate ? 'từ ' + fromDate : ''} ${toDate ? 'đến ' + toDate : ''}). Vui lòng điều chỉnh hoặc mở rộng phạm vi ngày để xem số liệu thống kê.`
+                  : `No assignments or submissions found in the selected date range (${fromDate ? 'from ' + fromDate : ''} ${toDate ? 'to ' + toDate : ''}). Please adjust or expand the date range to view metrics.`}
+              </span>
+            </div>
+          )}
           {tableError ? (
             <div className="adm-alert-error justify-between" role="alert">
               <div className="flex items-center gap-2">
@@ -897,7 +922,7 @@ export const AdminReports: React.FC = () => {
                 title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
                 description={
                   selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
-                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại. Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'No performance data matching the active filters. Try adjusting the date range or selecting another class.')
                     : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
                 }
               />
