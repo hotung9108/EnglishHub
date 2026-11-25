@@ -3,6 +3,7 @@ import { screen, fireEvent, waitFor } from '@testing-library/react';
 import Profile from '../../pages/Profile';
 import { Accounts } from '../../pages/Accounts';
 import StudentClasses from '../../pages/StudentClasses';
+import TeacherClasses from '../../pages/TeacherClasses';
 import { userService } from '../../api/services/user.service';
 import { classService } from '../../api/services/class.service';
 import { submissionService } from '../../api/services/submission.service';
@@ -141,6 +142,21 @@ describe('FE-107 Validation, EmptyStates & Password Match Guard', () => {
       await waitFor(() => {
         expect(
           screen.getByText(/Vui lòng liên hệ Quản trị viên để được phân lớp/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('shows contact Admin message when teacher is not assigned to any classes', async () => {
+      vi.mocked(classService.list).mockResolvedValueOnce({
+        data: [],
+        pagination: { page: 1, limit: 10, total: 0 },
+      });
+
+      renderPage(<TeacherClasses />, '/teacher/classes');
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Vui lòng liên hệ Quản trị viên để được xếp lớp giảng dạy/i)
         ).toBeInTheDocument();
       });
     });

@@ -16,7 +16,7 @@ import {
   getSubmissionFinalScore
 } from '../api/services/submission.service';
 import { Button, EmptyState, Pagination, MetricCard, LoadingState, useToast } from '../components/common';
-import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
+import { exportSubmissionsToExcel } from '../utils/submissionExport.utils';
 
 interface EnrolledStudentSubmissionRow {
   studentId: number;
@@ -162,7 +162,7 @@ export const TeacherAssignmentGrading: React.FC = () => {
         // Fallback to client-side CSV export
       }
 
-      exportSubmissionsToCsv({
+      exportSubmissionsToExcel({
         assignmentId: id,
         assignmentTitle: assignment?.title,
         className,

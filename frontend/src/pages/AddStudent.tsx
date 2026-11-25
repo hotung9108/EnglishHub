@@ -21,9 +21,10 @@ export const AddStudent: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [defaultStudentCode] = useState(() => `STU2026${String(Math.floor(1000 + Math.random() * 9000))}`);
   const [formData, setFormData] = useState({
     name: '',
-    code: '',
+    code: defaultStudentCode,
     email: '',
     phone: '',
     password: '',
@@ -214,11 +215,15 @@ export const AddStudent: React.FC = () => {
                     <label className="adm-form-label">{isVi ? 'Mã định danh (HV Code)' : 'Student ID'}</label>
                     <input 
                       type="text" 
-                      className="input font-mono"
-                      placeholder={isVi ? 'Tự sinh nếu để trống' : 'Auto-generated'}
+                      className="input font-mono opacity-80 cursor-not-allowed bg-surface-variant/40"
+                      placeholder="STU2026xxxx"
                       value={formData.code}
-                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      readOnly
+                      disabled
                     />
+                    <span className="adm-form-field-hint">
+                      {isVi ? 'Mã học viên được hệ thống tự động sinh theo chuẩn STU2026xxxx' : 'Student ID is auto-generated (STU2026xxxx)'}
+                    </span>
                   </div>
 
                   <div className="adm-form-group">
