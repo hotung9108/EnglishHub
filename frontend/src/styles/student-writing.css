@@ -449,6 +449,11 @@
   color: var(--eh-primary-hover, #133D30);
 }
 
+.writing-file-icon.txt {
+  background-color: #ecfdf5;
+  color: #047857;
+}
+
 @media (max-width: 768px) {
   .writing-container {
     width: 100%;
