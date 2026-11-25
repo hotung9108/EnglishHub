@@ -61,6 +61,29 @@ it.each(['vi', 'en'] as const)('báo sai định dạng tại ô Email khi bấm
   expect(screen.getByRole('button', { name: copy.toClass })).toBeVisible();
 });
 
+it('Issue #377: hiển thị lỗi email bắt buộc khi blur hoặc bấm Tiếp với email trống', async () => {
+  renderPage(<AddTeacher />, '/admin/teachers/add', undefined, undefined, 'vi');
+  const nameInput = await screen.findByPlaceholderText('Nguyễn Văn A...');
+  const emailInput = screen.getByLabelText(/Email/);
+
+  fireEvent.change(nameInput, { target: { value: 'Trần Văn Teacher' } });
+
+  // Focus and blur email with empty value
+  fireEvent.focus(emailInput);
+  fireEvent.blur(emailInput);
+
+  expect(await screen.findByText(/Vui lòng nhập/i)).toBeInTheDocument();
+  expect(emailInput).toHaveClass('adm-input-error');
+
+  // Click Next button
+  const nextBtn = screen.getByRole('button', { name: labels.vi.next });
+  fireEvent.click(nextBtn);
+
+  // Still on step 1 with error
+  expect(screen.getByText(/Vui lòng nhập/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: labels.vi.toClass })).not.toBeInTheDocument();
+});
+
 it.each(['vi', 'en'] as const)('quay về bước 1 khi API trả 409, giữ dữ liệu và cho sửa email (%s)', async language => {
   vi.mocked(userService.createUser).mockRejectedValueOnce(new ConflictError('Existing email'));
   const { copy } = await fillFirstStep(language, teacher.email);

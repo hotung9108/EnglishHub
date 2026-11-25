@@ -854,21 +854,6 @@ export const AdminReports: React.FC = () => {
         </div>
       </div>
 
-      {noMatchingClasses && (
-        <EmptyState
-          icon={<BookOpen size={36} />}
-          title={t('adminReports.noMatchingClasses')}
-          description={t('adminReports.noMatchingClassesDescription')}
-        />
-      )}
-      {noAssignedWork && (
-        <EmptyState
-          icon={<BookOpen size={36} />}
-          title={t('adminReports.noAssignedWork')}
-          description={t('adminReports.noAssignedWorkDescription')}
-        />
-      )}
-
       {loading ? (
         <div className="p-8 text-center text-muted">
           <Loader2 size={32} className="animate-spin mx-auto mb-3" />
@@ -890,6 +875,74 @@ export const AdminReports: React.FC = () => {
                 {isVi ? 'Thử lại' : 'Retry'}
               </Button>
             </div>
+          ) : noMatchingClasses ? (
+            <EmptyState
+              icon={<BookOpen size={36} />}
+              title={t('adminReports.noMatchingClasses')}
+              description={t('adminReports.noMatchingClassesDescription')}
+            />
+          ) : noAssignedWork ? (
+            <div className="adm-report-empty">
+              <div className="adm-report-empty-icon-wrap">
+                <Calendar size={28} className="stroke-[1.75]" />
+              </div>
+
+              {(fromDate || toDate) && (
+                <div className="adm-report-empty-date-pill">
+                  <Calendar size={13} className="shrink-0" />
+                  <span>
+                    {fromDate && toDate && fromDate === toDate
+                      ? `${isVi ? 'Ngày' : 'Date'}: ${fromDate}`
+                      : `${fromDate ? `${isVi ? 'Từ' : 'From'} ${fromDate}` : ''} ${toDate ? `${isVi ? 'đến' : 'to'} ${toDate}` : ''}`.trim()}
+                  </span>
+                </div>
+              )}
+
+              <h3 className="adm-report-empty-title">
+                {t('adminReports.noAssignedWork')}
+              </h3>
+
+              {(fromDate || toDate) ? (
+                <p className="adm-report-empty-desc">
+                  {isVi
+                    ? 'Không có bài tập hoặc bài nộp nào phát sinh trong khoảng thời gian đã chọn. Vui lòng điều chỉnh hoặc mở rộng phạm vi ngày để xem số liệu thống kê.'
+                    : 'No assignments or submissions found in the selected date range. Please adjust or expand the date range to view metrics.'}
+                </p>
+              ) : (
+                <p className="adm-report-empty-desc">
+                  {t('adminReports.noAssignedWorkDescription')}
+                </p>
+              )}
+
+              <div className="adm-report-empty-actions">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Calendar}
+                  onClick={() => handleApplyPreset('30days')}
+                >
+                  {isVi ? 'Xem 30 ngày qua' : 'View Last 30 Days'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={BarChart3}
+                  onClick={() => handleApplyPreset('all')}
+                >
+                  {isVi ? 'Xem toàn thời gian' : 'View All Time'}
+                </Button>
+                {(fromDate || toDate) && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={handleResetFilters}
+                  >
+                    {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                  </Button>
+                )}
+              </div>
+            </div>
           ) : filteredClasses.length === 0 ? (
             <div className="flex flex-col items-center">
               <EmptyState
@@ -897,7 +950,7 @@ export const AdminReports: React.FC = () => {
                 title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
                 description={
                   selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
-                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại. Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'No performance data matching the active filters. Try adjusting the date range or selecting another class.')
                     : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
                 }
               />

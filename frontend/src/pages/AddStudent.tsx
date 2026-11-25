@@ -33,6 +33,32 @@ export const AddStudent: React.FC = () => {
     assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState<'required' | 'invalid' | 'duplicate' | null>(null);
+
+  const handleNextStep1 = () => {
+    let hasError = false;
+    const res = validateFullName(formData.name, isVi);
+    if (!res.isValid) {
+      setNameError(res.errorMessage || (isVi ? 'Vui lòng nhập họ và tên của học viên' : 'Full name is required'));
+      hasError = true;
+    } else {
+      setNameError('');
+    }
+
+    if (!formData.email.trim()) {
+      setEmailError('required');
+      hasError = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      setEmailError('invalid');
+      hasError = true;
+    } else if (emailError === 'duplicate') {
+      hasError = true;
+    }
+
+    if (hasError) return;
+    setFormData(prev => ({ ...prev, name: res.normalized }));
+    setCurrentStep(2);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -190,11 +216,15 @@ export const AddStudent: React.FC = () => {
                       if (nameError) setNameError('');
                     }}
                     onBlur={() => {
-                      const res = validateFullName(formData.name, isVi);
-                      if (!res.isValid) {
-                        setNameError(res.errorMessage || '');
+                      if (!formData.name.trim()) {
+                        setNameError(isVi ? 'Vui lòng nhập họ và tên của học viên' : 'Full name is required');
                       } else {
-                        setNameError('');
+                        const res = validateFullName(formData.name, isVi);
+                        if (!res.isValid) {
+                          setNameError(res.errorMessage || '');
+                        } else {
+                          setNameError('');
+                        }
                       }
                     }}
                     required
@@ -242,12 +272,40 @@ export const AddStudent: React.FC = () => {
                     <label className="adm-form-label">Email *</label>
                     <input 
                       type="email" 
-                      className="input"
+                      className={`input ${emailError ? 'adm-input-error' : ''}`}
                       placeholder="student@center.edu.vn"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        setEmailError(null);
+                      }}
+                      onBlur={() => {
+                        if (!formData.email.trim()) {
+                          setEmailError('required');
+                        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+                          setEmailError('invalid');
+                        } else {
+                          setEmailError(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleNextStep1();
+                        }
+                      }}
+                      aria-invalid={Boolean(emailError)}
                       required
                     />
+                    {emailError && (
+                      <span className="adm-form-field-error" role="alert">
+                        {emailError === 'duplicate'
+                          ? (isVi ? 'Email này đã tồn tại trong hệ thống.' : 'This email already exists.')
+                          : emailError === 'required'
+                          ? (isVi ? 'Vui lòng nhập địa chỉ email của học viên' : 'Email is required')
+                          : (isVi ? 'Email không đúng định dạng.' : 'Enter a valid email address.')}
+                      </span>
+                    )}
                   </div>
 
                   <div className="adm-form-group">
@@ -290,17 +348,7 @@ export const AddStudent: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-primary adm-btn-with-icon"
-                    disabled={!formData.name.trim() || !formData.email.trim()}
-                    onClick={() => {
-                      const res = validateFullName(formData.name, isVi);
-                      if (!res.isValid) {
-                        setNameError(res.errorMessage || '');
-                        return;
-                      }
-                      setNameError('');
-                      setFormData(prev => ({ ...prev, name: res.normalized }));
-                      setCurrentStep(2);
-                    }}
+                    onClick={handleNextStep1}
                   >
                     <span>{isVi ? 'Tiếp theo: Ghi danh lớp học' : 'Next: Class Enrollment'}</span>
                     <ArrowRight size={16} />
