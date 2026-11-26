@@ -1,0 +1,229 @@
+name: Release-Official-Images
+
+# Workflow phát hành chính thức (Release Workflow):
+# Tự động hóa việc gắn Semantic Versioning (v1.0.0) cho cả 3 services: Backend, Frontend, AI Service.
+#
+# Triggers:
+# 1. Khi bạn tạo và bấm "Publish release" trên giao diện Web GitHub.
+# 2. Khi push một Git Tag có định dạng v*.*.* (ví dụ: git push origin v1.0.0).
+# 3. Kích hoạt thủ công từ tab Actions (workflow_dispatch).
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Phiên bản release (ví dụ: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/english-hub-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/english-hub-frontend
+  AI_IMAGE: ghcr.io/${{ github.repository_owner }}/english-hub-ai-service
+
+jobs:
+  # ============================================================================
+  # 1. Chuẩn bị metadata và xác định Version Tag
+  # ============================================================================
+  prepare:
+    name: Prepare Release Context
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version_step.outputs.version }}
+      commit_sha: ${{ steps.sha_step.outputs.commit_sha }}
+    steps:
+      - name: Resolve Version Tag
+        id: version_step
+        run: |
+          set -euo pipefail
+          # Lấy tag từ release event, git tag push, hoặc input thủ công
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.version }}"
+          fi
+          echo "Release Version: $TAG"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Commit SHA
+        id: sha_step
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.release.target_commitish }}" ]; then
+            SHA="${{ github.event.release.target_commitish }}"
+          else
+            SHA="${{ github.sha }}"
+          fi
+          echo "Target Commit SHA: $SHA"
+          echo "commit_sha=$SHA" >> "$GITHUB_OUTPUT"
+
+  # ============================================================================
+  # 2. Xử lý Backend Image (Retagging siêu tốc hoặc fallback Build)
+  # ============================================================================
+  release-backend:
+    name: Release Backend Image
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish Backend Image (${{ needs.prepare.outputs.version }})
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SHA: ${{ needs.prepare.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          SOURCE_IMAGE="${{ env.BACKEND_IMAGE }}:$SHA"
+          echo "Kiểm tra image SHA đã build từ luồng CD trước đó: $SOURCE_IMAGE"
+
+          if docker manifest inspect "$SOURCE_IMAGE" > /dev/null 2>&1; then
+            echo "Tìm thấy image SHA trên GHCR! Tiến hành Retagging nhanh trong 5s..."
+            docker buildx imagetools create \
+              --tag "${{ env.BACKEND_IMAGE }}:$VERSION" \
+              --tag "${{ env.BACKEND_IMAGE }}:latest" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-backend:$VERSION" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-backend:latest" \
+              "$SOURCE_IMAGE"
+            echo "Retag Backend hoàn tất thành công!"
+          else
+            echo "Image SHA chưa có trên GHCR. Thực hiện build trực tiếp từ Dockerfile..."
+            docker buildx build \
+              --context ./backend \
+              --file ./backend/Dockerfile \
+              --push \
+              --tag "${{ env.BACKEND_IMAGE }}:$VERSION" \
+              --tag "${{ env.BACKEND_IMAGE }}:latest" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-backend:$VERSION" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-backend:latest" \
+              --cache-from type=gha \
+              --cache-to type=gha,mode=max
+          fi
+
+  # ============================================================================
+  # 3. Xử lý AI Service Image (Retagging siêu tốc hoặc fallback Build)
+  # ============================================================================
+  release-ai-service:
+    name: Release AI Service Image
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish AI Service Image (${{ needs.prepare.outputs.version }})
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SHA: ${{ needs.prepare.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          SOURCE_IMAGE="${{ env.AI_IMAGE }}:$SHA"
+          echo "Kiểm tra image SHA đã build từ luồng CD trước đó: $SOURCE_IMAGE"
+
+          if docker manifest inspect "$SOURCE_IMAGE" > /dev/null 2>&1; then
+            echo "Tìm thấy image SHA trên GHCR! Tiến hành Retagging nhanh trong 5s..."
+            docker buildx imagetools create \
+              --tag "${{ env.AI_IMAGE }}:$VERSION" \
+              --tag "${{ env.AI_IMAGE }}:latest" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-ai:$VERSION" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-ai:latest" \
+              "$SOURCE_IMAGE"
+            echo "Retag AI Service hoàn tất thành công!"
+          else
+            echo "Image SHA chưa có trên GHCR. Thực hiện build trực tiếp từ Dockerfile..."
+            docker buildx build \
+              --context ./ai-service \
+              --file ./ai-service/Dockerfile \
+              --push \
+              --tag "${{ env.AI_IMAGE }}:$VERSION" \
+              --tag "${{ env.AI_IMAGE }}:latest" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-ai:$VERSION" \
+              --tag "ghcr.io/${{ github.repository_owner }}/englishhub-ai:latest"
+          fi
+
+  # ============================================================================
+  # 4. Xử lý Frontend Image (Build Production Stage với Nginx)
+  # ============================================================================
+  release-frontend:
+    name: Build & Release Frontend Image
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Frontend Docker image (${{ needs.prepare.outputs.version }})
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ needs.prepare.outputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ghcr.io/${{ github.repository_owner }}/englishhub-frontend:${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/englishhub-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 5. Tổng kết thông tin Release
+  # ============================================================================
+  summary:
+    name: Release Summary
+    needs: [prepare, release-backend, release-ai-service, release-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Release Summary
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          echo "=========================================================="
+          echo " 🎉 BỘ 3 DOCKER IMAGES ĐÃ PHÁT HÀNH THÀNH CÔNG CHO $VERSION"
+          echo "=========================================================="
+          echo "1. Backend   : ${{ env.BACKEND_IMAGE }}:$VERSION"
+          echo "2. Frontend  : ${{ env.FRONTEND_IMAGE }}:$VERSION"
+          echo "3. AI Service: ${{ env.AI_IMAGE }}:$VERSION"
+          echo "=========================================================="
