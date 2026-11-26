@@ -54,7 +54,7 @@ export const Classes: React.FC = () => {
           return {
             id: c.id,
             name: c.name,
-            code: `ENG-${c.id}`,
+            code: c.code || `ENG-${c.id}`,
             teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
             status,
             level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'

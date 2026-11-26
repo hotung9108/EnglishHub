@@ -13,6 +13,7 @@ export interface TeacherSummary {
 
 export interface ClassSummary {
   id: ClassId;
+  code?: string;
   name: string;
   status: ClassStatus;
   teacherId?: number;
@@ -42,6 +43,7 @@ export type ClassListParams = { status?: ClassStatus; page?: number; limit?: num
 
 export interface CreateClassPayload {
   name: string;
+  code?: string;
   level?: string;
   description?: string;
   startDate?: string;
@@ -51,6 +53,7 @@ export interface CreateClassPayload {
 
 export interface UpdateClassPayload {
   name?: string;
+  code?: string;
   level?: string;
   description?: string;
   endDate?: string;
