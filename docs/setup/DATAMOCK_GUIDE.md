@@ -145,3 +145,34 @@ Không dùng `down -v` trừ khi thực sự muốn xoá volume database local.
 - `DATAMOCK_GUIDE.md` là runbook dùng chung cho team; các file mock entity,
   repository và seeder nằm trong `backend/src/main/java` để ứng dụng có thể
   dùng lại sau này.
+
+## 8. Làm sạch dữ liệu cũ (BE-92)
+
+`database/clean-old-seed-data.sql` dùng với `psql` từ thư mục gốc repo. Chọn
+đúng cụm kiểm thử, xem tận mắt tên DB và chỉ dùng `be92_sandbox` hoặc DB tạm
+được phép (`be92_*_check`, `be92_partial_check_*`, `be92_special_*_check`).
+Guard chỉ nhận biết marker trong tên DB.
+
+```sh
+psql -X -d be92_sandbox -f database/clean-old-seed-data.sql; echo "exit=$?"
+```
+
+Dry-run trả số dòng của 16 bảng. Trước khi xóa, dừng backend local, đóng IDE
+và connection pool, rồi kiểm tra không còn session khác:
+
+```sh
+psql -X -At -d be92_sandbox -c 'SELECT current_database(), count(*) FROM pg_catalog.pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();'
+```
+
+Chỉ khi kết quả là `be92_sandbox|0` và sandbox có thể xóa, chạy:
+
+```sh
+psql -X -d be92_sandbox -v 'BE92_CONFIRM_DELETE=DELETE_BE92_DATA:be92_sandbox' -f database/clean-old-seed-data.sql; echo "exit=$?"
+```
+
+Mã `0` báo thành công. Mã `3` báo bị từ chối hoặc có lỗi SQL. Sau khi xóa
+thành công, 16 bảng không còn dòng, 14 sequence trở về điểm bắt đầu, và
+`flyway_schema_history` giữ nguyên. Không còn tài khoản đăng nhập cho tới
+khi nạp seed Release v1.0.0. MinIO được xử lý riêng. Xem
+[bàn giao BE-92](../../production_artifacts/be_to_tester/BE-92-clean-old-seed-data.md)
+để chạy checklist DevOps và kiểm PH-03.
