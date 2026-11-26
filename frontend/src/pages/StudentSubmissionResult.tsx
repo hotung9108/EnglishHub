@@ -511,6 +511,14 @@ export const StudentSubmissionResult: React.FC = () => {
     return `${scoreVal}/${maxVal}`;
   }, [rawScore, maxScore]);
 
+  const normalizedScore10 = useMemo<string | null>(() => {
+    if (rawScore === null || maxScore === null || !Number.isFinite(rawScore) || !Number.isFinite(maxScore) || maxScore <= 0) {
+      return null;
+    }
+    const score10 = Math.min(10, Math.max(0, (rawScore / maxScore) * 10));
+    return score10.toFixed(1);
+  }, [rawScore, maxScore]);
+
   const isGraded = useMemo<boolean>(() => {
     if (submission?.status === 'GRADED') return true;
     if (activeSubModule?.status === 'GRADED') return true;
@@ -1120,7 +1128,12 @@ export const StudentSubmissionResult: React.FC = () => {
           {/* Main Score Capsule */}
           {displayScore !== null && (
             <div className="result-hero-score-box">
-              <span className="result-score-number">{displayScore}</span>
+              <span className="result-score-number" data-testid="normalized-score-10">
+                {normalizedScore10} <span className="result-score-scale">/ 10.0</span>
+              </span>
+              <span className="result-score-raw" data-testid="raw-score-detail">
+                ({isVi ? 'Điểm thô: ' : 'Raw score: '}{displayScore})
+              </span>
             </div>
           )}
 
