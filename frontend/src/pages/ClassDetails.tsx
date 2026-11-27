@@ -280,7 +280,7 @@ export const ClassDetails: React.FC = () => {
   };
 
   const teacherName = classDetail?.teacher?.fullName || (isVi ? 'Chưa phân công' : 'Unassigned');
-  const classCode = `ENG-${classNumericId}`;
+  const classCode = classDetail?.code || `ENG-${classNumericId}`;
   const maxCapacity = settingsForm.maxCapacity || 25;
   const enrolledCount = studentsRoster.length;
 

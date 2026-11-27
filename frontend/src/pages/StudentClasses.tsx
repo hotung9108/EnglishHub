@@ -93,7 +93,7 @@ const StudentClasses: React.FC = () => {
 
             return {
               id: String(c.id),
-              code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
+              code: c.code || (c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`),
               name: c.name,
               instructorName: 'Giáo viên phụ trách',
               status: isCompleted ? 'completed' : 'active',
