@@ -7,5 +7,6 @@ configure({ asyncUtilTimeout: 4000 });
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.clearAllTimers();
   vi.useRealTimers();
 });

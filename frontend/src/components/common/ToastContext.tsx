@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -25,13 +25,29 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const removeToast = useCallback((id: string) => {
+    const timer = timeoutsRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timeoutsRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const clearAll = useCallback(() => {
+    timeoutsRef.current.forEach((timer) => clearTimeout(timer));
+    timeoutsRef.current.clear();
     setToasts([]);
+  }, []);
+
+  useEffect(() => {
+    const timeouts = timeoutsRef.current;
+    return () => {
+      timeouts.forEach((timer) => clearTimeout(timer));
+      timeouts.clear();
+    };
   }, []);
 
   const showToast = useCallback(
@@ -42,9 +58,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setToasts((prev) => [newItem, ...prev.slice(0, 4)]);
 
       if (duration > 0) {
-        setTimeout(() => {
-          removeToast(id);
+        const timer = setTimeout(() => {
+          timeoutsRef.current.delete(id);
+          if (typeof window !== 'undefined') {
+            removeToast(id);
+          }
         }, duration);
+        timeoutsRef.current.set(id, timer);
       }
 
       return id;
