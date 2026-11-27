@@ -230,7 +230,7 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
                   <span className="badge badge-primary font-mono">{teacherCode}</span>
                   <span className={`badge ${statusClass}`}>
                     {isActive && (isVi ? 'Đang hoạt động' : 'Active')}
-                    {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+                    {isLocked && (isVi ? 'Bị khóa' : 'Locked')}
                     {!canChangeStatus && (
                       <>
                         <span aria-hidden="true">—</span>

@@ -111,7 +111,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
   const statusBadge = (
     <span className={`badge ${statusClass}`}>
       {isActive && (isVi ? 'Hoạt động' : 'Active')}
-      {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+      {isLocked && (isVi ? 'Bị khóa' : 'Locked')}
       {!canChangeStatus && (
         <>
           <span aria-hidden="true">—</span>
