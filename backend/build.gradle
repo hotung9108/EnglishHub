@@ -51,6 +51,8 @@ tasks.named('test') {
 	// so it is disabled here to keep the suite deterministic.
 	systemProperty 'app.cache.enabled', 'false'
 	systemProperty 'spring.cache.type', 'none'
+	// Keep existing tests isolated from automatic default accounts unless explicitly enabled
+	systemProperty 'app.seed.default-accounts.enabled', 'false'
 }
 
 dependencyManagement {

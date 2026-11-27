@@ -19,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 	long countByDeletedFalse();
 
 	boolean existsByEmailIgnoreCase(String email);
+
+	Optional<User> findByEmailIgnoreCase(String email);
 }
