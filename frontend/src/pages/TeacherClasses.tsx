@@ -114,7 +114,7 @@ export const TeacherClasses: React.FC = () => {
 
             return {
               id: String(cls.id),
-              code: `CLASS-${cls.id.toString().padStart(2, '0')}`,
+              code: cls.code || `CLASS-${cls.id.toString().padStart(2, '0')}`,
               name: cls.name,
               teacher: user?.fullName || (isVi ? 'Quý Thầy/Cô' : 'Teacher'),
               room: isVi ? 'Lớp học trực tuyến' : 'Online Classroom',
@@ -432,8 +432,16 @@ export const TeacherClasses: React.FC = () => {
             <div className="col-span-full">
               <EmptyState
                 icon={BookOpen}
-                title={isVi ? 'Không tìm thấy lớp học nào' : 'No classes match your filter'}
-                description={isVi ? 'Vui lòng thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc khác.' : 'Try changing your search query or status filter.'}
+                title={
+                  classes.length === 0
+                    ? (isVi ? 'Chưa có lớp học nào được phân công' : 'No classes assigned yet')
+                    : (isVi ? 'Không tìm thấy lớp học nào' : 'No classes match your filter')
+                }
+                description={
+                  classes.length === 0
+                    ? (isVi ? 'Tài khoản của bạn hiện chưa được phân công lớp học nào. Vui lòng liên hệ Quản trị viên để được xếp lớp giảng dạy.' : 'You have not been assigned to any classes yet. Please contact an Administrator for class assignment.')
+                    : (isVi ? 'Vui lòng thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc khác.' : 'Try changing your search query or status filter.')
+                }
               />
             </div>
           )}

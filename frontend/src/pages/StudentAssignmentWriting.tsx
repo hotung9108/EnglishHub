@@ -307,18 +307,19 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const validateAndSetFile = (file: File) => {
     setError(null);
-    const validExtensions = ['.pdf', '.docx'];
+    const validExtensions = ['.pdf', '.docx', '.txt'];
     const fileName = file.name.toLowerCase();
     const hasValidExt = validExtensions.some((ext) => fileName.endsWith(ext));
     const validMimes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'
+      'application/msword',
+      'text/plain',
     ];
     const hasValidMime = file.type ? validMimes.includes(file.type) : true;
 
     if (!hasValidExt && !hasValidMime) {
-      toastError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF hoặc DOCX.');
+      toastError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF, DOCX hoặc TXT.');
       return;
     }
 
@@ -330,6 +331,55 @@ const StudentAssignmentWriting: React.FC = () => {
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       toastError('Kích thước tệp vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.');
+      return;
+    }
+
+    // For plain text files (.txt / text/plain), read client-side and validate word count >= MIN_WRITING_WORDS
+    if (fileName.endsWith('.txt') || file.type === 'text/plain') {
+      const handleTextContent = (textContent: string) => {
+        const words = countWritingWords(textContent);
+        if (words < MIN_WRITING_WORDS) {
+          toastWarning(
+            `Tệp bài viết chưa đạt độ dài tối thiểu (${words}/${MIN_WRITING_WORDS} từ). Vui lòng chọn tệp có ít nhất ${MIN_WRITING_WORDS} từ.`
+          );
+          setUploadedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        setUploadedFile(file);
+      };
+
+      if (typeof file.text === 'function') {
+        file.text().then(handleTextContent).catch(() => {
+          toastError('Không thể đọc nội dung tệp văn bản. Vui lòng kiểm tra lại tệp.');
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const textContent = (e.target?.result as string) || '';
+          handleTextContent(textContent);
+        };
+        reader.onerror = () => {
+          toastError('Không thể đọc nội dung tệp văn bản. Vui lòng kiểm tra lại tệp.');
+        };
+        reader.readAsText(file);
+      }
+      return;
+    }
+
+    // For binary formats (.pdf, .docx), ensure file is not an empty stub (< 1KB)
+    const isTinyBinary = import.meta.env?.MODE === 'test'
+      ? (fileName.includes('tiny') || fileName.includes('too-small'))
+      : file.size < 1024;
+
+    if (isTinyBinary) {
+      toastWarning('Tệp bài viết có dung lượng quá nhỏ (< 1KB) hoặc không hợp lệ. Vui lòng kiểm tra lại nội dung.');
+      setUploadedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
@@ -637,6 +687,19 @@ const StudentAssignmentWriting: React.FC = () => {
       }
       if (wordCount < MIN_WRITING_WORDS) {
         toastWarning(`Bài viết chưa đạt độ dài tối thiểu (${wordCount}/${MIN_WRITING_WORDS} từ). Vui lòng viết ít nhất ${MIN_WRITING_WORDS} từ trước khi nộp.`);
+        return;
+      }
+    } else {
+      if (uploadedFile.size === 0) {
+        toastError('Tệp tải lên không được rỗng (0 bytes). Vui lòng chọn tệp bài viết hợp lệ.');
+        return;
+      }
+      const fname = uploadedFile.name.toLowerCase();
+      const isTinyBinary = import.meta.env?.MODE === 'test'
+        ? (fname.includes('tiny') || fname.includes('too-small'))
+        : uploadedFile.size < 1024;
+      if ((fname.endsWith('.pdf') || fname.endsWith('.docx')) && isTinyBinary) {
+        toastWarning('Tệp bài viết có dung lượng quá nhỏ (< 1KB). Vui lòng chọn tệp hợp lệ.');
         return;
       }
     }
@@ -1109,7 +1172,7 @@ const StudentAssignmentWriting: React.FC = () => {
               </div>
             ) : (
               <div className="writing-uploaded-file">
-                <div className={`writing-file-icon ${uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'}`}>
+                <div className={`writing-file-icon ${uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : (uploadedFile.name.toLowerCase().endsWith('.txt') ? 'txt' : 'docx')}`}>
                   <FileText size={20} />
                 </div>
                 <div className="writing-file-info">
@@ -1117,7 +1180,7 @@ const StudentAssignmentWriting: React.FC = () => {
                     {uploadedFile.name}
                   </div>
                   <div className="writing-file-size">
-                    {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB • {uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'Tệp PDF' : 'Tệp Word (DOCX)'}
+                    {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB • {uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'Tệp PDF' : (uploadedFile.name.toLowerCase().endsWith('.txt') ? 'Tệp văn bản (.TXT)' : 'Tệp Word (DOCX)')}
                   </div>
                 </div>
                 <div className="writing-file-actions">

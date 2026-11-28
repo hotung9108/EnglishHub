@@ -26,9 +26,10 @@ export const AddClass: React.FC = () => {
   const [nameError, setNameError] = useState(false);
   const [teacherError, setTeacherError] = useState(false);
 
+  const [suggestedClassCode] = useState(() => `ENG-2026-${Math.floor(1000 + Math.random() * 9000)}`);
   const [formData, setFormData] = useState({
     name: '',
-    code: '',
+    code: suggestedClassCode,
     level: 'Trung cấp (B1-B2)',
     room: '',
     startDate: new Date().toISOString().slice(0, 10),
@@ -122,6 +123,7 @@ export const AddClass: React.FC = () => {
 
       await classService.create({
         name: formData.name.trim(),
+        code: formData.code.trim() || undefined,
         level: formData.level,
         description,
         startDate: formData.startDate,
@@ -255,10 +257,13 @@ export const AddClass: React.FC = () => {
                     <input 
                       type="text"
                       className="input font-mono"
-                      placeholder={isVi ? 'Tự động tạo hoặc nhập' : 'Auto-generated or custom'}
+                      placeholder="ENG-2026-XXXX"
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     />
+                    <span className="adm-form-field-hint">
+                      {isVi ? 'Mã lớp gợi ý tự động theo chuẩn ENG-2026-XXXX (có thể chỉnh sửa)' : 'Suggested class code ENG-2026-XXXX (customizable)'}
+                    </span>
                   </div>
 
                   <div className="adm-form-group">

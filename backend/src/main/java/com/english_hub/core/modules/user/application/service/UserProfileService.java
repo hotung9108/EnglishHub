@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.user.application.service;
 
 import com.english_hub.core.common.ApiException;
+import com.english_hub.core.common.utils.PasswordLengthGuard;
 import com.english_hub.core.modules.user.application.command.ChangePasswordCommand;
 import com.english_hub.core.modules.user.application.command.UpdateOwnProfileCommand;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
@@ -74,6 +75,10 @@ public class UserProfileService {
 		}
 		if (!passwordEncoder.matches(request.currentPassword(), currentUser.passwordHash())) {
 			throw ApiException.unauthorized("Mật khẩu hiện tại không chính xác.");
+		}
+		PasswordLengthGuard.validate(request.newPassword());
+		if (passwordEncoder.matches(request.newPassword(), currentUser.passwordHash())) {
+			throw ApiException.badRequest("Mật khẩu mới không được trùng với mật khẩu hiện tại.");
 		}
 		if (!PASSWORD_PATTERN.matcher(request.newPassword()).matches()) {
 			throw ApiException.badRequest("Mật khẩu mới phải từ 8 ký tự, có chữ hoa và chữ số.");

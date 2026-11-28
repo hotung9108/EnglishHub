@@ -120,7 +120,7 @@ describe('AdminGradingAuditLogs (FE-106 / BE-89)', () => {
 
     expect(screen.getByText('GR-102')).toBeVisible();
     expect(screen.getByText('Speaking Mock Test 1')).toBeVisible();
-    expect(screen.getByText('AI Đã Chấm')).toBeVisible();
+    expect(screen.getAllByText('Đánh giá tự động').length).toBeGreaterThanOrEqual(2);
   });
 
   it('filters rows by status segment pills', async () => {
@@ -131,8 +131,8 @@ describe('AdminGradingAuditLogs (FE-106 / BE-89)', () => {
       expect(screen.getByText('GR-101')).toBeVisible();
     });
 
-    // Click on AI Graded pill
-    const aiGradedBtn = screen.getByRole('button', { name: /AI Đã chấm/i });
+    // Click on Automated Evaluation pill
+    const aiGradedBtn = screen.getByRole('button', { name: /Đánh giá tự động/i });
     await user.click(aiGradedBtn);
 
     expect(screen.getByText('GR-102')).toBeVisible();

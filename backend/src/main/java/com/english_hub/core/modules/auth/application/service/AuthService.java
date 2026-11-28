@@ -3,6 +3,7 @@ package com.english_hub.core.modules.auth.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.common.email.EmailService;
+import com.english_hub.core.common.utils.PasswordLengthGuard;
 import com.english_hub.core.modules.auth.application.command.LoginCommand;
 import com.english_hub.core.modules.auth.application.command.LogoutCommand;
 import com.english_hub.core.modules.auth.application.command.RefreshCommand;
@@ -213,7 +214,9 @@ public class AuthService {
 			throw ApiException.forbidden("Tài khoản đã bị khoá.");
 		}
 
-		user.setPasswordHash(passwordEncoder.encode(command.newPassword().trim()));
+		String newPassword = command.newPassword().trim();
+		PasswordLengthGuard.validate(newPassword);
+		user.setPasswordHash(passwordEncoder.encode(newPassword));
 		authUserRepository.save(user);
 
 		int revokedSessions = refreshTokenRepository.revokeAllByUserId(user.getId());

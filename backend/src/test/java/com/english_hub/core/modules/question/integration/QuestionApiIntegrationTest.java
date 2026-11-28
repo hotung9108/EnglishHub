@@ -84,6 +84,9 @@ import tools.jackson.databind.json.JsonMapper;
 class QuestionApiIntegrationTest {
 
 	private static final String NULL_OPTION_MESSAGE = "options không được chứa phần tử null.";
+	private static final int SCORE_TEST_ORDER_INDEX = 2;
+	private static final String MAX_SCORE_ERROR = "Điểm số không được vượt quá 100.00";
+	private static final String MIN_SCORE_ERROR = "score không được âm.";
 
 	private final ObjectMapper objectMapper;
 	private final EntityManager entityManager;
@@ -219,6 +222,140 @@ class QuestionApiIntegrationTest {
 				BigDecimal.ONE,
 				1));
 		questionId = question.getId();
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidQuestionCreateScores")
+	void rejectsInvalidQuestionCreateScoresWithoutCreatingAQuestion(
+			String caseId,
+			String scoreJson,
+			String expectedError) throws Exception {
+		assertRejectedQuestionCreate(caseId, createQuestionScoreBody(scoreJson), expectedError);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidQuestionUpdateScores")
+	void rejectsInvalidQuestionUpdateScoresWithoutChangingTheStoredScore(
+			String caseId,
+			String scoreJson,
+			String expectedError) throws Exception {
+		assertRejectedQuestionUpdate(caseId, updateQuestionScoreBody(scoreJson), expectedError);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("validQuestionScoreMutations")
+	void acceptsQuestionScoreBoundariesAndRestoresFixture(
+			String caseId,
+			boolean create,
+			String scoreJson,
+			String expectedStoredScoreJson) throws Exception {
+		BigDecimal expectedStoredScore = new BigDecimal(expectedStoredScoreJson);
+		if (create) {
+			try {
+				MvcResult response = createQuestion(createQuestionScoreBody(scoreJson));
+				assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(201);
+				assertThat(objectMapper.readTree(response.getResponse().getContentAsString()).path("message").asText())
+						.isEqualTo("Tạo câu hỏi thành công.");
+				assertThat(questionAtScoreTestOrder().getScore()).isEqualByComparingTo(expectedStoredScore);
+			} finally {
+				deleteQuestionAtScoreTestOrder();
+			}
+			return;
+		}
+
+		BigDecimal originalScore = readQuestionScore(questionId);
+		try {
+			MvcResult response = updateQuestion(updateQuestionScoreBody(scoreJson));
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(200);
+			assertThat(objectMapper.readTree(response.getResponse().getContentAsString()).path("message").asText())
+					.isEqualTo("Cập nhật câu hỏi thành công.");
+			assertThat(readQuestionScore(questionId)).isEqualByComparingTo(expectedStoredScore);
+		} finally {
+			restoreQuestionScore(originalScore);
+		}
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nullableQuestionCreateScores")
+	void createUsesDefaultScoreForNullOrMissingScore(String caseId, String scoreJson) throws Exception {
+		String body = scoreJson == null ? createQuestionBodyWithoutScore() : createQuestionScoreBody(scoreJson);
+		try {
+			MvcResult response = createQuestion(body);
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(201);
+			assertThat(questionAtScoreTestOrder().getScore()).isEqualByComparingTo(BigDecimal.ONE);
+		} finally {
+			deleteQuestionAtScoreTestOrder();
+		}
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("nullableQuestionUpdateScores")
+	void updateKeepsStoredScoreForNullOrMissingScore(String caseId, boolean includeNullScore) throws Exception {
+		BigDecimal originalScore = readQuestionScore(questionId);
+		String content = questionRepository.findById(questionId).orElseThrow().getContent();
+		String body = "{\"content\":" + objectMapper.writeValueAsString(content)
+				+ (includeNullScore ? ",\"score\":null}" : "}");
+		try {
+			MvcResult response = updateQuestion(body);
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(200);
+			assertThat(readQuestionScore(questionId)).isEqualByComparingTo(originalScore);
+		} finally {
+			restoreQuestionScore(originalScore);
+		}
+	}
+
+	@Test
+	void nonNumericQuestionCreateScoreUsesTheCommonBadRequestMessage() throws Exception {
+		assertRejectedQuestionCreate(
+				"ED-407-QUESTION-CREATE-NONNUMERIC",
+				createQuestionScoreBody("\"not-a-number\""),
+				"Dữ liệu không hợp lệ.");
+	}
+
+	@Test
+	void nonNumericQuestionUpdateScoreUsesTheCommonBadRequestMessage() throws Exception {
+		assertRejectedQuestionUpdate(
+				"ED-407-QUESTION-UPDATE-NONNUMERIC",
+				updateQuestionScoreBody("\"not-a-number\""),
+				"Dữ liệu không hợp lệ.");
+	}
+
+	@Test
+	void prioritizesScoreWhenCreateAlsoHasInvalidContent() throws Exception {
+		String body = createQuestionScoreBodyWithContent("", "1000");
+		assertRejectedQuestionCreate("ED-407-04", body, MAX_SCORE_ERROR);
+	}
+
+	@Test
+	void preservesTheCommonHandlerMessageWhenOnlyContentIsInvalid() throws Exception {
+		String body = createQuestionScoreBodyWithContent("", "1");
+		assertRejectedQuestionCreate("ED-407-05", body, "content là bắt buộc.");
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("unauthorizedQuestionScoreMutations")
+	void keepsQuestionScoreAuthorizationAndDatabaseState(
+			String caseId,
+			boolean create,
+			UserRole role,
+			int expectedStatus,
+			String expectedError) throws Exception {
+		String authorization = role == null ? null : bearer(studentId, role);
+		if (create) {
+			long countBefore = questionCountForModule();
+			MvcResult response = createQuestion(authorization, createQuestionScoreBody("100"));
+			long countAfter = questionCountForModule();
+			assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(expectedStatus);
+			assertQuestionApiError(response, expectedError);
+			assertThat(countAfter).as(caseId + " must not create a question").isEqualTo(countBefore);
+			return;
+		}
+
+		BigDecimal scoreBefore = readQuestionScore(questionId);
+		MvcResult response = updateQuestion(authorization, updateQuestionScoreBody("100"));
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(expectedStatus);
+		assertQuestionApiError(response, expectedError);
+		assertThat(readQuestionScore(questionId)).isEqualByComparingTo(scoreBefore);
 	}
 
 	@ParameterizedTest
@@ -825,6 +962,189 @@ class QuestionApiIntegrationTest {
 					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	private static Stream<Arguments> invalidQuestionCreateScores() {
+		return Stream.of(
+				Arguments.of("CH-407-03", "1000", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-10001-QUESTION-CREATE", "100.01", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-NEG-QUESTION-CREATE", "-1", MIN_SCORE_ERROR),
+				Arguments.of("ED-407-04", "-1000", MIN_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1000.123", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "100.001", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1E+3", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "999999999999999999999999999999", MAX_SCORE_ERROR));
+	}
+
+	private static Stream<Arguments> invalidQuestionUpdateScores() {
+		return Stream.of(
+				Arguments.of("CH-407-04", "1000", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-10001-QUESTION-UPDATE", "100.01", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-01 / ED-407-NEG-QUESTION-UPDATE", "-1", MIN_SCORE_ERROR),
+				Arguments.of("ED-407-04", "-1000", MIN_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1000.123", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "100.001", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "1E+3", MAX_SCORE_ERROR),
+				Arguments.of("ED-407-04", "999999999999999999999999999999", MAX_SCORE_ERROR));
+	}
+
+	private static Stream<Arguments> validQuestionScoreMutations() {
+		return Stream.of(
+				Arguments.of("PH-407-01 / PH-407-QUESTION-CREATE", true, "100.00", "100.00"),
+				Arguments.of("PH-407-01 / PH-407-QUESTION-UPDATE", false, "100.00", "100.00"),
+				Arguments.of("ED-407-02 / ED-407-QUESTION-CREATE-ZERO", true, "0", "0.00"),
+				Arguments.of("ED-407-02 / ED-407-QUESTION-UPDATE-ZERO", false, "0", "0.00"),
+				Arguments.of("ED-407-03", true, "0.00", "0.00"),
+				Arguments.of("ED-407-03", false, "0.00", "0.00"),
+				Arguments.of("ED-407-03", true, "0.001", "0.00"),
+				Arguments.of("ED-407-03", false, "0.001", "0.00"),
+				Arguments.of("ED-407-03", true, "100", "100.00"),
+				Arguments.of("ED-407-03", false, "100", "100.00"),
+				Arguments.of("ED-407-03", true, "100.0", "100.00"),
+				Arguments.of("ED-407-03", false, "100.0", "100.00"),
+				Arguments.of("ED-407-03", true, "99.99", "99.99"),
+				Arguments.of("ED-407-03", false, "99.99", "99.99"),
+				Arguments.of("ED-407-03", true, "0.01", "0.01"),
+				Arguments.of("ED-407-03", false, "0.01", "0.01"),
+				Arguments.of("ED-407-03", true, "3.333333", "3.33"),
+				Arguments.of("ED-407-03", false, "3.333333", "3.33"),
+				Arguments.of("ED-407-99999-QUESTION-CREATE", true, "99.999", "100.00"),
+				Arguments.of("ED-407-99999-QUESTION-UPDATE", false, "99.999", "100.00"));
+	}
+
+	private static Stream<Arguments> nullableQuestionCreateScores() {
+		return Stream.of(
+				Arguments.of("ED-407-02 / ED-407-QUESTION-CREATE-NULL", "null"),
+				Arguments.of("ED-407-02 / ED-407-QUESTION-CREATE-MISSING", null));
+	}
+
+	private static Stream<Arguments> nullableQuestionUpdateScores() {
+		return Stream.of(
+				Arguments.of("ED-407-02 / ED-407-QUESTION-UPDATE-NULL", true),
+				Arguments.of("ED-407-02 / ED-407-QUESTION-UPDATE-MISSING", false));
+	}
+
+	private static Stream<Arguments> unauthorizedQuestionScoreMutations() {
+		return Stream.of(
+				Arguments.of("ED-AUTH-NO-TOKEN-QUESTION-CREATE", true, (UserRole) null, 401,
+						"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."),
+				Arguments.of("ED-AUTH-NO-TOKEN-QUESTION-UPDATE", false, (UserRole) null, 401,
+						"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."),
+				Arguments.of("ED-AUTH-STUDENT-QUESTION-CREATE", true, UserRole.STUDENT, 403,
+						"Bạn không có quyền thực hiện thao tác này."),
+				Arguments.of("ED-AUTH-STUDENT-QUESTION-UPDATE", false, UserRole.STUDENT, 403,
+						"Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	private void assertRejectedQuestionCreate(String caseId, String body, String expectedError) throws Exception {
+		long countBefore = questionCountForModule();
+		MvcResult response = createQuestion(body);
+		long countAfter = questionCountForModule();
+
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(400);
+		assertQuestionApiError(response, expectedError);
+		assertThat(countAfter).as(caseId + " must not create a question").isEqualTo(countBefore);
+	}
+
+	private void assertRejectedQuestionUpdate(String caseId, String body, String expectedError) throws Exception {
+		BigDecimal scoreBefore = readQuestionScore(questionId);
+		MvcResult response = updateQuestion(body);
+		BigDecimal scoreAfter = readQuestionScore(questionId);
+
+		assertThat(response.getResponse().getStatus()).as(caseId).isEqualTo(400);
+		assertQuestionApiError(response, expectedError);
+		assertThat(scoreAfter).as(caseId + " must preserve score").isEqualByComparingTo(scoreBefore);
+	}
+
+	private void assertQuestionApiError(MvcResult response, String expectedMessage) throws Exception {
+		JsonNode body = objectMapper.readTree(response.getResponse().getContentAsString());
+		assertThat(body.size()).isEqualTo(1);
+		assertThat(body.path("error").asString()).isEqualTo(expectedMessage);
+	}
+
+	private MvcResult createQuestion(String body) throws Exception {
+		return createQuestion(bearer(teacherId, UserRole.TEACHER), body);
+	}
+
+	private MvcResult createQuestion(String authorization, String body) throws Exception {
+		MockHttpServletRequestBuilder request = post("/api/v1/modules/{id}/questions", moduleId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+		if (authorization != null) {
+			request.header("Authorization", authorization);
+		}
+		return mockMvc.perform(request).andReturn();
+	}
+
+	private MvcResult updateQuestion(String body) throws Exception {
+		return updateQuestion(bearer(teacherId, UserRole.TEACHER), body);
+	}
+
+	private MvcResult updateQuestion(String authorization, String body) throws Exception {
+		MockHttpServletRequestBuilder request = put("/api/v1/questions/{id}", questionId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+		if (authorization != null) {
+			request.header("Authorization", authorization);
+		}
+		return mockMvc.perform(request).andReturn();
+	}
+
+	private static String createQuestionScoreBody(String scoreJson) {
+		return createQuestionScoreBodyWithContent("Score validation test", scoreJson);
+	}
+
+	private static String createQuestionScoreBodyWithContent(String content, String scoreJson) {
+		return "{\"content\":\"" + content + "\",\"questionType\":\"SHORT_ANSWER\","
+				+ "\"correctAnswer\":{\"correctAnswer\":\"Answer\"},\"orderIndex\":"
+				+ SCORE_TEST_ORDER_INDEX + ",\"score\":" + scoreJson + "}";
+	}
+
+	private static String createQuestionBodyWithoutScore() {
+		return "{\"content\":\"Score validation test\",\"questionType\":\"SHORT_ANSWER\","
+				+ "\"correctAnswer\":{\"correctAnswer\":\"Answer\"},\"orderIndex\":"
+				+ SCORE_TEST_ORDER_INDEX + "}";
+	}
+
+	private static String updateQuestionScoreBody(String scoreJson) {
+		return "{\"score\":" + scoreJson + "}";
+	}
+
+	private long questionCountForModule() {
+		entityManager.flush();
+		entityManager.clear();
+		return questionRepository.findByModuleIdOrderByOrderIndexAsc(moduleId).size();
+	}
+
+	private BigDecimal readQuestionScore(long id) {
+		entityManager.flush();
+		entityManager.clear();
+		return questionRepository.findById(id).orElseThrow().getScore();
+	}
+
+	private Question questionAtScoreTestOrder() {
+		entityManager.flush();
+		entityManager.clear();
+		return questionRepository.findByModuleIdOrderByOrderIndexAsc(moduleId).stream()
+				.filter(question -> question.getOrderIndex() == SCORE_TEST_ORDER_INDEX)
+				.findFirst()
+				.orElseThrow();
+	}
+
+	private void deleteQuestionAtScoreTestOrder() {
+		entityManager.flush();
+		entityManager.clear();
+		questionRepository.findByModuleIdOrderByOrderIndexAsc(moduleId).stream()
+				.filter(question -> question.getOrderIndex() == SCORE_TEST_ORDER_INDEX)
+				.forEach(question -> questionRepository.deleteById(question.getId()));
+		entityManager.flush();
+		entityManager.clear();
+	}
+
+	private void restoreQuestionScore(BigDecimal score) throws Exception {
+		MvcResult response = updateQuestion(updateQuestionScoreBody(score.toPlainString()));
+		assertThat(response.getResponse().getStatus()).isEqualTo(200);
+		assertThat(readQuestionScore(questionId)).isEqualByComparingTo(score);
 	}
 
 	private static Stream<Arguments> questionReadNotFoundCases() {

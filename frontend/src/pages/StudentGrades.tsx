@@ -249,7 +249,7 @@ export const StudentGrades: React.FC = () => {
           <Skeleton width="280px" height="36px" />
           <Skeleton width="160px" height="36px" />
         </div>
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {[1, 2, 3, 4].map(i => (
             <Skeleton key={i} height="96px" />
           ))}
@@ -293,7 +293,7 @@ export const StudentGrades: React.FC = () => {
       )}
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title={isVi ? 'Điểm TB Tích lũy (Thang 10)' : 'Cumulative Grade (Scale 10)'}
           value={overallAvg !== null && overallAvg > 0 ? `${overallAvg.toFixed(1)} / 10` : '--'}

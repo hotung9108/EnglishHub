@@ -82,6 +82,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -175,6 +178,31 @@ class AssignmentApiIntegrationTest {
 				false,
 				AssignmentStatus.DRAFT));
 		assignmentId = assignment.getId();
+	}
+
+	@Test
+	void assignmentValidationUsesCommonErrorAndDoesNotCreateAnAssignment() throws Exception {
+		List<Long> assignmentIdsBefore = assignmentIdsForClass();
+		String invalidBody = validCreateBody().replace("\"title\":\"New assignment\"", "\"title\":\"\"");
+		MvcResult response = mockMvc.perform(post("/api/v1/classes/{id}/assignments", classId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(invalidBody))
+				.andReturn();
+		List<Long> assignmentIdsAfter = assignmentIdsForClass();
+
+		assertThat(response.getResponse().getStatus()).isEqualTo(400);
+		assertThat(response.getResolvedException()).isInstanceOf(MethodArgumentNotValidException.class);
+		MethodArgumentNotValidException exception =
+				(MethodArgumentNotValidException) response.getResolvedException();
+		assertThat(exception.getBindingResult().getErrorCount()).isEqualTo(1);
+		assertThat(exception.getBindingResult().getFieldError("title").getDefaultMessage())
+				.isEqualTo("Dữ liệu không hợp lệ.");
+
+		JsonNode body = JsonMapper.builder().build().readTree(response.getResponse().getContentAsString());
+		assertThat(body.size()).isEqualTo(1);
+		assertThat(body.path("error").asString()).isEqualTo("Dữ liệu không hợp lệ.");
+		assertThat(assignmentIdsAfter).containsExactlyElementsOf(assignmentIdsBefore);
 	}
 
 	@Test
@@ -1075,6 +1103,16 @@ class AssignmentApiIntegrationTest {
 		return "{\"title\":\"New assignment\",\"description\":\"Instructions\","
 				+ "\"openAt\":\"2026-09-15T00:00:00Z\","
 				+ "\"closeAt\":\"2026-09-20T23:59:00Z\",\"maxSubmissions\":2}";
+	}
+
+	private List<Long> assignmentIdsForClass() {
+		entityManager.flush();
+		entityManager.clear();
+		return assignmentRepository.findAll().stream()
+				.filter(assignment -> classId.equals(assignment.getClassId()))
+				.map(Assignment::getId)
+				.sorted()
+				.toList();
 	}
 
 	private String uniqueSuffix() {

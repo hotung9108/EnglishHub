@@ -54,7 +54,7 @@ export const Classes: React.FC = () => {
           return {
             id: c.id,
             name: c.name,
-            code: `ENG-${c.id}`,
+            code: c.code || `ENG-${c.id}`,
             teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
             status,
             level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'
@@ -234,72 +234,74 @@ export const Classes: React.FC = () => {
         />
       ) : (
         <div className="adm-table-card">
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                <th>{isVi ? 'GIẢNG VIÊN' : 'INSTRUCTOR'}</th>
-                <th>{isVi ? 'TRÌNH ĐỘ' : 'LEVEL'}</th>
-                <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedClasses.map(cls => (
-                <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
-                  <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                  <td className="font-medium text-surface">{cls.name}</td>
-                  <td>{cls.teacher}</td>
-                  <td className="text-muted">{cls.level}</td>
-                  <td>
-                    {cls.status === 'active' 
-                      ? (isVi ? 'Đang mở' : 'Active') 
-                      : cls.status === 'completed' 
-                      ? (isVi ? 'Đã hoàn thành' : 'Completed') 
-                      : (isVi ? 'Đã hủy' : 'Cancelled')}
-                  </td>
-                  <td className="text-right">
-                    <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
-                      <Button 
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/admin/classes/${cls.id}`);
-                        }}
-                      >
-                        {t('adminClasses.viewDetails')}
-                      </Button>
-                      {cls.status === 'active' ? (
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'close' });
-                          }}
-                        >
-                          {isVi ? 'Đóng lớp' : 'Close Class'}
-                        </Button>
-                      ) : cls.status === 'completed' ? (
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'reopen' });
-                          }}
-                        >
-                          {isVi ? 'Mở lại lớp' : 'Reopen Class'}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                  <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                  <th>{isVi ? 'GIẢNG VIÊN' : 'INSTRUCTOR'}</th>
+                  <th>{isVi ? 'TRÌNH ĐỘ' : 'LEVEL'}</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedClasses.map(cls => (
+                  <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
+                    <td className="font-semibold text-primary font-mono">{cls.code}</td>
+                    <td className="font-medium text-surface">{cls.name}</td>
+                    <td>{cls.teacher}</td>
+                    <td className="text-muted">{cls.level}</td>
+                    <td>
+                      {cls.status === 'active' 
+                        ? (isVi ? 'Đang mở' : 'Active') 
+                        : cls.status === 'completed' 
+                        ? (isVi ? 'Đã hoàn thành' : 'Completed') 
+                        : (isVi ? 'Đã hủy' : 'Cancelled')}
+                    </td>
+                    <td className="text-right">
+                      <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/classes/${cls.id}`);
+                          }}
+                        >
+                          {t('adminClasses.viewDetails')}
+                        </Button>
+                        {cls.status === 'active' ? (
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'close' });
+                            }}
+                          >
+                            {isVi ? 'Đóng lớp' : 'Close Class'}
+                          </Button>
+                        ) : cls.status === 'completed' ? (
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'reopen' });
+                            }}
+                          >
+                            {isVi ? 'Mở lại lớp' : 'Reopen Class'}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <Pagination
             currentPage={safeCurrentPage}

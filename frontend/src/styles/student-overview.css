@@ -515,3 +515,44 @@
   cursor: not-allowed;
   transform: none;
 }
+
+@media (max-width: 768px) {
+  .overview-container {
+    padding: 12px 14px 40px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .overview-breadcrumbs {
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .overview-card {
+    padding: 16px 14px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .overview-sections-grid {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .overview-module-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .overview-module-card > div:last-child {
+    width: 100%;
+  }
+  .overview-module-card > div:last-child .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

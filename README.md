@@ -147,13 +147,17 @@ docker compose -f docker-compose.dev.yml up -d postgres
 
 ## 6. Tài khoản thử nghiệm
 
-Hệ thống tích hợp dữ liệu mẫu (Mock Data) phục vụ kiểm thử phân quyền Role-Based Access Control:
+Hệ thống tích hợp sẵn dữ liệu mẫu thực tế trong cơ sở dữ liệu (`appdb`) phục vụ kiểm thử phân quyền Role-Based Access Control (RBAC):
 
-| Vai trò | Email đăng nhập | Mật khẩu | Ghi chú |
-| :--- | :--- | :--- | :--- |
-| Quản trị viên (Admin) | `admin@eh.com` | Bất kỳ | Toàn quyền quản trị hệ thống |
-| Giáo viên (Teacher) | `teacher@eh.com` | Bất kỳ | Tạo bài tập, cấu hình module, chấm bài |
-| Học sinh (Student) | `student@eh.com` | Bất kỳ | Làm bài, nộp bài trắc nghiệm và file ghi âm |
+> **Mật khẩu dùng chung cho toàn bộ tài khoản thử nghiệm**: `Password123!`
+
+| Vai trò | Email đăng nhập | Mật khẩu | Lớp học / Mã SV | Ghi chú & Mục đích sử dụng |
+| :--- | :--- | :--- | :--- | :--- |
+| **Quản trị viên (Admin)** | `admin@englishhub.com` | `Password123!` | Quản trị hệ thống | Quản lý người dùng, phân quyền, xem log kiểm toán (Audit Logs) |
+| **Giáo viên (Teacher)** | `teacher@englishhub.com` | `Password123!` | Giáo viên dùng chung | Tạo bài tập mới, cấu hình module Reading/Listening/Writing/Speaking |
+| **Học sinh (Student)** | `student@englishhub.com` | `Password123!` | SV999999 | Tài khoản học sinh dùng chung |
+
+Chi tiết toàn bộ danh sách tài khoản theo từng lớp và kịch bản sử dụng xem tại [docs/setup/SEED_ACCOUNTS.md](docs/setup/SEED_ACCOUNTS.md).
 
 ---
 

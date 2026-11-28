@@ -93,7 +93,7 @@ const StudentClasses: React.FC = () => {
 
             return {
               id: String(c.id),
-              code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
+              code: c.code || (c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`),
               name: c.name,
               instructorName: 'Giáo viên phụ trách',
               status: isCompleted ? 'completed' : 'active',
@@ -175,7 +175,7 @@ const StudentClasses: React.FC = () => {
     return (
       <div className="std-eco-container pb-48">
         <Skeleton height="36px" width="240px" borderRadius="8px" className="mb-24" />
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[1, 2, 3, 4].map(i => (
             <Skeleton key={i} height="110px" borderRadius="12px" />
           ))}
@@ -213,7 +213,7 @@ const StudentClasses: React.FC = () => {
       )}
 
       {/* 2. Overview Metric Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <MetricCard
           title={isVi ? 'Tất cả lớp học' : 'All Classes'}
           value={counts.all}

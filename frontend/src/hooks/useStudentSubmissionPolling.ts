@@ -32,7 +32,8 @@ export function useStudentSubmissionPolling({
         (m) =>
           m.status === 'GRADED' ||
           m.grading?.status === 'AI_GRADED' ||
-          m.grading?.status === 'COMPLETED'
+          m.grading?.status === 'COMPLETED' ||
+          m.grading?.status === 'FAILED'
       );
     }
     return false;

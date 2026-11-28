@@ -511,6 +511,14 @@ export const StudentSubmissionResult: React.FC = () => {
     return `${scoreVal}/${maxVal}`;
   }, [rawScore, maxScore]);
 
+  const normalizedScore10 = useMemo<string | null>(() => {
+    if (rawScore === null || maxScore === null || !Number.isFinite(rawScore) || !Number.isFinite(maxScore) || maxScore <= 0) {
+      return null;
+    }
+    const score10 = Math.min(10, Math.max(0, (rawScore / maxScore) * 10));
+    return score10.toFixed(1);
+  }, [rawScore, maxScore]);
+
   const isGraded = useMemo<boolean>(() => {
     if (submission?.status === 'GRADED') return true;
     if (activeSubModule?.status === 'GRADED') return true;
@@ -522,6 +530,13 @@ export const StudentSubmissionResult: React.FC = () => {
     return false;
   }, [submission, activeSubModule, moduleDetail, gradingResult, rawScore]);
 
+  const isAiFailed = useMemo<boolean>(() => {
+    return (
+      activeSubModule?.grading?.status === 'FAILED' ||
+      moduleDetail?.grading?.status === 'FAILED'
+    );
+  }, [activeSubModule, moduleDetail]);
+
   // Issue #379: Polling callback to automatically refresh AI grading results without F5
   const handleGradingCompleted = useCallback(async (freshSubmission: SubmissionDetail) => {
     setSubmission(freshSubmission);
@@ -529,7 +544,12 @@ export const StudentSubmissionResult: React.FC = () => {
     if (targetModuleId) {
       await loadModuleData(targetModuleId);
     }
-    showToast(isVi ? 'Đã có kết quả chấm điểm từ AI!' : 'AI grading results are ready!');
+    const hasFailed = freshSubmission.modules?.some((m) => m.grading?.status === 'FAILED');
+    if (hasFailed) {
+      showToast(isVi ? 'Không thể chấm điểm tự động. Giảng viên sẽ chấm bài thủ công.' : 'Automatic grading unavailable. The teacher will grade manually.');
+    } else {
+      showToast(isVi ? 'Đã có kết quả chấm điểm từ AI!' : 'AI grading results are ready!');
+    }
   }, [selectedModuleId, loadModuleData, isVi, showToast]);
 
   useStudentSubmissionPolling({
@@ -1040,14 +1060,22 @@ export const StudentSubmissionResult: React.FC = () => {
 
       {/* Pending Grading Alert */}
       {!isGraded && !isLoading && (
-        <div className="result-alert-pending">
+        <div className={`result-alert-pending ${isAiFailed ? 'result-alert-failed' : ''}`}>
           <Clock size={32} className="result-pending-icon" />
           <div>
             <h3 className="result-pending-title">
-              {t('studentResult.statusPending')} ({submission?.status || 'SUBMITTED'})
+              {isAiFailed
+                ? (isVi ? 'Chờ giảng viên chấm thủ công' : 'Waiting for Teacher Manual Grading')
+                : `${t('studentResult.statusPending')} (${submission?.status || 'SUBMITTED'})`}
             </h3>
             <p className="result-pending-text">
-              Bài nộp của bạn đã được tiếp nhận thành công vào lúc {submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('vi-VN') : 'vừa xong'}. Điểm số và bài chữa chi tiết từ AI và Giảng viên sẽ xuất hiện tại đây ngay khi hoàn tất.
+              {isAiFailed
+                ? (isVi
+                    ? 'Hệ thống không thể tự động chấm bài thi này. Giảng viên phụ trách lớp sẽ chấm điểm và phản hồi trực tiếp cho bạn.'
+                    : 'Automatic grading is unavailable for this task. Your instructor will grade and provide feedback manually.')
+                : (isVi
+                    ? `Bài nộp của bạn đã được tiếp nhận thành công vào lúc ${submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('vi-VN') : 'vừa xong'}. Điểm số và bài chữa chi tiết từ AI và Giảng viên sẽ xuất hiện tại đây ngay khi hoàn tất.`
+                    : `Your submission was received at ${submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('en-US') : 'recently'}. Scores and detailed feedback will appear here once finalized.`)}
             </p>
           </div>
         </div>
@@ -1058,7 +1086,11 @@ export const StudentSubmissionResult: React.FC = () => {
         <div className="result-hero-left">
           <div className="result-badge-row">
             <span className="result-hero-tag">
-              {isGraded ? t('studentResult.statusGraded') : t('studentResult.statusAiGrading')}
+              {isGraded
+                ? t('studentResult.statusGraded')
+                : isAiFailed
+                ? (isVi ? 'Chấm thủ công' : 'Manual Grading')
+                : t('studentResult.statusAiGrading')}
             </span>
 
             {/* Attempt Switcher if multiple attempts exist */}
@@ -1096,7 +1128,12 @@ export const StudentSubmissionResult: React.FC = () => {
           {/* Main Score Capsule */}
           {displayScore !== null && (
             <div className="result-hero-score-box">
-              <span className="result-score-number">{displayScore}</span>
+              <span className="result-score-number" data-testid="normalized-score-10">
+                {normalizedScore10} <span className="result-score-scale">/ 10.0</span>
+              </span>
+              <span className="result-score-raw" data-testid="raw-score-detail">
+                ({isVi ? 'Điểm thô: ' : 'Raw score: '}{displayScore})
+              </span>
             </div>
           )}
 

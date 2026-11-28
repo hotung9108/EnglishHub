@@ -119,73 +119,75 @@ export const Roles: React.FC = () => {
           </div>
         </div>
 
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th className="w-[38%]">{t('roles.colModule')}</th>
-              <th className="text-center w-[15%]">{t('roles.colRead')}</th>
-              <th className="text-center w-[15%]">{t('roles.colWrite')}</th>
-              <th className="text-center w-[15%]">{t('roles.colApprove')}</th>
-              <th className="text-center w-[17%]">{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {permissions[activeRole].map((mod) => (
-              <tr key={mod.id}>
-                <td>
-                  <div className="flex flex-col gap-[3px]">
-                    <span className="font-semibold text-sm text-on-surface">{mod.module}</span>
-                    <span className="text-[12.5px] text-on-surface-variant">{mod.description}</span>
-                  </div>
-                </td>
-
-                {/* Read Badge */}
-                <td className="text-center">
-                  {mod.read ? (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
-                      <Check size={15} />
-                    </span>
-                  ) : (
-                    <span className="text-muted text-sm font-semibold">—</span>
-                  )}
-                </td>
-
-                {/* Write Badge */}
-                <td className="text-center">
-                  {mod.write ? (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
-                      <Check size={15} />
-                    </span>
-                  ) : (
-                    <span className="text-muted text-sm font-semibold">—</span>
-                  )}
-                </td>
-
-                {/* Approve Badge */}
-                <td className="text-center">
-                  {mod.approve ? (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
-                      <Check size={15} />
-                    </span>
-                  ) : (
-                    <span className="text-muted text-sm font-semibold">—</span>
-                  )}
-                </td>
-
-                {/* Export Badge */}
-                <td className="text-center">
-                  {mod.export ? (
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
-                      <Check size={15} />
-                    </span>
-                  ) : (
-                    <span className="text-muted text-sm font-semibold">—</span>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th className="w-[38%]">{t('roles.colModule')}</th>
+                <th className="text-center w-[15%]">{t('roles.colRead')}</th>
+                <th className="text-center w-[15%]">{t('roles.colWrite')}</th>
+                <th className="text-center w-[15%]">{t('roles.colApprove')}</th>
+                <th className="text-center w-[17%]">{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {permissions[activeRole].map((mod) => (
+                <tr key={mod.id}>
+                  <td>
+                    <div className="flex flex-col gap-[3px]">
+                      <span className="font-semibold text-sm text-on-surface">{mod.module}</span>
+                      <span className="text-[12.5px] text-on-surface-variant">{mod.description}</span>
+                    </div>
+                  </td>
+
+                  {/* Read Badge */}
+                  <td className="text-center">
+                    {mod.read ? (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                        <Check size={15} />
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm font-semibold">—</span>
+                    )}
+                  </td>
+
+                  {/* Write Badge */}
+                  <td className="text-center">
+                    {mod.write ? (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                        <Check size={15} />
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm font-semibold">—</span>
+                    )}
+                  </td>
+
+                  {/* Approve Badge */}
+                  <td className="text-center">
+                    {mod.approve ? (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                        <Check size={15} />
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm font-semibold">—</span>
+                    )}
+                  </td>
+
+                  {/* Export Badge */}
+                  <td className="text-center">
+                    {mod.export ? (
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                        <Check size={15} />
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm font-semibold">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <div className="adm-table-card-footer">
           {t('roles.note')}

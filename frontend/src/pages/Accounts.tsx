@@ -145,7 +145,10 @@ export const Accounts: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) {
+      setNameError(isVi ? 'Vui lòng nhập họ và tên.' : 'Please enter full name.');
+      return;
+    }
     if (!editingUser && !formData.email.trim()) {
       setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
       return;
@@ -381,92 +384,94 @@ export const Accounts: React.FC = () => {
           />
         ) : (
           <>
-            <table className="adm-table">
-              <thead>
-                <tr>
-                  <th>{t('accounts.colIdAvatar')}</th>
-                  <th>{t('accounts.colEmailPhone')}</th>
-                  <th>{t('accounts.colRole')}</th>
-                  <th>{t('accounts.colStatus')}</th>
-                  <th className="text-right">{t('accounts.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedUsers.map(user => {
-                  const code = formatUserCode(user.id, user.role);
-                  const initials = getAvatarInitials(user.fullName);
-                  const isActive = user.status === 'ACTIVE';
+            <div className="overflow-x-auto">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>{t('accounts.colIdAvatar')}</th>
+                    <th>{t('accounts.colEmailPhone')}</th>
+                    <th>{t('accounts.colRole')}</th>
+                    <th>{t('accounts.colStatus')}</th>
+                    <th className="text-right">{t('accounts.colActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedUsers.map(user => {
+                    const code = formatUserCode(user.id, user.role);
+                    const initials = getAvatarInitials(user.fullName);
+                    const isActive = user.status === 'ACTIVE';
 
-                  return (
-                    <tr key={user.id}>
-                      <td>
-                        <div className="adm-cell-user">
-                          <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
-                            {initials}
-                            <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <div className="adm-cell-user">
+                            <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
+                              {initials}
+                              <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
+                            </div>
+                            <div className="adm-avatar-info">
+                              <div className="adm-avatar-name">{user.fullName}</div>
+                              <div className="adm-avatar-meta font-mono">{code}</div>
+                            </div>
                           </div>
-                          <div className="adm-avatar-info">
-                            <div className="adm-avatar-name">{user.fullName}</div>
-                            <div className="adm-avatar-meta font-mono">{code}</div>
+                        </td>
+                        <td>
+                          <div className="flex flex-col gap-0">
+                            <span className="text-sm text-surface">{user.email}</span>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="flex flex-col gap-0">
-                          <span className="text-sm text-surface">{user.email}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
-                          {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                        </span>
-                      </td>
-                      <td className="text-right">
-                        <div className="inline-flex gap-2">
-                          <Button 
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleOpenEditDrawer(user)}
-                            title={t('accounts.actionEdit')}
-                            icon={<Edit3 size={14} />}
-                          />
-                          <Button 
-                            variant="secondary"
-                            size="sm"
-                            disabled={currentUser?.id === user.id}
-                            onClick={() => {
-                              if (currentUser?.id === user.id) {
-                                toastError(isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.' : 'Please use your personal profile to change your own password.');
-                                return;
-                              }
-                              setResetPasswordUser(user);
-                            }}
-                            title={currentUser?.id === user.id 
-                              ? (isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình' : 'Please use your personal profile to change your password')
-                              : t('accounts.actionResetPassword')}
-                            aria-label={t('accounts.actionResetPassword')}
-                            icon={<Key size={14} />}
-                          />
-                          <Button 
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setStatusModalUser(user)}
-                            title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
-                            className={isActive ? 'text-error' : 'text-success'}
-                            icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td>
+                          <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
+                            {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          <div className="inline-flex gap-2">
+                            <Button 
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOpenEditDrawer(user)}
+                              title={t('accounts.actionEdit')}
+                              icon={<Edit3 size={14} />}
+                            />
+                            <Button 
+                              variant="secondary"
+                              size="sm"
+                              disabled={currentUser?.id === user.id}
+                              onClick={() => {
+                                if (currentUser?.id === user.id) {
+                                  toastError(isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.' : 'Please use your personal profile to change your own password.');
+                                  return;
+                                }
+                                setResetPasswordUser(user);
+                              }}
+                              title={currentUser?.id === user.id 
+                                ? (isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình' : 'Please use your personal profile to change your password')
+                                : t('accounts.actionResetPassword')}
+                              aria-label={t('accounts.actionResetPassword')}
+                              icon={<Key size={14} />}
+                            />
+                            <Button 
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setStatusModalUser(user)}
+                              title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
+                              className={isActive ? 'text-error' : 'text-success'}
+                              icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
             <Pagination
               currentPage={pagination.page}
@@ -503,7 +508,7 @@ export const Accounts: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} className="flex flex-col flex-1">
+            <form onSubmit={handleSaveUser} className="flex flex-col flex-1" noValidate>
               <div className="adm-drawer-body">
                 {actionError && (
                   <div className="adm-alert-error">

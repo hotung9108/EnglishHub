@@ -230,7 +230,7 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
                   <span className="badge badge-primary font-mono">{teacherCode}</span>
                   <span className={`badge ${statusClass}`}>
                     {isActive && (isVi ? 'Đang hoạt động' : 'Active')}
-                    {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+                    {isLocked && (isVi ? 'Bị khóa' : 'Locked')}
                     {!canChangeStatus && (
                       <>
                         <span aria-hidden="true">—</span>
@@ -348,41 +348,43 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
                   </div>
                 </div>
               ) : (
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                      <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                      <th>{isVi ? 'SĨ SỐ' : 'ENROLLED'}</th>
-                      <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
-                      <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                      <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTION'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teacherClasses.map(cls => (
-                      <tr key={cls.id}>
-                        <td className="font-mono font-semibold text-primary">{cls.code}</td>
-                        <td className="font-medium">{cls.name}</td>
-                        <td>{cls.students}/{cls.maxStudents}</td>
-                        <td className="text-on-surface-variant">{cls.schedule}</td>
-                        <td>
-                          <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                            {cls.status}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button 
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => navigate(`/admin/classes/${cls.id}`)}
-                          >
-                            {isVi ? 'Chi tiết' : 'Details'}
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                        <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                        <th>{isVi ? 'SĨ SỐ' : 'ENROLLED'}</th>
+                        <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
+                        <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                        <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTION'}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {teacherClasses.map(cls => (
+                        <tr key={cls.id}>
+                          <td className="font-mono font-semibold text-primary">{cls.code}</td>
+                          <td className="font-medium">{cls.name}</td>
+                          <td>{cls.students}/{cls.maxStudents}</td>
+                          <td className="text-on-surface-variant">{cls.schedule}</td>
+                          <td>
+                            <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
+                              {cls.status}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button 
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => navigate(`/admin/classes/${cls.id}`)}
+                            >
+                              {isVi ? 'Chi tiết' : 'Details'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

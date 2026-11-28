@@ -16,7 +16,7 @@ import {
   getSubmissionFinalScore
 } from '../api/services/submission.service';
 import { Button, EmptyState, Pagination, MetricCard, LoadingState, useToast } from '../components/common';
-import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
+import { exportSubmissionsToExcel } from '../utils/submissionExport.utils';
 
 interface EnrolledStudentSubmissionRow {
   studentId: number;
@@ -162,7 +162,7 @@ export const TeacherAssignmentGrading: React.FC = () => {
         // Fallback to client-side CSV export
       }
 
-      exportSubmissionsToCsv({
+      exportSubmissionsToExcel({
         assignmentId: id,
         assignmentTitle: assignment?.title,
         className,
@@ -628,30 +628,16 @@ export const TeacherAssignmentGrading: React.FC = () => {
             </div>
           </div>
 
-          {/* Search & Actions */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="teacher-search-wrap">
-              <Search size={15} className="teacher-search-icon" />
-              <input
-                type="text"
-                placeholder={t('assignmentDetails.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="teacher-search-input"
-              />
-            </div>
-
-            <Button 
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={isLoading || isExporting || students.length === 0}
-              loading={isExporting}
-              onClick={handleExportSubmissions}
-              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
-            >
-              {t('assignmentDetails.btnExport')}
-            </Button>
+          {/* Search */}
+          <div className="teacher-search-wrap">
+            <Search size={15} className="teacher-search-icon" />
+            <input
+              type="text"
+              placeholder={t('assignmentDetails.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="teacher-search-input"
+            />
           </div>
         </div>
 

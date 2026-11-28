@@ -2073,5 +2073,21 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
       }));
     });
   });
+
+  it('FE-94: renders student writing answer formatted with bold, italic, and underline markdown', async () => {
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValueOnce({
+      ...moduleDetail,
+      answers: [{ id: 60, questionId: 1, content: { text: '**Daily** *English* <u>practice</u>' } }]
+    });
+
+    renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5');
+
+    const strongEl = await screen.findByText('Daily');
+    expect(strongEl.tagName).toBe('STRONG');
+    const emEl = screen.getByText('English');
+    expect(emEl.tagName).toBe('EM');
+    const uEl = screen.getByText('practice');
+    expect(uEl.tagName).toBe('U');
+  });
 });
 

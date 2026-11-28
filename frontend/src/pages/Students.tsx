@@ -192,75 +192,77 @@ export const Students: React.FC = () => {
           />
         ) : (
           <>
-            <table className="adm-table">
-              <thead>
-                <tr>
-                  <th>{t('students.colId')}</th>
-                  <th>{t('students.colName')}</th>
-                  <th>Email</th>
-                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedStudents.map(st => (
-                  <tr 
-                    key={st.id} 
-                    className="adm-table-row-clickable cursor-pointer"
-                    onClick={() => navigate(`/admin/students/${st.id}`, {
-                      state: {
-                        studentId: st.id,
-                        fullName: st.name,
-                        email: st.email,
-                        studentCode: st.code,
-                      }
-                    })}
-                  >
-                    <td className="font-mono font-semibold text-primary">{st.code}</td>
-                    <td>
-                      <div className="font-semibold text-surface">{st.name}</div>
-                    </td>
-                    <td className="font-mono text-muted">{st.email}</td>
-                    <td>
-                      <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
-                        {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <div className="inline-flex gap-2 justify-end">
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStatusModalStudent(st);
-                          }}
-                        >
-                          {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
-                        </Button>
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/admin/students/${st.id}`, {
-                              state: {
-                                studentId: st.id,
-                                fullName: st.name,
-                                email: st.email,
-                                studentCode: st.code,
-                              }
-                            });
-                          }}
-                        >
-                          {t('students.actionViewDetails')}
-                        </Button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="adm-table">
+                <thead>
+                  <tr>
+                    <th>{t('students.colId')}</th>
+                    <th>{t('students.colName')}</th>
+                    <th>Email</th>
+                    <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                    <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedStudents.map(st => (
+                    <tr 
+                      key={st.id} 
+                      className="adm-table-row-clickable cursor-pointer"
+                      onClick={() => navigate(`/admin/students/${st.id}`, {
+                        state: {
+                          studentId: st.id,
+                          fullName: st.name,
+                          email: st.email,
+                          studentCode: st.code,
+                        }
+                      })}
+                    >
+                      <td className="font-mono font-semibold text-primary">{st.code}</td>
+                      <td>
+                        <div className="font-semibold text-surface">{st.name}</div>
+                      </td>
+                      <td className="font-mono text-muted">{st.email}</td>
+                      <td>
+                        <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
+                          {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <div className="inline-flex gap-2 justify-end">
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStatusModalStudent(st);
+                            }}
+                          >
+                            {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
+                          </Button>
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/students/${st.id}`, {
+                                state: {
+                                  studentId: st.id,
+                                  fullName: st.name,
+                                  email: st.email,
+                                  studentCode: st.code,
+                                }
+                              });
+                            }}
+                          >
+                            {t('students.actionViewDetails')}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <Pagination
               currentPage={pagination.page}
