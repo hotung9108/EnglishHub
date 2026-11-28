@@ -324,7 +324,7 @@ export const Teachers: React.FC = () => {
 
                       <span className={`badge ${statusClass}`}>
                         {isActive && (isVi ? 'Đang hoạt động' : 'Active')}
-                        {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+                        {isLocked && (isVi ? 'Bị khóa' : 'Locked')}
                         {!isActive && !isLocked && (
                           <>
                             <span aria-hidden="true">—</span>

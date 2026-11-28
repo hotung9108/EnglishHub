@@ -210,7 +210,7 @@ it.each(pages)('I3 $name aborts the old ID and ignores its late response', async
 
 const knownStatuses = pages.flatMap(page => [
   { name: page.name, page, language: 'en', activeLabel: 'Active', lockedLabel: 'Locked' },
-  { name: page.name, page, language: 'vi', activeLabel: page.activeVi, lockedLabel: 'Đã khóa' },
+  { name: page.name, page, language: 'vi', activeLabel: page.activeVi, lockedLabel: 'Bị khóa' },
 ]);
 
 it.each(knownStatuses)('S1 $name shows the real ACTIVE and LOCKED badge in $language', async ({ page, language, activeLabel, lockedLabel }) => {
@@ -338,7 +338,7 @@ const teacherLocales = [
     search: 'Search teachers...', save: 'Save Changes',
   },
   {
-    language: 'vi', active: 'Đang hoạt động', locked: 'Đã khóa', unknown: 'Chưa xác định', missing: 'Chưa cập nhật',
+    language: 'vi', active: 'Đang hoạt động', locked: 'Bị khóa', unknown: 'Chưa xác định', missing: 'Chưa cập nhật',
     search: 'Tìm tên giáo viên, mã GV, email...', save: 'Lưu thay đổi',
   },
 ] as const;
@@ -714,7 +714,7 @@ it.each([
     newValue: `${specialization} ${specialization}`, payloadKey: 'specialization',
   },
   {
-    profile: drawerStudent, roleLabel: 'Học viên', statusLabel: 'Đã khóa',
+    profile: drawerStudent, roleLabel: 'Học viên', statusLabel: 'Bị khóa',
     fieldLabel: 'Ngày sinh', otherField: 'Chuyên môn', value: storedBirthDate,
     newValue: '2004-02-29', payloadKey: 'dateOfBirth',
   },
@@ -1182,7 +1182,7 @@ const editPages = [
     edit: 'Sửa', nameLabel: 'Họ và tên', phoneLabel: 'Số điện thoại', detailLabel: 'Ngày sinh',
     title: 'Chỉnh sửa hồ sơ', save: 'Lưu thay đổi', cancel: 'Hủy', stay: 'Tiếp tục chỉnh sửa', discard: 'Bỏ thay đổi',
     confirmTitle: 'Bỏ thay đổi?', loadingLabel: 'Đang tải thông tin học viên...',
-    refreshError: 'Đã lưu, chưa tải lại được hồ sơ', retry: 'Thử lại', locked: 'Đã khóa',
+    refreshError: 'Đã lưu, chưa tải lại được hồ sơ', retry: 'Thử lại', locked: 'Bị khóa',
   },
 ];
 

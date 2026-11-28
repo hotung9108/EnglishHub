@@ -114,7 +114,7 @@ export const TeacherClasses: React.FC = () => {
 
             return {
               id: String(cls.id),
-              code: `CLASS-${cls.id.toString().padStart(2, '0')}`,
+              code: cls.code || `CLASS-${cls.id.toString().padStart(2, '0')}`,
               name: cls.name,
               teacher: user?.fullName || (isVi ? 'Quý Thầy/Cô' : 'Teacher'),
               room: isVi ? 'Lớp học trực tuyến' : 'Online Classroom',

@@ -257,7 +257,7 @@ function DrawerSession({ profile, onClose, onSaved }: DrawerSessionProps) {
 
   const roleLabel = isTeacher ? (isVi ? 'Giáo viên' : 'Teacher') : (isVi ? 'Học viên' : 'Student');
   let statusLabel = '—';
-  if (snapshot.status === 'LOCKED') statusLabel = isVi ? 'Đã khóa' : 'Locked';
+  if (snapshot.status === 'LOCKED') statusLabel = isVi ? 'Bị khóa' : 'Locked';
   if (snapshot.status === 'ACTIVE') statusLabel = isVi ? 'Đang hoạt động' : 'Active';
 
   return (

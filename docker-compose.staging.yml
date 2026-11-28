@@ -19,7 +19,15 @@ services:
     ports:
       - "${BACKEND_PORT:-8082}:${SERVER_PORT:-8082}"
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: dev
+      # Staging khởi tạo cả 3 tài khoản Admin, Teacher, Student
+      APP_SEED_INCLUDE_DEMO_ACCOUNTS: ${APP_SEED_INCLUDE_DEMO_ACCOUNTS:-true}
+      APP_INIT_ADMIN_EMAIL: ${APP_INIT_ADMIN_EMAIL:-admin@englishhub.com}
+      APP_INIT_ADMIN_PASSWORD: ${APP_INIT_ADMIN_PASSWORD:-Password123!}
+      APP_INIT_TEACHER_EMAIL: ${APP_INIT_TEACHER_EMAIL:-teacher@englishhub.com}
+      APP_INIT_TEACHER_PASSWORD: ${APP_INIT_TEACHER_PASSWORD:-Password123!}
+      APP_INIT_STUDENT_EMAIL: ${APP_INIT_STUDENT_EMAIL:-student@englishhub.com}
+      APP_INIT_STUDENT_PASSWORD: ${APP_INIT_STUDENT_PASSWORD:-Password123!}
       # Kết nối trực tiếp tới Neon PostgreSQL Serverless (bắt buộc sslmode=require)
       SPRING_DATASOURCE_URL: ${DB_URL:?Database connection URL (DB_URL) is required}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:?Database username (DB_USER) is required}

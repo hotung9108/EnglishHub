@@ -123,6 +123,7 @@ export const AddClass: React.FC = () => {
 
       await classService.create({
         name: formData.name.trim(),
+        code: formData.code.trim() || undefined,
         level: formData.level,
         description,
         startDate: formData.startDate,
